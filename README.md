@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # trackermobitra
 
 A new Flutter project.
@@ -14,3 +15,6 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# gps-frontend
+>>>>>>> 6a986772d6f51f869d4ae29242566c83d6083b23
