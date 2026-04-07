@@ -1,0 +1,13 @@
+<!-- Tambahkan permission berikut di dalam tag <manifest> di file:
+     android/app/src/main/AndroidManifest.xml -->
+
+<!-- WAJIB untuk GPS tracking -->
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+<!-- Untuk GPS background (saat app diminimize - opsional) -->
+<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+<!-- Untuk koneksi internet (load peta OpenStreetMap) -->
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
