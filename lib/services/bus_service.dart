@@ -185,20 +185,22 @@ class BusService {
     return token != null && token.isNotEmpty;
   }
 
-  /// Versi getGpsDashboard yang juga mengembalikan status code HTTP
-  /// sehingga polling bisa mendeteksi 401 dan berhenti sendiri.
-  Future<({List<BusModel> buses, int statusCode})>
-      getGpsDashboardWithStatus() async {
-    final res = await _api.get('/gps-tracks/dashboard');
-    if (res.statusCode == 401) {
-      return (buses: <BusModel>[], statusCode: 401);
+  /// Parsing response dashboard: backend kirim {'data': {'count': N, 'data': [...]}}
+  /// Ekstrak list bus dari struktur nested tersebut.
+  List<BusModel> _parseDashboardList(Map<String, dynamic> responseData) {
+    // Struktur response: responseData = {'data': {'count': N, 'data': [...]}, ...}
+    final outer = responseData['data'];
+    List? list;
+    if (outer is Map) {
+      // {'data': {'count': N, 'data': [...]}} — struktur normal backend
+      list = outer['data'] as List?;
+    } else if (outer is List) {
+      // Fallback jika backend kirim array langsung
+      list = outer;
     }
-    if (!res.success || res.data == null) {
-      return (buses: <BusModel>[], statusCode: res.statusCode);
-    }
-    final list =
-        res.data!['data']?['data'] as List? ?? res.data!['data'] as List? ?? [];
-    final buses = list.map((e) {
+    list ??= [];
+
+    return list.map((e) {
       final json = e as Map<String, dynamic>;
       // Dashboard mengembalikan driver.name (bukan driver.user.name)
       // Normalisasi agar BusModel.fromJson bisa parsing dengan benar
@@ -222,7 +224,20 @@ class BusService {
         'created_at': DateTime.now().toIso8601String(),
       });
     }).toList();
-    return (buses: buses, statusCode: res.statusCode);
+  }
+
+  /// Versi getGpsDashboard yang juga mengembalikan status code HTTP
+  /// sehingga polling bisa mendeteksi 401 dan berhenti sendiri.
+  Future<({List<BusModel> buses, int statusCode})>
+      getGpsDashboardWithStatus() async {
+    final res = await _api.get('/gps-tracks/dashboard');
+    if (res.statusCode == 401) {
+      return (buses: <BusModel>[], statusCode: 401);
+    }
+    if (!res.success || res.data == null) {
+      return (buses: <BusModel>[], statusCode: res.statusCode);
+    }
+    return (buses: _parseDashboardList(res.data!), statusCode: res.statusCode);
   }
 
   // ── GPS tracking (admin lihat semua bus) ──────────────────
@@ -230,21 +245,7 @@ class BusService {
   Future<List<BusModel>> getGpsDashboard() async {
     final res = await _api.get('/gps-tracks/dashboard');
     if (!res.success || res.data == null) return [];
-    final list =
-        res.data!['data']?['data'] as List? ?? res.data!['data'] as List? ?? [];
-    return list.map((e) {
-      final json = e as Map<String, dynamic>;
-      return BusModel.fromJson({
-        'id': json['bus_id'],
-        'kode_bus': json['bus_code'],
-        'plat_nomor': json['bus_plate'],
-        'status': 'aktif',
-        'gps_status': json['gps_status'],
-        'current_position': json['current_position'],
-        'driver': json['driver'],
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    }).toList();
+    return _parseDashboardList(res.data!);
   }
 
   Future<BusModel?> getBusTracking(int busId) async {

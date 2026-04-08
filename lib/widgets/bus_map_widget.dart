@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/models.dart';
 import '../utils/app_theme.dart';
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 
 class BusMapWidget extends StatefulWidget {
   final List<BusModel> buses;
@@ -54,13 +55,18 @@ class _BusMapWidgetState extends State<BusMapWidget> {
   // [FIX] Bus yang sedang dipilih untuk ditampilkan info-nya
   int? _selectedBusId;
 
+  // Warna rute: orange (bus pertama) dan biru (bus kedua), bergantian
   static const List<Color> _routeColors = [
-    Color(0xFF1976D2), // biru
-    Color(0xFFE53935), // merah
-    Color(0xFF43A047), // hijau
-    Color(0xFFFF8F00), // oranye
-    Color(0xFF8E24AA), // ungu
+    Color(0xFFFF6B00), // orange
+    Color(0xFF1565C0), // biru
+    Color(0xFFFF6B00), // orange (rute ke-3 dst bergantian)
+    Color(0xFF1565C0),
+    Color(0xFFFF6B00),
   ];
+
+  // Menyimpan indeks titik terdekat bus di polyline, per busId
+  // Key: busId, Value: indeks titik polyline terdekat dengan posisi bus
+  final Map<int, int> _busPolylineIndex = {};
 
   @override
   void initState() {
@@ -71,6 +77,19 @@ class _BusMapWidgetState extends State<BusMapWidget> {
   @override
   void didUpdateWidget(BusMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Update indeks polyline untuk setiap bus yang posisinya berubah
+    for (final bus in widget.buses) {
+      if (!bus.gpsActive || bus.latitude == 0 || bus.longitude == 0) continue;
+      final oldBus = oldWidget.buses.where((b) => b.id == bus.id).firstOrNull;
+      final posChanged = oldBus == null ||
+          oldBus.latitude != bus.latitude ||
+          oldBus.longitude != bus.longitude;
+      if (posChanged) {
+        _updateBusPolylineIndex(bus);
+      }
+    }
+
     if (widget.driverLocation != null &&
         widget.driverLocation != oldWidget.driverLocation) {
       _mapController.move(widget.driverLocation!, _mapController.camera.zoom);
@@ -78,13 +97,61 @@ class _BusMapWidgetState extends State<BusMapWidget> {
     }
     if (!widget.showAllBuses && widget.focusBus != null) {
       final bus = widget.focusBus!;
-      // [FIX] Hanya move kamera bila koordinat GPS valid (bukan 0,0)
       if (bus.gpsActive && bus.latitude != 0 && bus.longitude != 0) {
         _mapController.move(
             LatLng(bus.latitude, bus.longitude), _mapController.camera.zoom);
       }
     }
   }
+
+  /// Cari titik di polyline yang paling dekat dengan posisi bus,
+  /// lalu simpan indeksnya — dipakai untuk split "sudah dilalui" vs "sisa rute"
+  void _updateBusPolylineIndex(BusModel bus) {
+    for (final route in widget.routes) {
+      if (route.busId != bus.id) continue;
+      if (route.polyline.isEmpty) continue;
+
+      int closestIdx = 0;
+      double minDist = double.infinity;
+
+      for (int i = 0; i < route.polyline.length; i++) {
+        final p = route.polyline[i];
+        final dist = _haversineDistance(
+          bus.latitude,
+          bus.longitude,
+          p.latitude,
+          p.longitude,
+        );
+        if (dist < minDist) {
+          minDist = dist;
+          closestIdx = i;
+        }
+      }
+
+      // Hanya update jika lebih maju dari posisi sebelumnya
+      // (tidak mundur supaya efek "menghilang" tidak balik lagi)
+      final prev = _busPolylineIndex[bus.id] ?? 0;
+      if (closestIdx > prev) {
+        setState(() => _busPolylineIndex[bus.id] = closestIdx);
+      }
+    }
+  }
+
+  /// Jarak haversine antara dua koordinat (hasil dalam meter)
+  double _haversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
+    const r = 6371000.0;
+    final dLat = _toRad(lat2 - lat1);
+    final dLon = _toRad(lon2 - lon1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRad(lat1)) *
+            math.cos(_toRad(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  double _toRad(double deg) => deg * math.pi / 180;
 
   // Koordinat default Madiun — dipakai bila tidak ada bus dengan GPS valid
   static const LatLng _defaultCenter = LatLng(-7.6298, 111.5239);
@@ -180,41 +247,105 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   },
                 ),
 
-                // ── Polyline Rute ────────────────────────────────
+                // ── Polyline Rute (Progressive) ─────────────────
                 if (visibleRoutes.isNotEmpty)
-                  ...visibleRoutes.asMap().entries.map((entry) {
+                  ...visibleRoutes.asMap().entries.expand((entry) {
                     final idx = entry.key;
                     final route = entry.value;
                     final color = _routeColors[idx % _routeColors.length];
 
-                    if (route.polyline.isEmpty) return const SizedBox.shrink();
+                    if (route.polyline.isEmpty) return <Widget>[];
 
-                    final points = route.polyline
+                    final allPoints = route.polyline
                         .map((p) => LatLng(p.latitude, p.longitude))
                         .toList();
 
-                    return PolylineLayer(
-                      polylines: [
-                        // Shadow (garis tebal transparan di bawah)
-                        Polyline(
-                          points: points,
-                          color: color.withValues(alpha: 0.25),
-                          strokeWidth: 10,
+                    // Cari bus yang sesuai dengan rute ini
+                    final matchBus = widget.buses
+                        .where((b) => b.gpsActive && b.id == route.busId)
+                        .firstOrNull;
+
+                    // Indeks titik terdekat bus di polyline
+                    final splitIdx = matchBus != null
+                        ? (_busPolylineIndex[matchBus.id] ?? 0)
+                        : 0;
+
+                    // Sisa rute: dari posisi bus ke depan
+                    final aheadPoints = splitIdx < allPoints.length
+                        ? allPoints.sublist(splitIdx)
+                        : <LatLng>[];
+
+                    // Bagian yang sudah dilalui: dari awal sampai posisi bus
+                    // Tampilkan sangat pudar (hampir transparan)
+                    final passedPoints = splitIdx > 0
+                        ? allPoints.sublist(0, splitIdx + 1)
+                        : <LatLng>[];
+
+                    return [
+                      // Bagian sudah dilalui — sangat pudar, tipis
+                      if (passedPoints.length >= 2)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: passedPoints,
+                              color: color.withValues(alpha: 0.12),
+                              strokeWidth: 3,
+                            ),
+                          ],
                         ),
-                        // Garis utama
-                        Polyline(
-                          points: points,
-                          color: color,
-                          strokeWidth: 4,
+
+                      // Sisa rute ke depan — shadow
+                      if (aheadPoints.length >= 2)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: aheadPoints,
+                              color: color.withValues(alpha: 0.22),
+                              strokeWidth: 10,
+                            ),
+                          ],
                         ),
-                        // Garis putih tipis di tengah (efek Google Maps)
-                        Polyline(
-                          points: points,
-                          color: Colors.white.withValues(alpha: 0.45),
-                          strokeWidth: 1.5,
+
+                      // Sisa rute ke depan — garis utama penuh
+                      if (aheadPoints.length >= 2)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: aheadPoints,
+                              color: color,
+                              strokeWidth: 5,
+                            ),
+                            // Garis putih tipis di tengah (efek Google Maps)
+                            Polyline(
+                              points: aheadPoints,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              strokeWidth: 1.8,
+                            ),
+                          ],
                         ),
-                      ],
-                    );
+
+                      // Fallback: belum ada bus aktif, tampilkan rute penuh normal
+                      if (matchBus == null && allPoints.length >= 2)
+                        PolylineLayer(
+                          polylines: [
+                            Polyline(
+                              points: allPoints,
+                              color: color.withValues(alpha: 0.22),
+                              strokeWidth: 10,
+                            ),
+                            Polyline(
+                              points: allPoints,
+                              color: color,
+                              strokeWidth: 5,
+                            ),
+                            Polyline(
+                              points: allPoints,
+                              color: Colors.white.withValues(alpha: 0.4),
+                              strokeWidth: 1.8,
+                            ),
+                          ],
+                        ),
+                    ];
                   }),
 
                 // ── Marker Halte ─────────────────────────────────
