@@ -1,20 +1,74 @@
-<<<<<<< HEAD
-# trackermobitra
+# 📱 GPS Tracking App - Frontend (Flutter)
 
-A new Flutter project.
+Aplikasi mobile berbasis **Flutter** untuk monitoring lokasi bus secara real-time, dengan role pengguna seperti admin, driver, dan siswa.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🚀 Tech Stack
 
-A few resources to get you started if this is your first Flutter project:
+* Flutter
+* Dart
+* REST API (Laravel Backend)
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-=======
-# gps-frontend
->>>>>>> 6a986772d6f51f869d4ae29242566c83d6083b23
+## 🔥 Fitur Utama
+
+* 🔐 Login & Authentication
+* 📍 Tracking Lokasi Bus Real-time
+* 🧾 Scan QR Code
+* 👨‍✈️ Dashboard Driver
+* 🎓 Dashboard Siswa
+* 🗺️ Manajemen Lokasi Halte (Admin)
+
+---
+
+## 📂 Struktur Project
+
+```
+lib/
+ ├── models/        # Data model
+ ├── screens/       # Semua tampilan UI
+ │    ├── admin/    # Halaman admin
+ │    ├── auth/     # Login & autentikasi
+ │    ├── common/   # Halaman umum
+ │    ├── driver/   # Halaman driver
+ │    └── siswa/    # Halaman siswa
+ ├── services/      # API service (GPS, bus, dll)
+ ├── utils/         # Helper / utility
+ ├── widgets/       # Reusable UI components
+ └── main.dart      # Entry point aplikasi
+```
+
+---
+
+## 🌐 Backend API
+
+Terhubung dengan:
+👉 https://github.com/FaizalMM/GPS_BE
+
+---
+
+## ⚙️ Cara Menjalankan
+
+```bash
+flutter pub get
+flutter run
+```
+
+---
+
+## ⚠️ Konfigurasi API
+
+Sesuaikan base URL:
+
+```dart
+const String baseUrl = "https://your-api-url/api";
+```
+
+
+---
+
+## ⭐ Catatan
+
+Project ini dikembangkan sebagai sistem tracking bus berbasis mobile dengan integrasi backend Laravel.
