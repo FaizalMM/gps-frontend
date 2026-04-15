@@ -16,12 +16,15 @@ class StudentService {
     return _parseStudentList(list);
   }
 
-  Future<List<UserModel>> getPendingStudents() async {
+  Future<({List<UserModel> students, int statusCode})>
+      getPendingStudents() async {
     final res = await _api.get('/students/pending');
-    if (!res.success || res.data == null) return [];
+    if (!res.success || res.data == null) {
+      return (students: <UserModel>[], statusCode: res.statusCode);
+    }
     final raw = res.data!['data'];
     final list = raw is List ? raw : (raw?['data'] as List? ?? []);
-    return _parseStudentList(list);
+    return (students: _parseStudentList(list), statusCode: res.statusCode);
   }
 
   List<UserModel> _parseStudentList(List list) {
@@ -40,9 +43,15 @@ class StudentService {
     }).toList();
   }
 
-  Future<bool> approveStudent(int studentId) async {
-    final res = await _api.post('/students/$studentId/approve', {});
-    return res.success;
+  /// Approve siswa dan return students.id dari response backend.
+  /// Mengirim userId (users.id) ke endpoint, backend cari by user_id.
+  /// Return: students.id jika berhasil, null jika gagal.
+  Future<int?> approveStudent(int userId) async {
+    final res = await _api.post('/students/$userId/approve', {});
+    if (!res.success) return null;
+    final data = res.data?['data'] as Map<String, dynamic>?;
+    // Backend return student object → ambil students.id
+    return data?['id'] as int?;
   }
 
   Future<bool> rejectStudent(int studentId, String reason) async {
@@ -199,7 +208,8 @@ class DriverService {
   }
 
   // Driver: scan QR siswa (check-in)
-  Future<AttendanceModel?> scanStudentQr(
+  // Mengembalikan ScanQrResult — bisa sukses, rute tidak sesuai, atau error lain
+  Future<ScanQrResult> scanStudentQr(
     Map<String, dynamic> qrData, {
     required double latitude,
     required double longitude,
@@ -213,10 +223,23 @@ class DriverService {
       'latitude': latitude,
       'longitude': longitude,
     });
-    if (!res.success) return null;
-    final d = res.data!['data'];
-    if (d == null) return null;
-    return AttendanceModel.fromJson(d as Map<String, dynamic>);
+
+    if (res.success) {
+      final d = res.data?['data'];
+      if (d == null) return ScanQrResult.error('Response tidak valid');
+      return ScanQrResult.success(
+          AttendanceModel.fromJson(d as Map<String, dynamic>));
+    }
+
+    // Cek apakah error karena rute tidak sesuai (403 + error_type)
+    final body = res.data;
+    if (res.statusCode == 403 &&
+        body != null &&
+        body['error_type'] == 'route_mismatch') {
+      return ScanQrResult.routeMismatch(RouteMismatchInfo.fromJson(body));
+    }
+
+    return ScanQrResult.error(res.message);
   }
 
   // Driver: checkout siswa

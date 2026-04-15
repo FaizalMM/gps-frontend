@@ -51,6 +51,96 @@ class AppDataService {
   /// Set ini dari AdminDashboard untuk handle logout otomatis.
   VoidCallback? onUnauthorized;
 
+  // ── Pending Students Polling — auto-refresh setiap 15 detik ─
+  Timer? _pendingPollingTimer;
+  bool _pendingPollingActive = false;
+  int _lastKnownPendingCount = -1; // -1 = belum diinisialisasi
+
+  /// Callback dipanggil saat ada siswa pending BARU masuk.
+  /// Set dari AdminPendingScreen / AdminDashboard untuk tampilkan notifikasi.
+  void Function(int jumlahBaru)? onNewPendingStudent;
+
+  /// Mulai polling pending students. Panggil dari AdminDashboard setelah login.
+  void startPendingPolling() {
+    if (_pendingPollingActive) return;
+    _pendingPollingActive = true;
+    _pollPendingStudents();
+    _pendingPollingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (_pendingPollingActive) _pollPendingStudents();
+    });
+  }
+
+  /// Stop polling pending. Panggil saat logout.
+  void stopPendingPolling() {
+    _pendingPollingActive = false;
+    _pendingPollingTimer?.cancel();
+    _pendingPollingTimer = null;
+    _lastKnownPendingCount = -1;
+    onNewPendingStudent = null;
+  }
+
+  Future<void> _pollPendingStudents() async {
+    try {
+      final result = await _studentService.getPendingStudents();
+
+      // [FIX] Hentikan polling jika server menolak token (401 Unauthorized)
+      // Ini mencegah log 401 berulang-ulang saat belum/tidak terautentikasi
+      if (result.statusCode == 401) {
+        stopPendingPolling();
+        onUnauthorized?.call();
+        return;
+      }
+
+      if (!_pendingPollingActive) return;
+      final pendingList = result.students;
+      final newCount = pendingList.length;
+
+      // Pertama kali polling — hanya set baseline, jangan notifikasi
+      if (_lastKnownPendingCount == -1) {
+        _lastKnownPendingCount = newCount;
+        // Tetap update cache agar UI langsung tampil data terbaru
+        _mergePendingIntoCache(pendingList);
+        return;
+      }
+
+      // Ada siswa baru masuk sejak polling terakhir
+      if (newCount > _lastKnownPendingCount) {
+        final jumlahBaru = newCount - _lastKnownPendingCount;
+        _lastKnownPendingCount = newCount;
+        _mergePendingIntoCache(pendingList);
+        onNewPendingStudent?.call(jumlahBaru);
+      } else if (newCount != _lastKnownPendingCount) {
+        // Jumlah berkurang (ada yang di-approve/reject) — update saja
+        _lastKnownPendingCount = newCount;
+        _mergePendingIntoCache(pendingList);
+      }
+    } catch (_) {}
+  }
+
+  /// Merge data pending terbaru dari server ke cache _users tanpa menghapus
+  /// data driver/student lain yang sudah ada.
+  void _mergePendingIntoCache(List<UserModel> pendingList) {
+    final pendingIds = pendingList.map((u) => u.id).toSet();
+
+    // Hapus entry pending lama dari cache, ganti dengan yang baru
+    _users = [
+      ..._users.where((u) =>
+          u.role != UserRole.siswa ||
+          u.status != AccountStatus.pending ||
+          pendingIds.contains(u.id)),
+    ];
+
+    // Tambahkan pending baru yang belum ada di cache
+    final existingIds = _users.map((u) => u.id).toSet();
+    for (final p in pendingList) {
+      if (!existingIds.contains(p.id)) {
+        _users.add(p);
+      }
+    }
+
+    _studentsCtrl.add(_users);
+  }
+
   /// Mulai polling GPS. Pastikan token sudah tersimpan sebelum memanggil ini.
   void startGpsPolling() {
     if (_gpsPollingActive) return;
@@ -161,9 +251,14 @@ class AppDataService {
     ]);
   }
 
+  // [FIX] loadStudents: getStudents() mengembalikan List<UserModel> langsung,
+  // sedangkan getPendingStudents() mengembalikan record {students, statusCode}.
+  // Jangan panggil .students pada List — itu akan crash.
   Future<void> loadStudents() async {
     final approved = await _studentService.getStudents();
-    final pending = await _studentService.getPendingStudents();
+    final pendingResult = await _studentService.getPendingStudents();
+    final pending = pendingResult.students;
+
     final all = [...approved, ...pending];
     final seen = <int>{};
     _users = [
@@ -197,11 +292,30 @@ class AppDataService {
     if (id == null) return;
     bool ok;
     if (status == AccountStatus.active) {
-      ok = await _studentService.approveStudent(id);
+      final studentDbId = await _studentService.approveStudent(id);
+      ok = studentDbId != null;
     } else {
       ok = await _studentService.rejectStudent(id, 'Ditolak oleh admin');
     }
     if (ok) await loadStudents();
+  }
+
+  /// Approve siswa dan return students.id — dipakai admin untuk assign bus
+  /// langsung setelah approve tanpa perlu call terpisah.
+  Future<int?> approveAndGetStudentId(String userId,
+      {int? studentDetailId}) async {
+    final id = int.tryParse(userId);
+    if (id == null) return studentDetailId;
+    // Jika studentDetailId sudah ada (dari cache), tidak perlu hit API lagi
+    if (studentDetailId != null && studentDetailId > 0) {
+      // Tetap approve via API
+      await _studentService.approveStudent(id);
+      await loadStudents();
+      return studentDetailId;
+    }
+    final studentDbId = await _studentService.approveStudent(id);
+    if (studentDbId != null) await loadStudents();
+    return studentDbId;
   }
 
   Future<void> deleteUser(String userId) async {

@@ -31,7 +31,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   late final List<Widget> _screens;
 
   @override
-  @override
   void initState() {
     super.initState();
     _dataService.loadAll();
@@ -59,13 +58,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
       };
 
       _dataService.startGpsPolling();
+      _dataService.startPendingPolling();
+
+      // Tampilkan notifikasi toast saat ada siswa baru daftar
+      _dataService.onNewPendingStudent = (jumlahBaru) {
+        if (!mounted) return;
+        _showNewPendingToast(jumlahBaru);
+      };
     });
+  }
+
+  void _showNewPendingToast(int jumlahBaru) {
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (ctx) => _NewPendingToast(count: jumlahBaru),
+    );
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 4), () => entry.remove());
   }
 
   @override
   void dispose() {
-    // Stop GPS polling saat admin keluar dari dashboard
     _dataService.stopGpsPolling();
+    _dataService.stopPendingPolling();
     super.dispose();
   }
 
@@ -151,7 +166,7 @@ class _HomeTabState extends State<_HomeTab> {
                           fontWeight: FontWeight.w800,
                           color: AppColors.black,
                           height: 1.2)),
-                ], 
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -573,14 +588,48 @@ class _HomeTabState extends State<_HomeTab> {
                     ],
                   ),
                   child: Row(children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                          color: AppColors.orange.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.pending_actions_rounded,
-                          color: AppColors.orange, size: 22),
+                    StreamBuilder<List<UserModel>>(
+                      stream: widget.dataService.usersStream,
+                      builder: (_, s) {
+                        final pending = (s.data ?? widget.dataService.users)
+                            .where((u) => u.status == AccountStatus.pending)
+                            .length;
+                        return Stack(clipBehavior: Clip.none, children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                                color: AppColors.orange.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12)),
+                            child: const Icon(Icons.pending_actions_rounded,
+                                color: AppColors.orange, size: 22),
+                          ),
+                          if (pending > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                    minWidth: 18, minHeight: 18),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: const BoxDecoration(
+                                    color: AppColors.red,
+                                    shape: BoxShape.circle),
+                                child: Center(
+                                  child: Text(
+                                    pending > 99 ? '99+' : '$pending',
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ]);
+                      },
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -1287,6 +1336,141 @@ class _ProfileMenu extends StatelessWidget {
                 color: color)),
         trailing: Icon(Icons.chevron_right_rounded,
             color: color.withValues(alpha: 0.4), size: 20),
+      ),
+    );
+  }
+}
+
+// ── Toast notifikasi siswa baru pending ───────────────────────
+// Muncul di atas semua UI (via Overlay), auto-hilang setelah 4 detik.
+class _NewPendingToast extends StatefulWidget {
+  final int count;
+  const _NewPendingToast({required this.count});
+
+  @override
+  State<_NewPendingToast> createState() => _NewPendingToastState();
+}
+
+class _NewPendingToastState extends State<_NewPendingToast>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<Offset> _slide;
+  late Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    )..forward();
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.count == 1
+        ? '1 siswa baru mendaftar, menunggu persetujuan'
+        : '${widget.count} siswa baru mendaftar, menunggu persetujuan';
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 12,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slide,
+        child: FadeTransition(
+          opacity: _fade,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(children: [
+                // Ikon dengan badge
+                Stack(clipBehavior: Clip.none, children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.orange.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.person_add_rounded,
+                        color: AppColors.orange, size: 20),
+                  ),
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: const BoxDecoration(
+                          color: AppColors.orange, shape: BoxShape.circle),
+                      child: Center(
+                        child: Text(
+                          '${widget.count}',
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ]),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Pendaftaran Baru! 🔔',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }

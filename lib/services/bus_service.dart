@@ -271,19 +271,45 @@ class BusService {
 
   // ── Siswa: tracking bus yang di-assign ───────────────────
 
-  Future<BusModel?> getMyBusTracking() async {
+  /// Tracking bus untuk siswa — return BusModel dengan rute+halte lengkap
+  /// plus my_halte (halte penjemputan siswa ini) sebagai field terpisah.
+  Future<({BusModel? bus, Map<String, dynamic>? myHalte})>
+      getMyBusTrackingFull() async {
     final res = await _api.get('/student/bus/tracking');
-    if (!res.success || res.data == null) return null;
-    final d = res.data!['data'];
-    if (d == null) return null;
-    final json = d as Map<String, dynamic>;
-    return BusModel.fromJson({
-      'id': json['bus_id'],
-      'kode_bus': json['bus_code'],
-      'plat_nomor': json['bus_plate'],
+    if (!res.success || res.data == null) return (bus: null, myHalte: null);
+    final d = res.data!['data'] as Map<String, dynamic>?;
+    if (d == null) return (bus: null, myHalte: null);
+
+    final pos = d['position'] as Map<String, dynamic>?;
+    final bus = BusModel.fromJson({
+      'id': d['bus_id'],
+      'kode_bus': d['bus_code'],
+      'plat_nomor': d['bus_plate'],
       'status': 'aktif',
-      'current_position': json['position'],
+      'gps_active': d['gps_active'] ?? false,
+      // inject posisi langsung agar BusModel punya lat/lng/speed
+      'current_position': pos,
+      'routes': d['routes'] ?? [],
       'created_at': DateTime.now().toIso8601String(),
     });
+
+    // Terapkan posisi GPS ke field bus secara eksplisit
+    if (pos != null) {
+      bus.updateGps(
+        latitude: (pos['latitude'] as num?)?.toDouble() ?? 0,
+        longitude: (pos['longitude'] as num?)?.toDouble() ?? 0,
+        speed: (pos['speed'] as num?)?.toDouble() ?? 0,
+        gpsActive: d['gps_active'] as bool? ?? false,
+      );
+    }
+
+    final myHalte = d['my_halte'] as Map<String, dynamic>?;
+    return (bus: bus, myHalte: myHalte);
+  }
+
+  /// Versi lama — tetap ada untuk kompatibilitas
+  Future<BusModel?> getMyBusTracking() async {
+    final result = await getMyBusTrackingFull();
+    return result.bus;
   }
 }

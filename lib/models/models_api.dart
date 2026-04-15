@@ -137,6 +137,12 @@ class StudentDetail {
   String alamat;
   String noHp;
   ApprovalStatus approvalStatus;
+  // Info bus & rute — diisi saat admin load student atau dari /student/bus
+  int busId;
+  int halteId;
+  String namaBus;
+  String namaRute;
+  String namaHalte;
 
   StudentDetail({
     required this.id,
@@ -147,6 +153,11 @@ class StudentDetail {
     required this.alamat,
     required this.noHp,
     required this.approvalStatus,
+    this.busId = 0,
+    this.halteId = 0,
+    this.namaBus = '',
+    this.namaRute = '',
+    this.namaHalte = '',
   });
 
   factory StudentDetail.fromJson(Map<String, dynamic> json) {
@@ -161,6 +172,13 @@ class StudentDetail {
       default:
         approvalStatus = ApprovalStatus.pending;
     }
+    // Bus info bisa datang dari nested 'bus' object atau flat fields
+    final busJson = json['bus'] as Map<String, dynamic>?;
+    final routeJson = busJson != null
+        ? (busJson['routes'] as List?)?.firstOrNull as Map<String, dynamic>?
+        : null;
+    final halteJson = json['halte'] as Map<String, dynamic>?;
+
     return StudentDetail(
       id: json['id'] as int,
       userId: json['user_id'] as int,
@@ -170,6 +188,16 @@ class StudentDetail {
       alamat: json['alamat'] as String? ?? '',
       noHp: json['no_hp'] as String? ?? '',
       approvalStatus: approvalStatus,
+      busId: busJson?['id'] as int? ?? json['bus_id'] as int? ?? 0,
+      halteId: halteJson?['id'] as int? ?? json['halte_id'] as int? ?? 0,
+      namaBus:
+          busJson?['kode_bus'] as String? ?? json['kode_bus'] as String? ?? '',
+      namaRute: routeJson?['nama_rute'] as String? ??
+          json['nama_rute'] as String? ??
+          '',
+      namaHalte: halteJson?['nama_halte'] as String? ??
+          json['nama_halte'] as String? ??
+          '',
     );
   }
 }
@@ -534,6 +562,9 @@ class AttendanceModel {
   final DateTime? waktuNaik;
   final DateTime? waktuTurun;
   final String status;
+  // Info rute dari response scan
+  final String namaRute;
+  final String platNomor;
 
   AttendanceModel({
     required this.id,
@@ -548,9 +579,12 @@ class AttendanceModel {
     this.waktuNaik,
     this.waktuTurun,
     required this.status,
+    this.namaRute = '',
+    this.platNomor = '',
   });
 
   factory AttendanceModel.fromJson(Map<String, dynamic> json) {
+    final routeInfo = json['route_info'] as Map<String, dynamic>?;
     return AttendanceModel(
       id: json['attendance_id'] as int? ?? json['id'] as int? ?? 0,
       qrId: json['qr_id'] as String? ?? '',
@@ -568,6 +602,40 @@ class AttendanceModel {
           ? DateTime.tryParse(json['waktu_turun'] as String)
           : null,
       status: json['status'] as String? ?? '',
+      namaRute: routeInfo?['nama_rute'] as String? ?? '',
+      platNomor: routeInfo?['plat_nomor'] as String? ?? '',
+    );
+  }
+}
+
+// ── Route Mismatch Info — dipakai oleh scan driver ────────────
+class RouteMismatchInfo {
+  final String studentName;
+  final String studentNis;
+  final String scannedBusCode;
+  final String scannedNamaRute;
+  final String? correctBusCode;
+  final String? correctNamaRute;
+
+  RouteMismatchInfo({
+    required this.studentName,
+    required this.studentNis,
+    required this.scannedBusCode,
+    required this.scannedNamaRute,
+    this.correctBusCode,
+    this.correctNamaRute,
+  });
+
+  factory RouteMismatchInfo.fromJson(Map<String, dynamic> json) {
+    final scanned = json['scanned_bus'] as Map<String, dynamic>? ?? {};
+    final correct = json['correct_bus'] as Map<String, dynamic>?;
+    return RouteMismatchInfo(
+      studentName: json['student_name'] as String? ?? '',
+      studentNis: json['student_nis'] as String? ?? '',
+      scannedBusCode: scanned['kode_bus'] as String? ?? '',
+      scannedNamaRute: scanned['nama_rute'] as String? ?? '-',
+      correctBusCode: correct?['kode_bus'] as String?,
+      correctNamaRute: correct?['nama_rute'] as String?,
     );
   }
 }
@@ -734,4 +802,33 @@ class RouteHalteModel {
       halte: halteData,
     );
   }
+}
+
+// ── ScanQrResult — hasil scan QR oleh driver ─────────────────
+enum ScanQrResultType { success, routeMismatch, error }
+
+class ScanQrResult {
+  final ScanQrResultType type;
+  final AttendanceModel? attendance;
+  final RouteMismatchInfo? mismatch;
+  final String message;
+
+  ScanQrResult._({
+    required this.type,
+    this.attendance,
+    this.mismatch,
+    this.message = '',
+  });
+
+  factory ScanQrResult.success(AttendanceModel a) =>
+      ScanQrResult._(type: ScanQrResultType.success, attendance: a);
+
+  factory ScanQrResult.routeMismatch(RouteMismatchInfo m) =>
+      ScanQrResult._(type: ScanQrResultType.routeMismatch, mismatch: m);
+
+  factory ScanQrResult.error(String msg) =>
+      ScanQrResult._(type: ScanQrResultType.error, message: msg);
+
+  bool get isSuccess => type == ScanQrResultType.success;
+  bool get isRouteMismatch => type == ScanQrResultType.routeMismatch;
 }

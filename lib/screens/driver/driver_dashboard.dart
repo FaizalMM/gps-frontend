@@ -55,8 +55,10 @@ class _DriverDashboardState extends State<DriverDashboard> {
               dataService: _dataService,
               isLoadingBus: isLoadingBus),
           LaporanOperasionalScreen(
-              dataService: _dataService, driverId: currentUser.idStr),
-          _DriverProfileTab(driver: currentUser),
+              dataService: _dataService,
+              driverId: currentUser.idStr,
+              busId: bus?.id),
+          _DriverProfileTab(driver: currentUser, bus: bus),
         ],
       ),
       bottomNavigationBar: MobitraBottomNav(
@@ -959,7 +961,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                   MaterialPageRoute(
                                       builder: (_) => LaporanOperasionalScreen(
                                           dataService: widget.dataService,
-                                          driverId: widget.driver.idStr))))),
+                                          driverId: widget.driver.idStr,
+                                          busId: widget.bus?.id))))),
                     ]),
                     const SizedBox(height: 12),
                     Row(children: [
@@ -1251,7 +1254,8 @@ class _InfoTile extends StatelessWidget {
 
 class _DriverProfileTab extends StatefulWidget {
   final UserModel driver;
-  const _DriverProfileTab({required this.driver});
+  final BusModel? bus;
+  const _DriverProfileTab({required this.driver, this.bus});
 
   @override
   State<_DriverProfileTab> createState() => _DriverProfileTabState();
@@ -1332,7 +1336,8 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
                         MaterialPageRoute(
                             builder: (_) => LaporanOperasionalScreen(
                                 dataService: AppDataService(),
-                                driverId: widget.driver.idStr)));
+                                driverId: widget.driver.idStr,
+                                busId: widget.bus?.id)));
                   }),
               const SizedBox(height: 24),
               Container(

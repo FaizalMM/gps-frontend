@@ -16,6 +16,8 @@
     <!-- Storage Permission for Image Picker -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Write storage untuk simpan PDF/Excel (Android < 10) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"/>
     
     <!-- Background GPS (opsional - untuk tracking saat app di background) -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
@@ -58,7 +60,7 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <!-- FileProvider untuk image_picker -->
+        <!-- FileProvider untuk image_picker dan download laporan -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -71,6 +73,16 @@
     </application>
     
     <queries>
+        <!-- open_filex: buka PDF setelah download laporan -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="application/pdf"/>
+        </intent>
+        <!-- open_filex: buka Excel setelah download laporan -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

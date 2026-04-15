@@ -1,16 +1,23 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:open_filex/open_filex.dart';
 import '../../services/app_data_service.dart';
+import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
 
 class LaporanOperasionalScreen extends StatefulWidget {
   final AppDataService dataService;
   final String driverId;
 
+  /// bus_id driver aktif — wajib untuk fetch laporan dari API
+  final int? busId;
+
   const LaporanOperasionalScreen({
     super.key,
     required this.dataService,
     required this.driverId,
+    this.busId,
   });
 
   @override
@@ -20,48 +27,213 @@ class LaporanOperasionalScreen extends StatefulWidget {
 
 class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   DateTime _selectedDate = DateTime.now();
+  final _reportService = ReportService();
 
-  // Dummy student log data (frontend only)
-  final List<_StudentLogEntry> _studentLog = [
-    const _StudentLogEntry(
-      name: 'Sarah Johnson',
-      initials: 'SJ',
-      avatarColor: null, // will show image placeholder
-      stopNumber: '03',
-      stopAddress: 'Main St.',
-      pickupTime: '07:45 AM',
-      isVerified: true,
-    ),
-    const _StudentLogEntry(
-      name: 'Michael Jones',
-      initials: 'MJ',
-      avatarColor: Color(0xFFBBDEFB),
-      stopNumber: '04',
-      stopAddress: 'Oak Ave.',
-      pickupTime: '07:52 AM',
-      isVerified: true,
-    ),
-    const _StudentLogEntry(
-      name: 'David Wilson',
-      initials: 'DW',
-      avatarColor: null,
-      stopNumber: '05',
-      stopAddress: 'Pine Ln.',
-      pickupTime: '08:05 AM',
-      isVerified: true,
-    ),
-    const _StudentLogEntry(
-      name: 'Emma Lewis',
-      initials: 'EL',
-      avatarColor: Color(0xFFFFF9C4),
-      stopNumber: '06',
-      stopAddress: 'Hilltop Rd.',
-      pickupTime: '08:12 AM',
-      isVerified: true,
-    ),
-  ];
+  bool _isLoading = false;
+  bool _hasError = false;
+  String _errorMessage = '';
+  DriverReportData? _reportData;
 
-  void _showAllStudents(BuildContext context) {
+  bool _isExportingPdf = false;
+  bool _isExportingExcel = false;
+
+  final _catatanController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchReport();
+  }
+
+  @override
+  void dispose() {
+    _catatanController.dispose();
+    super.dispose();
+  }
+
+  String get _tanggalParam => DateFormat('yyyy-MM-dd').format(_selectedDate);
+
+  Future<void> _fetchReport() async {
+    final busId = widget.busId;
+    if (busId == null || busId == 0) {
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'Bus belum ditugaskan ke akun ini.';
+      });
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    final data = await _reportService.fetchDriverReport(
+      busId: busId,
+      tanggal: _tanggalParam,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (data == null) {
+        _hasError = true;
+        _errorMessage = 'Gagal memuat laporan. Coba lagi.';
+      } else {
+        _reportData = data;
+      }
+    });
+  }
+
+  Future<void> _exportPdf() async {
+    final busId = widget.busId;
+    if (busId == null || busId == 0) return;
+    setState(() => _isExportingPdf = true);
+    final path = await _reportService.downloadDriverReportPdf(
+      busId: busId,
+      tanggal: _tanggalParam,
+      catatanDriver: _catatanController.text.trim().isEmpty
+          ? null
+          : _catatanController.text.trim(),
+    );
+    if (!mounted) return;
+    setState(() => _isExportingPdf = false);
+    if (path != null) {
+      _showSuccessSnack('PDF tersimpan', path);
+      await OpenFilex.open(path);
+    } else {
+      _showErrorSnack('Gagal mengunduh PDF. Periksa koneksi.');
+    }
+  }
+
+  Future<void> _exportExcel() async {
+    final busId = widget.busId;
+    if (busId == null || busId == 0) return;
+    setState(() => _isExportingExcel = true);
+    final path = await _reportService.downloadDriverReportExcel(
+      busId: busId,
+      tanggal: _tanggalParam,
+      catatanDriver: _catatanController.text.trim().isEmpty
+          ? null
+          : _catatanController.text.trim(),
+    );
+    if (!mounted) return;
+    setState(() => _isExportingExcel = false);
+    if (path != null) {
+      _showSuccessSnack('Excel tersimpan', path);
+      await OpenFilex.open(path);
+    } else {
+      _showErrorSnack('Gagal mengunduh Excel. Periksa koneksi.');
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _reportData = null;
+      });
+      _fetchReport();
+    }
+  }
+
+  Future<void> _showCatatanDialog(String exportType) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Catatan Driver (opsional)',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _catatanController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Tambahkan catatan untuk laporan ini...',
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (exportType == 'PDF') {
+                      _exportPdf();
+                    } else {
+                      _exportExcel();
+                    }
+                  },
+                  child: Text('Ekspor $exportType',
+                      style: const TextStyle(
+                          fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSuccessSnack(String msg, String path) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('$msg: ${path.split('/').last}'),
+      backgroundColor: AppColors.primary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  void _showErrorSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: Colors.redAccent,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  void _showAllStudents() {
+    final rows = _reportData?.rows ?? [];
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -92,83 +264,61 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
                           fontSize: 15,
                           fontWeight: FontWeight.w700)),
                   const Spacer(),
-                  Text('${_studentLog.length} siswa',
+                  Text('${rows.length} siswa',
                       style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,
                           color: AppColors.textGrey)),
                 ])),
             Expanded(
-              child: ListView.builder(
-                controller: ctrl,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
-                itemCount: _studentLog.length,
-                itemBuilder: (_, i) {
-                  final s = _studentLog[i];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 8)
-                        ]),
-                    child: Row(children: [
-                      Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                              color: AppColors.primaryLight,
-                              shape: BoxShape.circle),
-                          child: Center(
-                              child: Text(s.initials,
-                                  style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                      fontSize: 15)))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(s.name,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
-                            Text(s.route,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 11,
-                                    color: AppColors.textGrey)),
-                          ])),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: s.status == 'Naik'
-                              ? AppColors.primaryLight
-                              : AppColors.orange.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(s.status,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: s.status == 'Naik'
-                                    ? AppColors.primary
-                                    : AppColors.orange)),
-                      ),
-                    ]),
-                  );
-                },
-              ),
+              child: rows.isEmpty
+                  ? const Center(
+                      child: Text('Belum ada siswa hari ini',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              color: AppColors.textGrey)))
+                  : ListView.builder(
+                      controller: ctrl,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
+                      itemCount: rows.length,
+                      itemBuilder: (_, i) {
+                        final r = rows[i];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 8)
+                              ]),
+                          child: Row(children: [
+                            _Avatar(initials: r.initials),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(r.namaPenumpang,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600)),
+                                  Text('Halte: ${r.halteNaik}',
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11,
+                                          color: AppColors.textGrey)),
+                                ])),
+                            _StatusBadge(checkout: r.checkout),
+                          ]),
+                        );
+                      },
+                    ),
             ),
           ]),
         ),
@@ -176,39 +326,43 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     );
   }
 
-  void _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2024),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: AppColors.primary),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final laporan = widget.dataService.getLaporanByDriver(widget.driverId);
-    final todayLaporan = laporan;
-
-    final totalStudents = todayLaporan?.siswaTerangkut ?? _studentLog.length;
-    final routeTime = todayLaporan?.waktuOperasional ?? '1h 15m';
     final dateStr =
-        DateFormat('EEEE, MMM d').format(_selectedDate); // e.g. Monday, Oct 24
+        DateFormat('EEEE, d MMM yyyy', 'id_ID').format(_selectedDate);
+    final rows = _reportData?.rows ?? [];
+    final totalSiswa = _reportData?.totalAttendances ?? 0;
+
+    String routeTime = '-';
+    if (rows.isNotEmpty) {
+      final naik = rows
+          .where((r) => r.waktuNaik != null)
+          .map((r) => DateTime.tryParse(r.waktuNaik!))
+          .whereType<DateTime>()
+          .toList()
+        ..sort();
+      final turun = rows
+          .where((r) => r.waktuTurun != null)
+          .map((r) => DateTime.tryParse(r.waktuTurun!))
+          .whereType<DateTime>()
+          .toList()
+        ..sort();
+      if (naik.isNotEmpty && turun.isNotEmpty) {
+        final diff = turun.last.difference(naik.first);
+        final h = diff.inHours;
+        final m = diff.inMinutes % 60;
+        routeTime = h > 0 ? '${h}h ${m}m' : '${m}m';
+      }
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
       bottomNavigationBar: _BottomExportBar(
-        onExportPdf: () => _showExportSnack('PDF'),
-        onExportExcel: () => _showExportSnack('Excel'),
+        isExportingPdf: _isExportingPdf,
+        isExportingExcel: _isExportingExcel,
+        canExport: widget.busId != null && widget.busId != 0,
+        onExportPdf: () => _showCatatanDialog('PDF'),
+        onExportExcel: () => _showCatatanDialog('Excel'),
       ),
       appBar: AppBar(
         backgroundColor: AppColors.background,
@@ -222,11 +376,10 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
         title: const Text(
           'Laporan Harian',
           style: TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-            color: AppColors.black,
-          ),
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: AppColors.black),
         ),
         centerTitle: true,
         actions: [
@@ -241,457 +394,394 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
           child: Divider(height: 1, color: Color(0xFFE0E0E0)),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Date header
-            Text(
-              dateStr,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
-                color: AppColors.black,
-                height: 1.1,
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _fetchReport,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(dateStr,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.black,
+                      height: 1.1)),
+              const SizedBox(height: 4),
+              Text(
+                widget.busId != null && widget.busId != 0
+                    ? 'Bus ID: ${widget.busId}'
+                    : 'Bus belum ditugaskan',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    color: AppColors.textGrey),
               ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'School Year 2023-2024 • Route #42A',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                color: AppColors.textGrey,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Stat cards
-            Row(
-              children: [
-                Expanded(
-                  child: _BigStatCard(
-                    icon: Icons.people_rounded,
-                    iconBgColor: AppColors.primaryLight,
-                    iconColor: AppColors.primary,
-                    value: '$totalStudents',
-                    label: 'Total Students',
+              const SizedBox(height: 20),
+              if (_isLoading)
+                const _LoadingCard()
+              else if (_hasError)
+                _ErrorCard(message: _errorMessage, onRetry: _fetchReport)
+              else ...[
+                Row(children: [
+                  Expanded(
+                      child: _BigStatCard(
+                          icon: Icons.people_rounded,
+                          value: '$totalSiswa',
+                          label: 'Total Siswa')),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: _BigStatCard(
+                          icon: Icons.access_time_rounded,
+                          value: routeTime,
+                          label: 'Durasi Operasi')),
+                ]),
+                const SizedBox(height: 24),
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4))
+                    ],
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _BigStatCard(
-                    icon: Icons.access_time_rounded,
-                    iconBgColor: AppColors.primaryLight,
-                    iconColor: AppColors.primary,
-                    value: routeTime.contains('-') ? '1h 15m' : routeTime,
-                    label: 'Route Time',
-                  ),
+                  child: Column(children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Log Siswa',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.black)),
+                            if (rows.isNotEmpty)
+                              GestureDetector(
+                                onTap: _showAllStudents,
+                                child: const Text('Lihat Semua',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary)),
+                              ),
+                          ]),
+                    ),
+                    if (rows.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(18, 0, 18, 20),
+                        child: Text(
+                          'Belum ada data absensi untuk tanggal ini.',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              color: AppColors.textGrey,
+                              fontSize: 13),
+                        ),
+                      )
+                    else
+                      ...rows.take(4).toList().asMap().entries.map((e) {
+                        return _StudentLogRow(
+                          row: e.value,
+                          showDivider: e.key < (rows.take(4).length - 1),
+                        );
+                      }),
+                    const SizedBox(height: 8),
+                  ]),
                 ),
               ],
-            ),
-            const SizedBox(height: 24),
-
-            // Student Log card
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // Header
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Log Siswa',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.black,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () => _showAllStudents(context),
-                          child: const Text(
-                            'Lihat Semua',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Student entries
-                  ..._studentLog.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final s = entry.value;
-                    return _StudentLogRow(
-                      entry: s,
-                      showDivider: i < _studentLog.length - 1,
-                    );
-                  }),
-
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 100), // space for bottom bar
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showExportSnack(String type) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Mengekspor laporan ke $type...'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
-}
-
-// ─── Data model for student log entry ────────────────────────────────────────
-
-class _StudentLogEntry {
-  final String name;
-  final String initials;
-  final Color? avatarColor;
-  final String stopNumber;
-  final String stopAddress;
-  final String pickupTime;
-  final bool isVerified;
-  final String route;
-  final String status;
-
-  const _StudentLogEntry({
-    required this.name,
-    required this.initials,
-    this.avatarColor,
-    required this.stopNumber,
-    required this.stopAddress,
-    required this.pickupTime,
-    required this.isVerified,
-    this.route = 'Route #42A',
-    this.status = 'Naik',
-  });
-}
-
-// ─── Widgets ─────────────────────────────────────────────────────────────────
-
-class _BigStatCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconBgColor;
-  final Color iconColor;
-  final String value;
-  final String label;
-
-  const _BigStatCard({
-    required this.icon,
-    required this.iconBgColor,
-    required this.iconColor,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: iconColor, size: 26),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            value,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: AppColors.black,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 13,
-              color: AppColors.textGrey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StudentLogRow extends StatelessWidget {
-  final _StudentLogEntry entry;
-  final bool showDivider;
-
-  const _StudentLogRow({
-    required this.entry,
-    required this.showDivider,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          child: Row(
-            children: [
-              // Avatar
-              _Avatar(
-                initials: entry.initials,
-                bgColor: entry.avatarColor,
-              ),
-              const SizedBox(width: 14),
-
-              // Name & stop
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.name,
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Stop #${entry.stopNumber} • ${entry.stopAddress}',
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        color: AppColors.textGrey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Time & verified badge
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    entry.pickupTime,
-                    style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (entry.isVerified)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 16,
-                          height: 16,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: Colors.white,
-                            size: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Text(
-                          'TERVERIFIKASI',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
+              const SizedBox(height: 100),
             ],
           ),
         ),
-        if (showDivider)
-          const Divider(
-            height: 1,
-            indent: 18,
-            endIndent: 18,
-            color: Color(0xFFF0F0F0),
-          ),
-      ],
+      ),
     );
   }
+}
+
+// ── Widgets ─────────────────────────────────────────────────
+
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard();
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 140,
+        decoration: BoxDecoration(
+            color: AppColors.white, borderRadius: BorderRadius.circular(20)),
+        child: const Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            CircularProgressIndicator(color: AppColors.primary),
+            SizedBox(height: 12),
+            Text('Memuat laporan...',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ]),
+        ),
+      );
+}
+
+class _ErrorCard extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorCard({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+            color: AppColors.white, borderRadius: BorderRadius.circular(20)),
+        child: Column(children: [
+          const Icon(Icons.error_outline_rounded,
+              color: Colors.redAccent, size: 40),
+          const SizedBox(height: 10),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontFamily: 'Poppins', color: AppColors.textGrey)),
+          const SizedBox(height: 14),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Coba Lagi',
+                style: TextStyle(fontFamily: 'Poppins')),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
+          )
+        ]),
+      );
+}
+
+class _BigStatCard extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  const _BigStatCard(
+      {required this.icon, required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4))
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: AppColors.primary, size: 26)),
+          const SizedBox(height: 14),
+          Text(value,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.black,
+                  height: 1.0)),
+          const SizedBox(height: 4),
+          Text(label,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: AppColors.textGrey)),
+        ]),
+      );
+}
+
+class _StudentLogRow extends StatelessWidget {
+  final AttendanceReportRow row;
+  final bool showDivider;
+  const _StudentLogRow({required this.row, required this.showDivider});
+
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          child: Row(children: [
+            _Avatar(initials: row.initials),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(row.namaPenumpang,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.black)),
+                    const SizedBox(height: 2),
+                    Text('Halte: ${row.halteNaik}',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: AppColors.textGrey)),
+                  ]),
+            ),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(row.waktuNaikFormatted,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.black)),
+              const SizedBox(height: 4),
+              _StatusBadge(checkout: row.checkout),
+            ]),
+          ]),
+        ),
+        if (showDivider)
+          const Divider(
+              height: 1, indent: 18, endIndent: 18, color: Color(0xFFF0F0F0)),
+      ]);
+}
+
+class _StatusBadge extends StatelessWidget {
+  final bool checkout;
+  const _StatusBadge({required this.checkout});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: checkout
+              ? AppColors.primaryLight
+              : AppColors.orange.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          checkout ? 'CHECKOUT' : 'NAIK',
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: checkout ? AppColors.primary : AppColors.orange),
+        ),
+      );
 }
 
 class _Avatar extends StatelessWidget {
   final String initials;
-  final Color? bgColor;
-
-  const _Avatar({required this.initials, this.bgColor});
+  const _Avatar({required this.initials});
 
   @override
-  Widget build(BuildContext context) {
-    if (bgColor != null) {
-      return CircleAvatar(
+  Widget build(BuildContext context) => CircleAvatar(
         radius: 24,
-        backgroundColor: bgColor,
-        child: Text(
-          initials,
-          style: const TextStyle(
-            fontFamily: 'Poppins',
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            color: AppColors.black,
-          ),
-        ),
+        backgroundColor: AppColors.primaryLight,
+        child: Text(initials,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                fontSize: 14)),
       );
-    }
-    // Grey placeholder avatar
-    return const CircleAvatar(
-      radius: 24,
-      backgroundColor: AppColors.lightGrey,
-      child: Icon(Icons.person_rounded, color: AppColors.textGrey, size: 26),
-    );
-  }
 }
 
 class _BottomExportBar extends StatelessWidget {
+  final bool isExportingPdf;
+  final bool isExportingExcel;
+  final bool canExport;
   final VoidCallback onExportPdf;
   final VoidCallback onExportExcel;
 
   const _BottomExportBar({
+    required this.isExportingPdf,
+    required this.isExportingExcel,
+    required this.canExport,
     required this.onExportPdf,
     required this.onExportExcel,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-          20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
-      ),
-      child: Row(
-        children: [
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.fromLTRB(
+            20, 14, 20, 14 + MediaQuery.of(context).padding.bottom),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          border: Border(top: BorderSide(color: Color(0xFFEEEEEE))),
+        ),
+        child: Row(children: [
           Expanded(
-            child: _ExportButton(
-              label: 'Ekspor PDF',
-              icon: Icons.picture_as_pdf_rounded,
-              onTap: onExportPdf,
-            ),
-          ),
+              child: _ExportButton(
+                  label: 'Ekspor PDF',
+                  icon: Icons.picture_as_pdf_rounded,
+                  isLoading: isExportingPdf,
+                  enabled: canExport && !isExportingPdf && !isExportingExcel,
+                  onTap: onExportPdf)),
           const SizedBox(width: 12),
           Expanded(
-            child: _ExportButton(
-              label: 'Ekspor Excel',
-              icon: Icons.table_chart_rounded,
-              onTap: onExportExcel,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+              child: _ExportButton(
+                  label: 'Ekspor Excel',
+                  icon: Icons.table_chart_rounded,
+                  isLoading: isExportingExcel,
+                  enabled: canExport && !isExportingPdf && !isExportingExcel,
+                  onTap: onExportExcel)),
+        ]),
+      );
 }
 
 class _ExportButton extends StatelessWidget {
   final String label;
   final IconData icon;
+  final bool isLoading;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _ExportButton({
     required this.label,
     required this.icon,
+    required this.isLoading,
+    required this.enabled,
     required this.onTap,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A2E),
-          borderRadius: BorderRadius.circular(14),
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: enabled
+                ? const Color(0xFF1A1A2E)
+                : const Color(0xFF1A1A2E).withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: isLoading
+              ? const Center(
+                  child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                          color: AppColors.primary, strokeWidth: 2.5)))
+              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(icon, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Text(label,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ]),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: AppColors.primary, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      );
 }

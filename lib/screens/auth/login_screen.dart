@@ -81,7 +81,9 @@ class _LoginScreenState extends State<LoginScreen>
       );
     } else if (result == LoginResult.pending) {
       Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const PendingScreen()),
+        MaterialPageRoute(
+          builder: (_) => PendingScreen(email: _emailController.text.trim()),
+        ),
       );
     } else if (result == LoginResult.rejected) {
       ScaffoldMessenger.of(context).showSnackBar(

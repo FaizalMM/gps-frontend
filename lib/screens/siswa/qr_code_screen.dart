@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../models/models_api.dart';
@@ -19,6 +20,9 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   bool _isLoading = false;
   String? _errorMsg;
   String? _expiresAt;
+  String? _busCode;
+  String? _namaHalte;
+  double? _jarakKeHalte;
 
   @override
   void initState() {
@@ -51,10 +55,18 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
     setState(() {
       _isLoading = false;
       if (result != null) {
-        _qrData = result['qr_data'] != null
-            ? result['qr_data'].toString()
-            : result['qr_code_url'] as String?;
+        // Encode ke JSON string agar bisa di-decode driver saat scan
+        if (result['qr_data'] != null) {
+          final qrMap = result['qr_data'];
+          _qrData = qrMap is String ? qrMap : jsonEncode(qrMap);
+        } else {
+          _qrData = result['qr_code_url'] as String?;
+        }
         _expiresAt = result['expires_at'] as String?;
+        _busCode = result['bus_code'] as String?;
+        final halteInfo = result['halte_info'] as Map<String, dynamic>?;
+        _namaHalte = halteInfo?['nama_halte'] as String?;
+        _jarakKeHalte = (result['distance_to_halte'] as num?)?.toDouble();
       } else {
         _errorMsg =
             'Gagal generate QR Code. Pastikan kamu berada di dekat halte (<100m).';
@@ -429,44 +441,106 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                 ]),
               ),
 
-              // Divider + halte
+              // Divider + info QR aktual (halte, bus, expired)
               Container(
                   height: 1,
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   color: AppColors.lightGrey),
               Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(children: [
-                  Icon(Icons.location_on_rounded,
-                      color: isActive ? AppColors.primary : AppColors.textGrey,
-                      size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        const Text('HALTE TERDEKAT',
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(children: [
+                  // Row halte
+                  Row(children: [
+                    Icon(Icons.location_on_rounded,
+                        color:
+                            isActive ? AppColors.primary : AppColors.textGrey,
+                        size: 15),
+                    const SizedBox(width: 6),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          const Text('HALTE NAIK',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textGrey,
+                                  letterSpacing: 0.8)),
+                          Text(
+                            hasQr && _namaHalte != null
+                                ? _namaHalte! +
+                                    (_jarakKeHalte != null
+                                        ? ' (${_jarakKeHalte! < 1000 ? "${_jarakKeHalte!.round()} m" : "${(_jarakKeHalte! / 1000).toStringAsFixed(1)} km"})'
+                                        : '')
+                                : siswa.alamat.isNotEmpty
+                                    ? siswa.alamat
+                                    : 'Belum diatur',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontFamily: 'Poppins',
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textGrey,
-                                letterSpacing: 0.8)),
-                        Text(
-                          siswa.alamat.isNotEmpty
-                              ? siswa.alamat
-                              : 'Belum diatur',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isActive
-                                  ? AppColors.black
-                                  : AppColors.textGrey),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isActive
+                                    ? AppColors.black
+                                    : AppColors.textGrey),
+                          ),
+                        ])),
+                    if (hasQr && _busCode != null) ...[
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      ])),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.directions_bus_rounded,
+                              size: 12, color: AppColors.primary),
+                          const SizedBox(width: 4),
+                          Text(_busCode!,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary)),
+                        ]),
+                      ),
+                    ],
+                  ]),
+                  // Row expired
+                  if (hasQr && _expiresAt != null) ...[
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      const Icon(Icons.access_time_rounded,
+                          size: 13, color: AppColors.textGrey),
+                      const SizedBox(width: 6),
+                      Text(
+                        'QR berlaku hari ini s/d 23:59',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('Expired tiap hari',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.pendingOrange)),
+                      ),
+                    ]),
+                  ],
                 ]),
               ),
             ]),

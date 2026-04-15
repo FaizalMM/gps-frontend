@@ -24,6 +24,8 @@ dependencies:
 
   http: any
   flutter_secure_storage: any
+  open_filex: ^4.3.4
+  path_provider: ^2.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

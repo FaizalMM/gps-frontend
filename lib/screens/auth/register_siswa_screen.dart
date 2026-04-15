@@ -49,7 +49,9 @@ class _RegisterSiswaScreenState extends State<RegisterSiswaScreen> {
     if (!mounted) return;
     if (result == RegisterResult.success) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const PendingScreen()),
+        MaterialPageRoute(
+          builder: (_) => PendingScreen(email: _emailController.text.trim()),
+        ),
       );
     } else {
       final msg = result == RegisterResult.emailExists

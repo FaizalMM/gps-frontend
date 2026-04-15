@@ -106,9 +106,10 @@ class GpsService {
       await _sendPosition(position);
     });
 
-    // Heartbeat setiap 2 menit — kirim posisi terakhir agar last_gps_update fresh
-    // Pakai lastPosition (bukan speed: 0) agar kecepatan tetap akurat
-    _heartbeatTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+    // Heartbeat setiap 90 detik — kirim posisi terakhir agar last_gps_update fresh
+    // Threshold stale di backend adalah 10 menit, jadi 90 detik memberikan
+    // margin aman yang cukup bahkan saat koneksi lambat atau bus sedang diam
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 90), (_) async {
       if (!_isTracking) return;
       final pos = _lastPosition ?? await getCurrentPosition();
       if (pos != null && _isValidPosition(pos)) {
