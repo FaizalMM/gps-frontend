@@ -44,62 +44,81 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final BusModel? bus = _driverBus;
     const bool isLoadingBus = false;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: IndexedStack(
-        index: _stackIndex,
-        children: [
-          _DriverHomeTab(
-              driver: currentUser,
-              bus: bus,
-              dataService: _dataService,
-              isLoadingBus: isLoadingBus),
-          LaporanOperasionalScreen(
-              dataService: _dataService,
-              driverId: currentUser.idStr,
-              busId: bus?.id),
-          _DriverProfileTab(driver: currentUser, bus: bus),
-        ],
-      ),
-      bottomNavigationBar: MobitraBottomNav(
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          if (i == 1) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => ScanQrScreen(dataService: _dataService)),
-            );
-            return;
-          }
-          final stackIndex = i == 2
-              ? 1
-              : i == 3
-                  ? 2
-                  : 0;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
           setState(() {
-            _currentIndex = i;
-            _stackIndex = stackIndex;
+            _currentIndex = 0;
+            _stackIndex = 0;
           });
-        },
-        items: const [
-          BottomNavItem(
-              icon: Icons.directions_bus_outlined,
-              activeIcon: Icons.directions_bus_rounded,
-              label: 'Dashboard'),
-          BottomNavItem(
-              icon: Icons.qr_code_2_outlined,
-              activeIcon: Icons.qr_code_2_rounded,
-              label: 'Scan'),
-          BottomNavItem(
-              icon: Icons.description_outlined,
-              activeIcon: Icons.description_rounded,
-              label: 'Reports'),
-          BottomNavItem(
-              icon: Icons.person_outline,
-              activeIcon: Icons.person_rounded,
-              label: 'Profil'),
-        ],
+        }
+        // Kalau sudah di tab 0, cegah pop keluar (hindari layar hitam)
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: IndexedStack(
+          index: _stackIndex,
+          children: [
+            _DriverHomeTab(
+                driver: currentUser,
+                bus: bus,
+                dataService: _dataService,
+                isLoadingBus: isLoadingBus),
+            _DriverProfileTab(driver: currentUser, bus: bus),
+          ],
+        ),
+        bottomNavigationBar: MobitraBottomNav(
+          currentIndex: _currentIndex,
+          onTap: (i) {
+            if (i == 1) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => ScanQrScreen(dataService: _dataService)),
+              );
+              return;
+            }
+            // i == 2 → buka Laporan via push (lazy, bukan IndexedStack)
+            if (i == 2) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LaporanOperasionalScreen(
+                    dataService: _dataService,
+                    driverId: currentUser.idStr,
+                    busId: bus?.id,
+                  ),
+                ),
+              );
+              return;
+            }
+            final stackIndex = i == 3 ? 1 : 0;
+            setState(() {
+              _currentIndex = i;
+              _stackIndex = stackIndex;
+            });
+          },
+          items: const [
+            BottomNavItem(
+                icon: Icons.directions_bus_outlined,
+                activeIcon: Icons.directions_bus_rounded,
+                label: 'Dashboard'),
+            BottomNavItem(
+                icon: Icons.qr_code_2_outlined,
+                activeIcon: Icons.qr_code_2_rounded,
+                label: 'Scan'),
+            BottomNavItem(
+                icon: Icons.description_outlined,
+                activeIcon: Icons.description_rounded,
+                label: 'Reports'),
+            BottomNavItem(
+                icon: Icons.person_outline,
+                activeIcon: Icons.person_rounded,
+                label: 'Profil'),
+          ],
+        ),
       ),
     );
   }
@@ -618,380 +637,389 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     final firstName = widget.driver.namaLengkap.split(' ').first;
     final bus = widget.bus;
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const MobitraAppBar(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${_getGreeting()} Pak $firstName',
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
-                          color: AppColors.textGrey)),
-                  RichText(
-                    text: TextSpan(children: [
-                      const TextSpan(
-                          text: 'Siap\n',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.black,
-                              height: 1.2)),
-                      TextSpan(
-                          text: _gpsActive ? 'Beroperasi! ✅' : 'Beroperasi?',
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 30,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primary)),
-                    ]),
-                  ),
-                  const SizedBox(height: 24),
-
-                  if (bus != null) ...[
-                    // Card info bus
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4))
-                          ]),
-                      child: Row(
-                        children: [
-                          Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(12)),
-                              child: const Icon(Icons.directions_bus_rounded,
-                                  color: AppColors.primary, size: 28)),
-                          const SizedBox(width: 14),
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                Text(bus.nama,
-                                    style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700)),
-                                Text(bus.platNomor,
-                                    style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 12,
-                                        color: AppColors.textGrey)),
-                                Text(bus.rute,
-                                    style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 11,
-                                        color: AppColors.textGrey)),
-                              ])),
-                          bus.isActive
-                              ? StatusBadge.active()
-                              : StatusBadge.inactive(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Card GPS toggle
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4))
-                          ]),
-                      child: Row(
-                        children: [
-                          AnimatedBuilder(
-                            animation: _gpsActive
-                                ? _pulseAnim
-                                : const AlwaysStoppedAnimation(1.0),
-                            builder: (_, child) => Transform.scale(
-                                scale: _gpsActive ? _pulseAnim.value : 1.0,
-                                child: child),
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                  color: _gpsActive
-                                      ? AppColors.primaryLight
-                                      : AppColors.lightGrey,
-                                  borderRadius: BorderRadius.circular(12)),
-                              child: Icon(Icons.gps_fixed_rounded,
-                                  color: _gpsActive
-                                      ? AppColors.primary
-                                      : AppColors.textGrey,
-                                  size: 26),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                const Text('GPS Tracking',
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700)),
-                                Text(_gpsActive ? '• AKTIF' : '• NONAKTIF',
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: _gpsActive
-                                            ? AppColors.primary
-                                            : AppColors.textGrey)),
-                              ])),
-                          _gpsLoading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: AppColors.primary))
-                              : Switch(
-                                  value: _gpsActive,
-                                  onChanged: bus.isActive ? _toggleGps : null,
-                                  activeColor: AppColors.primary),
-                        ],
-                      ),
-                    ),
-
-                    // Error GPS
-                    if (_gpsError.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                            color: const Color(0xFFFEE2E2),
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Row(children: [
-                          const Icon(Icons.error_outline,
-                              color: AppColors.red, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: Text(_gpsError,
-                                  style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 12,
-                                      color: AppColors.red))),
-                        ]),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-
-                    // Peta + info live hanya kalau GPS aktif
-                    if (_gpsActive) ...[
-                      const Text('Posisi Saat Ini',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 10),
-                      StreamBuilder<List<BusModel>>(
-                        stream: widget.dataService.busesStream,
-                        builder: (context, snapshot) {
-                          final buses =
-                              snapshot.data ?? widget.dataService.buses;
-                          final updatedBus = buses.firstWhere(
-                              (b) => b.id == bus.id,
-                              orElse: () => bus);
-                          return Column(
-                            children: [
-                              // Peta OpenStreetMap
-                              BusMapWidget(
-                                buses: [updatedBus],
-                                height: 260,
-                                showAllBuses: false,
-                                focusBus: updatedBus,
-                                interactive: true,
-                                driverLocation: _driverLatLng,
-                                routes: updatedBus.routeList,
-                                showRoutes: updatedBus.routeList.isNotEmpty,
-                                navigationPolyline: _navPolyline,
-                              ),
-                              // Info halte tujuan berikutnya
-                              if (_gpsActive && _targetHalte != null)
-                                _NextHalteBanner(
-                                  halte: _targetHalte!,
-                                  halteIndex: _targetHalteIndex,
-                                  driverPos: _driverLatLng,
-                                  routingService: _routingService,
-                                ),
-                              const SizedBox(height: 12),
-                              // Speed & heading info
-                              Row(children: [
-                                Expanded(
-                                    child: _InfoTile(
-                                        icon: Icons.speed_rounded,
-                                        label: 'Kecepatan',
-                                        value:
-                                            '${updatedBus.speed.toStringAsFixed(0)} km/h',
-                                        color: AppColors.primary)),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child: _InfoTile(
-                                        icon: Icons.explore_rounded,
-                                        label: 'Arah',
-                                        value:
-                                            _headingToText(updatedBus.heading),
-                                        color: AppColors.orange)),
-                              ]),
-                            ],
-                          );
-                        },
-                      ),
-                    ] else ...[
-                      // Pesan jika GPS belum aktif
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: AppColors.pendingOrange
-                                    .withValues(alpha: 0.3))),
-                        child: const Row(children: [
-                          Icon(Icons.info_outline,
-                              color: AppColors.pendingOrange),
-                          SizedBox(width: 12),
-                          Expanded(
-                              child: Text(
-                                  'Aktifkan GPS Tracking agar siswa dapat melacak posisi bus secara realtime.',
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 13,
-                                      color: AppColors.orange))),
-                        ]),
-                      ),
-                    ],
-                  ] else if (widget.isLoadingBus) ...[
-                    // [FIX] Loading saat data bus masih diambil dari API
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(16)),
-                      child: const Column(children: [
-                        CircularProgressIndicator(color: AppColors.primary),
-                        SizedBox(height: 16),
-                        Text('Memuat informasi bus...',
+    return ColoredBox(
+      color: AppColors.background,
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const MobitraAppBar(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${_getGreeting()} Pak $firstName',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14,
+                            color: AppColors.textGrey)),
+                    RichText(
+                      text: TextSpan(children: [
+                        const TextSpan(
+                            text: 'Siap\n',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
-                                fontSize: 13,
-                                color: AppColors.textGrey)),
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.black,
+                                height: 1.2)),
+                        TextSpan(
+                            text: _gpsActive ? 'Beroperasi! ✅' : 'Beroperasi?',
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary)),
                       ]),
                     ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Column(children: [
-                        Icon(Icons.directions_bus_outlined,
-                            size: 64,
-                            color: AppColors.primary.withValues(alpha: 0.5)),
-                        const SizedBox(height: 12),
-                        const Text('Belum ada bus yang ditugaskan',
-                            textAlign: TextAlign.center,
+                    const SizedBox(height: 24),
+
+                    if (bus != null) ...[
+                      // Card info bus
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4))
+                            ]),
+                        child: Row(
+                          children: [
+                            Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(12)),
+                                child: const Icon(Icons.directions_bus_rounded,
+                                    color: AppColors.primary, size: 28)),
+                            const SizedBox(width: 14),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(bus.nama,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700)),
+                                  Text(bus.platNomor,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12,
+                                          color: AppColors.textGrey)),
+                                  Text(bus.rute,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11,
+                                          color: AppColors.textGrey)),
+                                ])),
+                            bus.isActive
+                                ? StatusBadge.active()
+                                : StatusBadge.inactive(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Card GPS toggle
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4))
+                            ]),
+                        child: Row(
+                          children: [
+                            AnimatedBuilder(
+                              animation: _gpsActive
+                                  ? _pulseAnim
+                                  : const AlwaysStoppedAnimation(1.0),
+                              builder: (_, child) => Transform.scale(
+                                  scale: _gpsActive ? _pulseAnim.value : 1.0,
+                                  child: child),
+                              child: Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                    color: _gpsActive
+                                        ? AppColors.primaryLight
+                                        : AppColors.lightGrey,
+                                    borderRadius: BorderRadius.circular(12)),
+                                child: Icon(Icons.gps_fixed_rounded,
+                                    color: _gpsActive
+                                        ? AppColors.primary
+                                        : AppColors.textGrey,
+                                    size: 26),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  const Text('GPS Tracking',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700)),
+                                  Text(_gpsActive ? '• AKTIF' : '• NONAKTIF',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: _gpsActive
+                                              ? AppColors.primary
+                                              : AppColors.textGrey)),
+                                ])),
+                            _gpsLoading
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primary))
+                                : Switch(
+                                    value: _gpsActive,
+                                    onChanged: bus.isActive ? _toggleGps : null,
+                                    activeColor: AppColors.primary),
+                          ],
+                        ),
+                      ),
+
+                      // Error GPS
+                      if (_gpsError.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFFEE2E2),
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Row(children: [
+                            const Icon(Icons.error_outline,
+                                color: AppColors.red, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                child: Text(_gpsError,
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12,
+                                        color: AppColors.red))),
+                          ]),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+
+                      // Peta + info live hanya kalau GPS aktif
+                      if (_gpsActive) ...[
+                        const Text('Posisi Saat Ini',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 16,
-                                color: AppColors.textGrey)),
-                        const SizedBox(height: 4),
-                        const Text('Hubungi admin untuk mendapatkan tugas bus',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                color: AppColors.textGrey)),
-                      ]),
-                    ),
-                  ],
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 10),
+                        StreamBuilder<List<BusModel>>(
+                          stream: widget.dataService.busesStream,
+                          builder: (context, snapshot) {
+                            final buses =
+                                snapshot.data ?? widget.dataService.buses;
+                            final updatedBus = buses.firstWhere(
+                                (b) => b.id == bus.id,
+                                orElse: () => bus);
+                            return Column(
+                              children: [
+                                // Peta OpenStreetMap
+                                BusMapWidget(
+                                  buses: [updatedBus],
+                                  height: 260,
+                                  showAllBuses: false,
+                                  focusBus: updatedBus,
+                                  interactive: true,
+                                  driverLocation: _driverLatLng,
+                                  routes: updatedBus.routeList,
+                                  showRoutes: updatedBus.routeList.isNotEmpty,
+                                  navigationPolyline: _navPolyline,
+                                ),
+                                // Info halte tujuan berikutnya
+                                if (_gpsActive && _targetHalte != null)
+                                  _NextHalteBanner(
+                                    halte: _targetHalte!,
+                                    halteIndex: _targetHalteIndex,
+                                    driverPos: _driverLatLng,
+                                    routingService: _routingService,
+                                  ),
+                                const SizedBox(height: 12),
+                                // Speed & heading info
+                                Row(children: [
+                                  Expanded(
+                                      child: _InfoTile(
+                                          icon: Icons.speed_rounded,
+                                          label: 'Kecepatan',
+                                          value:
+                                              '${updatedBus.speed.toStringAsFixed(0)} km/h',
+                                          color: AppColors.primary)),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                      child: _InfoTile(
+                                          icon: Icons.explore_rounded,
+                                          label: 'Arah',
+                                          value: _headingToText(
+                                              updatedBus.heading),
+                                          color: AppColors.orange)),
+                                ]),
+                              ],
+                            );
+                          },
+                        ),
+                      ] else ...[
+                        // Pesan jika GPS belum aktif
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: AppColors.pendingOrange
+                                      .withValues(alpha: 0.3))),
+                          child: const Row(children: [
+                            Icon(Icons.info_outline,
+                                color: AppColors.pendingOrange),
+                            SizedBox(width: 12),
+                            Expanded(
+                                child: Text(
+                                    'Aktifkan GPS Tracking agar siswa dapat melacak posisi bus secara realtime.',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 13,
+                                        color: AppColors.orange))),
+                          ]),
+                        ),
+                      ],
+                    ] else if (widget.isLoadingBus) ...[
+                      // [FIX] Loading saat data bus masih diambil dari API
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16)),
+                        child: const Column(children: [
+                          CircularProgressIndicator(color: AppColors.primary),
+                          SizedBox(height: 16),
+                          Text('Memuat informasi bus...',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  color: AppColors.textGrey)),
+                        ]),
+                      ),
+                    ] else ...[
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16)),
+                        child: Column(children: [
+                          Icon(Icons.directions_bus_outlined,
+                              size: 64,
+                              color: AppColors.primary.withValues(alpha: 0.5)),
+                          const SizedBox(height: 12),
+                          const Text('Belum ada bus yang ditugaskan',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 16,
+                                  color: AppColors.textGrey)),
+                          const SizedBox(height: 4),
+                          const Text(
+                              'Hubungi admin untuk mendapatkan tugas bus',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  color: AppColors.textGrey)),
+                        ]),
+                      ),
+                    ],
 
-                  // ── Quick Actions Driver ────────────────────────────
-                  const SizedBox(height: 24),
-                  const Text('Aksi Cepat',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.black)),
-                  const SizedBox(height: 12),
-                  Column(children: [
-                    Row(children: [
-                      Expanded(
-                          child: _DQA(
-                              icon: Icons.qr_code_scanner_rounded,
-                              label: 'Scan QR Siswa',
-                              color: AppColors.primary,
-                              bg: AppColors.primaryLight,
-                              onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) => ScanQrScreen(
-                                          dataService: widget.dataService))))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _DQA(
-                              icon: Icons.description_rounded,
-                              label: 'Laporan Harian',
-                              color: AppColors.blue,
-                              bg: const Color(0xFFE3F2FD),
-                              onTap: () => Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                      builder: (_) => LaporanOperasionalScreen(
-                                          dataService: widget.dataService,
-                                          driverId: widget.driver.idStr,
-                                          busId: widget.bus?.id))))),
-                    ]),
+                    // ── Quick Actions Driver ────────────────────────────
+                    const SizedBox(height: 24),
+                    const Text('Aksi Cepat',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.black)),
                     const SizedBox(height: 12),
-                    Row(children: [
-                      Expanded(
-                          child: _DQA(
-                              icon: Icons.people_rounded,
-                              label: 'Daftar Siswa',
-                              color: AppColors.purple,
-                              bg: const Color(0xFFF3E5F5),
-                              onTap: () => _showSiswaSheet(
-                                  context, widget.dataService))),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: _DQA(
-                              icon: Icons.route_rounded,
-                              label: 'Info Rute Bus',
-                              color: AppColors.pendingOrange,
-                              bg: AppColors.orange.withValues(alpha: 0.1),
-                              onTap: () =>
-                                  _showRuteSheet(context, widget.bus))),
+                    Column(children: [
+                      Row(children: [
+                        Expanded(
+                            child: _DQA(
+                                icon: Icons.qr_code_scanner_rounded,
+                                label: 'Scan QR Siswa',
+                                color: AppColors.primary,
+                                bg: AppColors.primaryLight,
+                                onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                        builder: (_) => ScanQrScreen(
+                                            dataService:
+                                                widget.dataService))))),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: _DQA(
+                                icon: Icons.description_rounded,
+                                label: 'Laporan Harian',
+                                color: AppColors.blue,
+                                bg: const Color(0xFFE3F2FD),
+                                onTap: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                        builder: (_) =>
+                                            LaporanOperasionalScreen(
+                                                dataService: widget.dataService,
+                                                driverId: widget.driver.idStr,
+                                                busId: widget.bus?.id))))),
+                      ]),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(
+                            child: _DQA(
+                                icon: Icons.people_rounded,
+                                label: 'Daftar Siswa',
+                                color: AppColors.purple,
+                                bg: const Color(0xFFF3E5F5),
+                                onTap: () => _showSiswaSheet(
+                                    context, widget.dataService))),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: _DQA(
+                                icon: Icons.route_rounded,
+                                label: 'Info Rute Bus',
+                                color: AppColors.pendingOrange,
+                                bg: AppColors.orange.withValues(alpha: 0.1),
+                                onTap: () =>
+                                    _showRuteSheet(context, widget.bus))),
+                      ]),
                     ]),
-                  ]),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      ), // SafeArea
+    ); // ColoredBox
   }
 
   String _headingToText(double heading) {
