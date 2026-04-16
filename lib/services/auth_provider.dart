@@ -92,6 +92,16 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Refresh data user + bus dari API — dipakai DriverDashboard saat cache kosong.
+  /// Memanggil notifyListeners() agar semua widget listener ikut terupdate.
+  Future<void> refreshDriverBus() async {
+    final user = await _authService.getMeWithBus();
+    if (user != null) {
+      _currentUser = user;
+      notifyListeners();
+    }
+  }
+
   Future<bool> tryAutoLogin() async {
     try {
       final loggedIn = await _authService.isLoggedIn();

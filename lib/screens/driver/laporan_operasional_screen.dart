@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart'; // ← TAMBAH INI
 import 'package:open_filex/open_filex.dart';
 import '../../services/app_data_service.dart';
 import '../../services/report_service.dart';
@@ -42,7 +43,10 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchReport();
+    initializeDateFormatting('id_ID', null).then((_) {
+      // ← TAMBAH INI (fallback safety)
+      if (mounted) _fetchReport();
+    });
   }
 
   @override

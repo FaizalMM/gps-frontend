@@ -26,23 +26,48 @@ class _DriverDashboardState extends State<DriverDashboard> {
   int _currentIndex = 0;
   int _stackIndex = 0;
   final AppDataService _dataService = AppDataService();
-  // Bus aktif driver — diambil dari cache login, tanpa request tambahan
   BusModel? _driverBus;
+
+  // [FIX 1] Lacak apakah sedang refresh bus dari API — untuk tampilkan loading
+  bool _isRefreshingBus = false;
 
   @override
   void initState() {
     super.initState();
-    // Ambil bus dari cache yang sudah diisi saat login — 0ms, no network call
     _driverBus = Provider.of<AuthProvider>(context, listen: false)
         .authService
         .cachedDriverBus;
+
+    if (_driverBus == null) {
+      _refreshBusFromApi();
+    }
+  }
+
+  // [FIX 2] Gunakan refreshDriverBus() dari AuthProvider agar notifyListeners()
+  // ikut dipanggil dan semua widget listener terupdate secara konsisten
+  Future<void> _refreshBusFromApi() async {
+    if (!mounted) return;
+    setState(() => _isRefreshingBus = true);
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.refreshDriverBus(); // notifyListeners() ada di dalam
+    final refreshedBus = authProvider.authService.cachedDriverBus;
+
+    if (mounted) {
+      setState(() {
+        _isRefreshingBus = false;
+        if (refreshedBus != null) _driverBus = refreshedBus;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final currentUser = context.read<AuthProvider>().currentUser!;
     final BusModel? bus = _driverBus;
-    const bool isLoadingBus = false;
+
+    // [FIX 3] isLoadingBus sekarang dinamis — bukan selalu false
+    final bool isLoadingBus = _isRefreshingBus && bus == null;
 
     return PopScope(
       canPop: false,
@@ -54,7 +79,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
             _stackIndex = 0;
           });
         }
-        // Kalau sudah di tab 0, cegah pop keluar (hindari layar hitam)
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
@@ -80,7 +104,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
               );
               return;
             }
-            // i == 2 → buka Laporan via push (lazy, bukan IndexedStack)
             if (i == 2) {
               Navigator.push(
                 context,
@@ -124,6 +147,8 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 }
 
+// ── _DriverHomeTab ────────────────────────────────────────────
+
 class _DriverHomeTab extends StatefulWidget {
   final UserModel driver;
   final BusModel? bus;
@@ -146,10 +171,9 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   bool _gpsActive = false;
   bool _gpsLoading = false;
   String _gpsError = '';
-  // Navigasi: polyline dari posisi driver ke halte berikutnya
   List<LatLng> _navPolyline = [];
-  int _targetHalteIndex = 0; // index halte yang sedang dituju
-  HalteModel? _targetHalte; // halte tujuan saat ini
+  int _targetHalteIndex = 0;
+  HalteModel? _targetHalte;
   LatLng? _driverLatLng;
   StreamSubscription<Position>? _positionSub;
 
@@ -161,13 +185,11 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     super.initState();
     _gpsActive = widget.bus?.gpsActive ?? false;
 
-    // Subscribe ke stream posisi GPS — update marker + navigasi real-time
     _positionSub = _gpsService.positionStream.listen((position) {
       if (!mounted || position.latitude == 0) return;
       final pos = LatLng(position.latitude, position.longitude);
       setState(() => _driverLatLng = pos);
 
-      // Update navigasi ke halte berikutnya setiap update posisi
       final bus = widget.bus;
       if (_gpsActive && bus != null && bus.routeList.isNotEmpty) {
         final haltes = bus.routeList.first.haltes;
@@ -175,17 +197,13 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
       }
     });
 
-    // Jika GPS sudah aktif dari DB (saat app restart setelah force-close):
-    // resume tracking tanpa toggle manual
     if (_gpsActive) {
       if (_gpsService.isTracking) {
-        // GpsService masih tracking (navigasi antar halaman) — ambil posisi terakhir
         if (_gpsService.lastPosition != null) {
           final p = _gpsService.lastPosition!;
           _driverLatLng = LatLng(p.latitude, p.longitude);
         }
       } else {
-        // App baru dibuka / force-close — restart tracking otomatis
         _resumeTracking();
       }
     }
@@ -200,16 +218,10 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   @override
   void dispose() {
     _positionSub?.cancel();
-    // JANGAN panggil stopTracking() di sini — GPS harus tetap jalan
-    // saat navigasi ke halaman lain (scan, laporan, profil).
-    // stopTracking() hanya dipanggil saat user sengaja matikan toggle GPS
-    // atau saat logout.
     _pulseController.dispose();
     super.dispose();
   }
 
-  /// Resume tracking GPS saat app dibuka kembali setelah force-close
-  /// dan DB masih mencatat gps_status = 'on'
   Future<void> _resumeTracking() async {
     final started = await _gpsService.startTracking();
     if (!mounted) return;
@@ -219,34 +231,27 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
         final latLng = LatLng(pos.latitude, pos.longitude);
         setState(() => _driverLatLng = latLng);
         await _gpsService.sendCurrentPosition(pos);
-        // Resume navigasi dari posisi saat ini
         await _initNavigation(latLng);
       }
     } else {
-      // Gagal restart (izin dicabut, GPS hp dimatikan, dll)
-      // Reset state dan update DB ke off
       setState(() => _gpsActive = false);
       await _gpsService.stopTracking();
     }
   }
 
-  /// Inisiasi navigasi ke halte pertama saat GPS diaktifkan
   Future<void> _initNavigation(LatLng driverPos) async {
     final bus = widget.bus;
     if (bus == null || bus.routeList.isEmpty) return;
     final route = bus.routeList.first;
     if (route.haltes.isEmpty) return;
-
     _targetHalteIndex = 0;
     await _updateNavigation(driverPos, route.haltes);
   }
 
-  /// Update polyline navigasi ke halte berikutnya
   Future<void> _updateNavigation(
       LatLng driverPos, List<RouteHalteModel> haltes) async {
     if (haltes.isEmpty) return;
 
-    // Cek apakah sudah melewati halte saat ini
     final nextIdx = _routingService.getNextHalteIndex(
       driverPos: driverPos,
       haltes: haltes,
@@ -257,7 +262,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
       setState(() => _targetHalteIndex = nextIdx);
     }
 
-    // Sudah melewati semua halte
     if (_targetHalteIndex >= haltes.length) {
       if (mounted)
         setState(() {
@@ -284,17 +288,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     }
   }
 
-  /// Ambil posisi perangkat saat ini secara async saat GPS sudah aktif
-  /// tapi posisi belum tersedia (misal setelah restart atau buka ulang layar)
-  Future<void> _fetchInitialPosition() async {
-    final pos = await _gpsService.getCurrentPosition();
-    if (mounted && pos != null) {
-      setState(() {
-        _driverLatLng = LatLng(pos.latitude, pos.longitude);
-      });
-    }
-  }
-
   String _getGreeting() {
     final h = DateTime.now().hour;
     if (h < 12) return 'Selamat pagi,';
@@ -304,16 +297,13 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
 
   Future<void> _toggleGps(bool value) async {
     if (widget.bus == null) return;
-
     setState(() {
       _gpsLoading = true;
       _gpsError = '';
     });
 
     if (value) {
-      // Aktifkan GPS → minta permission → mulai tracking lokasi HP
-      final started =
-          await _gpsService.startTracking(); // API call ada di GpsService
+      final started = await _gpsService.startTracking();
       if (started) {
         final currentPos = await _gpsService.getCurrentPosition();
         if (!mounted) return;
@@ -328,7 +318,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
           _gpsLoading = false;
           if (pos != null) _driverLatLng = pos;
         });
-        // Inisiasi navigasi dari posisi awal driver ke halte pertama
         if (pos != null) await _initNavigation(pos);
       } else {
         setState(() {
@@ -338,7 +327,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
         });
       }
     } else {
-      // Matikan GPS → stop tracking
       _gpsService.stopTracking();
       setState(() {
         _gpsActive = false;
@@ -485,7 +473,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                       fontWeight: FontWeight.w700)),
               const SizedBox(height: 14),
               if (widget.isLoadingBus && bus == null)
-                // [FIX] Tampilkan loading saat data bus sedang dimuat dari API
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Row(children: [
@@ -522,7 +509,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                     icon: Icons.people_rounded,
                     label: 'Status',
                     value: bus.isActive ? 'Aktif Beroperasi' : 'Tidak Aktif'),
-                // List halte berurutan
                 if (bus.routeList.isEmpty && bus.rute.isEmpty) ...[
                   const SizedBox(height: 8),
                   Container(
@@ -675,9 +661,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                       ]),
                     ),
                     const SizedBox(height: 24),
-
                     if (bus != null) ...[
-                      // Card info bus
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -728,8 +712,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                         ),
                       ),
                       const SizedBox(height: 12),
-
-                      // Card GPS toggle
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -799,8 +781,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                           ],
                         ),
                       ),
-
-                      // Error GPS
                       if (_gpsError.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         Container(
@@ -822,8 +802,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                         ),
                       ],
                       const SizedBox(height: 20),
-
-                      // Peta + info live hanya kalau GPS aktif
                       if (_gpsActive) ...[
                         const Text('Posisi Saat Ini',
                             style: TextStyle(
@@ -841,7 +819,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                 orElse: () => bus);
                             return Column(
                               children: [
-                                // Peta OpenStreetMap
                                 BusMapWidget(
                                   buses: [updatedBus],
                                   height: 260,
@@ -853,7 +830,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                   showRoutes: updatedBus.routeList.isNotEmpty,
                                   navigationPolyline: _navPolyline,
                                 ),
-                                // Info halte tujuan berikutnya
                                 if (_gpsActive && _targetHalte != null)
                                   _NextHalteBanner(
                                     halte: _targetHalte!,
@@ -862,7 +838,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                     routingService: _routingService,
                                   ),
                                 const SizedBox(height: 12),
-                                // Speed & heading info
                                 Row(children: [
                                   Expanded(
                                       child: _InfoTile(
@@ -885,7 +860,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                           },
                         ),
                       ] else ...[
-                        // Pesan jika GPS belum aktif
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
@@ -909,7 +883,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                         ),
                       ],
                     ] else if (widget.isLoadingBus) ...[
-                      // [FIX] Loading saat data bus masih diambil dari API
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -953,8 +926,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                         ]),
                       ),
                     ],
-
-                    // ── Quick Actions Driver ────────────────────────────
                     const SizedBox(height: 24),
                     const Text('Aksi Cepat',
                         style: TextStyle(
@@ -1018,8 +989,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
             ],
           ),
         ),
-      ), // SafeArea
-    ); // ColoredBox
+      ),
+    );
   }
 
   String _headingToText(double heading) {
@@ -1034,7 +1005,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   }
 }
 
-// ── Driver Quick Action tile (2x2 grid style) ───────────────
+// ── _DQA ─────────────────────────────────────────────────────
+
 class _DQA extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1085,66 +1057,10 @@ class _DQA extends StatelessWidget {
   }
 }
 
-class _DriverQuickAction extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color bgColor;
-  final VoidCallback onTap;
+// [FIX 4] _DriverQuickAction DIHAPUS — tidak dipakai, sudah digantikan _DQA
 
-  const _DriverQuickAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.bgColor,
-    required this.onTap,
-  });
+// ── Banner halte berikutnya ───────────────────────────────────
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3))
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                  color: bgColor, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 22),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.black,
-                  height: 1.3),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Banner info halte berikutnya ─────────────────────────────
 class _NextHalteBanner extends StatelessWidget {
   final HalteModel halte;
   final int halteIndex;
@@ -1279,6 +1195,8 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
+
+// ── Profile Tab ───────────────────────────────────────────────
 
 class _DriverProfileTab extends StatefulWidget {
   final UserModel driver;
