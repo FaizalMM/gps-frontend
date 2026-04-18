@@ -219,10 +219,42 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   }
 
   void _showSuccessSnack(String msg, String path) {
+    final fileName = path.split('/').last;
+    final isDownloads = path.contains('/Download');
+
+    // Tampilkan folder lokasi yang jelas kepada user
+    final folderPath = path.substring(0, path.lastIndexOf('/'));
+    final locationLabel = isDownloads
+        ? '📁 Folder: Download'
+        : '📁 Folder: Penyimpanan internal app';
+    final locationHint = isDownloads
+        ? 'Buka File Manager → Download'
+        : 'File Manager → Internal → Android → data';
+
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$msg: ${path.split('/').last}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('$msg berhasil! File otomatis terbuka.',
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 4),
+          Text(locationLabel,
+              style: const TextStyle(fontSize: 12, color: Colors.white)),
+          Text(locationHint,
+              style: const TextStyle(fontSize: 11, color: Colors.white70)),
+          const SizedBox(height: 2),
+          Text('📄 $fileName',
+              style: const TextStyle(fontSize: 11, color: Colors.white70)),
+          Text('📂 $folderPath',
+              style: const TextStyle(fontSize: 10, color: Colors.white54),
+              overflow: TextOverflow.ellipsis),
+        ],
+      ),
       backgroundColor: AppColors.primary,
       behavior: SnackBarBehavior.floating,
+      duration: const Duration(seconds: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ));
   }
