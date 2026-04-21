@@ -287,16 +287,26 @@ class _ResultSheet extends StatelessWidget {
 }
 
 // ── Sheet: Sukses ────────────────────────────────────────────
-class _SuccessSheet extends StatelessWidget {
+class _SuccessSheet extends StatefulWidget {
   final AttendanceModel attendance;
   final VoidCallback onNext;
   const _SuccessSheet({required this.attendance, required this.onNext});
 
   @override
+  State<_SuccessSheet> createState() => _SuccessSheetState();
+}
+
+class _SuccessSheetState extends State<_SuccessSheet> {
+  @override
   Widget build(BuildContext context) {
+    final attendance = widget.attendance;
     final initials = attendance.studentName.isNotEmpty
         ? attendance.studentName[0].toUpperCase()
         : '?';
+    final waktuNaik = attendance.waktuNaik != null
+        ? '${attendance.waktuNaik!.hour.toString().padLeft(2, '0')}:${attendance.waktuNaik!.minute.toString().padLeft(2, '0')}'
+        : '-';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 36),
       decoration: const BoxDecoration(
@@ -349,7 +359,7 @@ class _SuccessSheet extends StatelessWidget {
           decoration: BoxDecoration(
               color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(20)),
-          child: const Text('✅  RUTE SESUAI — TERVERIFIKASI',
+          child: const Text('✅  RUTE SESUAI — BERHASIL NAIK',
               style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,
@@ -358,7 +368,7 @@ class _SuccessSheet extends StatelessWidget {
                   letterSpacing: 0.5)),
         ),
         const SizedBox(height: 16),
-        // Info rute + halte
+        // Info rute + halte + waktu
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(14),
@@ -384,19 +394,41 @@ class _SuccessSheet extends StatelessWidget {
             Container(width: 1, height: 36, color: AppColors.lightGrey),
             Expanded(
                 child: _InfoCol(
-              label: 'BUS',
-              value: attendance.platNomor.isNotEmpty
-                  ? attendance.platNomor
-                  : attendance.busCode,
+              label: 'JAM NAIK',
+              value: waktuNaik,
+              color: AppColors.primary,
             )),
           ]),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        // Info: checkout dilakukan saat siswa turun via dashboard
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(12)),
+          child: const Row(children: [
+            Icon(Icons.info_outline_rounded,
+                color: AppColors.primary, size: 16),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Siswa tercatat di bus. Checkout dilakukan saat siswa turun melalui menu Dashboard → Penumpang Hari Ini.',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    color: AppColors.primaryDark,
+                    height: 1.4),
+              ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           height: 50,
           child: ElevatedButton(
-            onPressed: onNext,
+            onPressed: widget.onNext,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -404,21 +436,12 @@ class _SuccessSheet extends StatelessWidget {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text('Konfirmasi Naik Bus',
+            child: const Text('Scan Berikutnya',
                 style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 15,
                     fontWeight: FontWeight.w700)),
           ),
-        ),
-        const SizedBox(height: 10),
-        TextButton(
-          onPressed: onNext,
-          child: const Text('Scan Berikutnya',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  color: AppColors.textGrey)),
         ),
       ]),
     );

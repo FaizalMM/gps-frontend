@@ -320,9 +320,11 @@ class BusModel {
       //   punya gps_status → gpsOn tetap false (default)
       gpsOn = statusOn;
     }
-    // Fallback ke koordinat Madiun hanya untuk tampilan default (bukan GPS live)
-    if (lat == 0.0) lat = -7.6298;
-    if (lng == 0.0) lng = 111.5239;
+    // Fallback ke koordinat Madiun HANYA jika GPS sedang off (bukan active)
+    // Jika gps_status='on' tapi belum ada koordinat hari ini (current_position=null),
+    // biarkan 0,0 — bus_map_widget sudah filter lat==0 agar marker tidak muncul
+    if (lat == 0.0 && !gpsOn) lat = -7.6298;
+    if (lng == 0.0 && !gpsOn) lng = 111.5239;
 
     // Rute dari relasi
     String rute = '';

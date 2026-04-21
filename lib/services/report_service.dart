@@ -134,7 +134,7 @@ class ReportService {
         'tanggal': tanggal,
         if (catatanDriver != null) 'catatan_driver': catatanDriver,
       },
-      filename: 'laporan_driver_${busId}_$tanggal.pdf',
+      fallbackFilename: 'Laporan_driver_$tanggal.pdf',
     );
   }
 
@@ -150,7 +150,7 @@ class ReportService {
         'tanggal': tanggal,
         if (catatanDriver != null) 'catatan_driver': catatanDriver,
       },
-      filename: 'laporan_driver_${busId}_$tanggal.xlsx',
+      fallbackFilename: 'Laporan_driver_$tanggal.xlsx',
     );
   }
 
@@ -159,7 +159,7 @@ class ReportService {
   Future<String?> _downloadFile({
     required String endpoint,
     required Map<String, String> params,
-    required String filename,
+    required String fallbackFilename,
   }) async {
     try {
       final token = await _api.getToken();
@@ -182,6 +182,28 @@ class ReportService {
       if (bytes.isEmpty) {
         if (kDebugMode) debugPrint('[ReportService] Response kosong');
         return null;
+      }
+
+      // Ambil nama file dari header Content-Disposition jika ada
+      // Contoh: attachment; filename="Laporan_Ahmad_2025-01-15.pdf"
+      String filename = fallbackFilename;
+      final contentDisposition = response.headers['content-disposition'] ?? '';
+      if (contentDisposition.contains('filename')) {
+        // Parse: filename="Laporan_Ahmad.pdf" atau filename=Laporan_Ahmad.pdf
+        final parts = contentDisposition.split('filename');
+        if (parts.length > 1) {
+          String namePart = parts.last
+              .replaceFirst('=', '')
+              .replaceAll('"', '')
+              .replaceAll("'", '')
+              .trim();
+          if (namePart.contains(';')) {
+            namePart = namePart.split(';').first.trim();
+          }
+          if (namePart.isNotEmpty) {
+            filename = namePart;
+          }
+        }
       }
 
       final path = await _saveToDownloads(bytes, filename);

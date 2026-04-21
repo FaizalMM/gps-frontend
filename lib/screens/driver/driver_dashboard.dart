@@ -8,6 +8,8 @@ import '../../services/auth_provider.dart';
 import '../../services/app_data_service.dart';
 import '../../services/gps_service.dart';
 import '../../services/routing_service.dart';
+import '../../services/bus_service.dart';
+import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/bus_map_widget.dart';
@@ -177,6 +179,10 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   LatLng? _driverLatLng;
   StreamSubscription<Position>? _positionSub;
 
+  // Absensi hari ini — diperbarui setiap 15 detik saat GPS aktif
+  List<Map<String, dynamic>> _attendanceToday = [];
+  Timer? _attendancePollTimer;
+
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
 
@@ -213,11 +219,26 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
           ..repeat(reverse: true);
     _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
         CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+
+    // Load absensi awal + mulai polling
+    _loadAttendanceToday();
+    _attendancePollTimer = Timer.periodic(
+        const Duration(seconds: 15), (_) => _loadAttendanceToday());
+  }
+
+  Future<void> _loadAttendanceToday() async {
+    final bus = widget.bus;
+    if (bus == null || !mounted) return;
+    try {
+      final list = await DriverService().getBusAttendanceToday(bus.id);
+      if (mounted) setState(() => _attendanceToday = list);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _positionSub?.cancel();
+    _attendancePollTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
@@ -339,8 +360,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   }
 
   void _showSiswaSheet(BuildContext ctx, AppDataService ds) {
-    final siswa =
-        ds.siswaList.where((u) => u.status == AccountStatus.active).toList();
+    final bus = widget.bus;
+
     showModalBottomSheet(
       context: ctx,
       backgroundColor: Colors.transparent,
@@ -349,97 +370,9 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
         initialChildSize: 0.55,
         maxChildSize: 0.85,
         minChildSize: 0.3,
-        builder: (_, ctrl) => Container(
-          decoration: const BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-          child: Column(children: [
-            Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                child: Row(children: [
-                  Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: AppColors.lightGrey,
-                          borderRadius: BorderRadius.circular(2))),
-                  const Spacer(),
-                  const Text('Siswa di Rute Ini',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  Text('${siswa.length} siswa',
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          color: AppColors.textGrey)),
-                ])),
-            Expanded(
-              child: siswa.isEmpty
-                  ? const Center(
-                      child: Text('Belum ada siswa terdaftar',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              color: AppColors.textGrey)))
-                  : ListView.builder(
-                      controller: ctrl,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 30),
-                      itemCount: siswa.length,
-                      itemBuilder: (_, i) {
-                        final s = siswa[i];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                              color: AppColors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 8)
-                              ]),
-                          child: Row(children: [
-                            Container(
-                                width: 40,
-                                height: 40,
-                                decoration: const BoxDecoration(
-                                    color: AppColors.primaryLight,
-                                    shape: BoxShape.circle),
-                                child: Center(
-                                    child: Text(s.namaLengkap[0].toUpperCase(),
-                                        style: const TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.primary,
-                                            fontSize: 16)))),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(s.namaLengkap,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600)),
-                                  Text(s.alamat.isEmpty ? '-' : s.alamat,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 11,
-                                          color: AppColors.textGrey)),
-                                ])),
-                            const Icon(Icons.qr_code_rounded,
-                                size: 18, color: AppColors.textGrey),
-                          ]),
-                        );
-                      }),
-            ),
-          ]),
+        builder: (_, ctrl) => _SiswaListSheet(
+          bus: bus,
+          scrollCtrl: ctrl,
         ),
       ),
     );
@@ -983,6 +916,195 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                     _showRuteSheet(context, widget.bus))),
                       ]),
                     ]),
+                    const SizedBox(height: 24),
+
+                    // ── Penumpang Hari Ini ─────────────────────────
+                    Row(children: [
+                      const Expanded(
+                          child: Text('Penumpang Hari Ini',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.black))),
+                      GestureDetector(
+                        onTap: _loadAttendanceToday,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(20)),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(
+                              '${_attendanceToday.length} siswa',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.refresh_rounded,
+                                size: 13, color: AppColors.primary),
+                          ]),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 10),
+
+                    if (_attendanceToday.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 8)
+                            ]),
+                        child: const Column(children: [
+                          Icon(Icons.people_outline_rounded,
+                              size: 36, color: AppColors.lightGrey),
+                          SizedBox(height: 8),
+                          Text('Belum ada siswa naik hari ini',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  color: AppColors.textGrey)),
+                        ]),
+                      )
+                    else
+                      Column(
+                        children: _attendanceToday.map((a) {
+                          final name = a['student_name'] as String? ?? '-';
+                          final halte = a['halte_naik'] as String? ?? '-';
+                          final sudahTurun = a['waktu_turun'] != null;
+                          final qrId = a['qr_id'] as String? ?? '';
+                          final waktuNaik = a['waktu_naik'] as String?;
+                          final waktuTurun = a['waktu_turun'] as String?;
+                          String jam = '';
+                          if (waktuNaik != null) {
+                            final dt = DateTime.tryParse(waktuNaik);
+                            if (dt != null) {
+                              jam =
+                                  '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                            }
+                          }
+                          String jamTurun = '';
+                          if (waktuTurun != null) {
+                            final dt = DateTime.tryParse(waktuTurun);
+                            if (dt != null) {
+                              jamTurun =
+                                  '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                            }
+                          }
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                                color: AppColors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 8)
+                                ]),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                        color: sudahTurun
+                                            ? AppColors.primaryLight
+                                            : AppColors.orange
+                                                .withValues(alpha: 0.12),
+                                        shape: BoxShape.circle),
+                                    child: Center(
+                                        child: Text(
+                                      name.isNotEmpty
+                                          ? name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                          color: sudahTurun
+                                              ? AppColors.primary
+                                              : AppColors.orange),
+                                    )),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                      child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                        Text(name,
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.black)),
+                                        Text(
+                                          [
+                                            if (jam.isNotEmpty) 'Naik $jam',
+                                            if (halte != '-') '\u2022 $halte',
+                                            if (jamTurun.isNotEmpty)
+                                              '\u2022 Turun $jamTurun',
+                                          ].join(' '),
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 11,
+                                              color: AppColors.textGrey),
+                                        ),
+                                      ])),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: sudahTurun
+                                            ? AppColors.primaryLight
+                                            : AppColors.orange
+                                                .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(8)),
+                                    child: Text(
+                                      sudahTurun ? 'Sudah Turun' : 'Di Bus',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: sudahTurun
+                                              ? AppColors.primary
+                                              : AppColors.orange),
+                                    ),
+                                  ),
+                                ]),
+                                // Tombol checkout — hanya muncul jika siswa masih di bus
+                                if (!sudahTurun && qrId.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 36,
+                                    child: _CheckoutButton(
+                                      qrId: qrId,
+                                      studentName: name,
+                                      onDone: _loadAttendanceToday,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -1442,6 +1564,409 @@ class _RuteItem extends StatelessWidget {
                   color: AppColors.black)),
         ])),
       ]),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// _SiswaListSheet — list siswa yang terdaftar di bus driver ini
+// Data diambil dari API /buses/{id}/students bukan dari stream global
+// ══════════════════════════════════════════════════════════════
+class _SiswaListSheet extends StatefulWidget {
+  final BusModel? bus;
+  final ScrollController scrollCtrl;
+  const _SiswaListSheet({required this.bus, required this.scrollCtrl});
+  @override
+  State<_SiswaListSheet> createState() => _SiswaListSheetState();
+}
+
+class _SiswaListSheetState extends State<_SiswaListSheet> {
+  List<UserModel> _siswa = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final bus = widget.bus;
+    if (bus == null) {
+      setState(() {
+        _error = 'Bus belum ditugaskan ke akun driver ini.';
+        _loading = false;
+      });
+      return;
+    }
+    try {
+      final list = await BusService().getBusStudents(bus.id);
+      if (!mounted) return;
+      setState(() {
+        _siswa = list;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Gagal memuat daftar siswa.';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final busName = widget.bus?.nama ?? '-';
+    return Container(
+      decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      child: Column(children: [
+        // Handle + header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+          child: Column(children: [
+            Center(
+              child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(2))),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.people_rounded,
+                    color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Siswa di Bus Saya',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.black)),
+                      Text(busName,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              color: AppColors.textGrey)),
+                    ]),
+              ),
+              if (!_loading)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(20)),
+                  child: Text(
+                    '${_siswa.length} siswa',
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary),
+                  ),
+                ),
+            ]),
+          ]),
+        ),
+        const Divider(height: 1, color: AppColors.lightGrey),
+
+        // Content
+        Expanded(
+          child: _loading
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : _error != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.info_outline_rounded,
+                              size: 48, color: AppColors.textGrey),
+                          const SizedBox(height: 12),
+                          Text(_error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 13,
+                                  color: AppColors.textGrey)),
+                        ]),
+                      ),
+                    )
+                  : _siswa.isEmpty
+                      ? Center(
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.person_off_outlined,
+                                size: 52,
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.3)),
+                            const SizedBox(height: 12),
+                            const Text('Belum ada siswa terdaftar',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textGrey)),
+                            const SizedBox(height: 6),
+                            const Text('Hubungi admin untuk menambahkan siswa',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 12,
+                                    color: AppColors.textGrey)),
+                          ]),
+                        )
+                      : ListView.builder(
+                          controller: widget.scrollCtrl,
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 30),
+                          itemCount: _siswa.length,
+                          itemBuilder: (_, i) {
+                            final s = _siswa[i];
+                            final initial = s.namaLengkap.isNotEmpty
+                                ? s.namaLengkap[0].toUpperCase()
+                                : '?';
+                            // Ambil info halte dari studentDetail jika tersedia
+                            final halteId =
+                                s.studentDetail?.halteId?.toString();
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                  color: AppColors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.04),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2))
+                                  ]),
+                              child: Row(children: [
+                                // Avatar inisial
+                                Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: const BoxDecoration(
+                                        color: AppColors.primaryLight,
+                                        shape: BoxShape.circle),
+                                    child: Center(
+                                        child: Text(initial,
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.primary,
+                                                fontSize: 18)))),
+                                const SizedBox(width: 12),
+                                // Info siswa
+                                Expanded(
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                      Text(s.namaLengkap,
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.black)),
+                                      const SizedBox(height: 2),
+                                      if (s.alamat.isNotEmpty)
+                                        Row(children: [
+                                          const Icon(Icons.location_on_rounded,
+                                              size: 11,
+                                              color: AppColors.textGrey),
+                                          const SizedBox(width: 3),
+                                          Expanded(
+                                              child: Text(s.alamat,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                      fontFamily: 'Poppins',
+                                                      fontSize: 11,
+                                                      color:
+                                                          AppColors.textGrey))),
+                                        ]),
+                                    ])),
+                                // Status badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: s.status == AccountStatus.active
+                                        ? AppColors.primaryLight
+                                        : AppColors.surface2,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    s.status == AccountStatus.active
+                                        ? 'Aktif'
+                                        : 'Non-aktif',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: s.status == AccountStatus.active
+                                            ? AppColors.primary
+                                            : AppColors.textGrey),
+                                  ),
+                                ),
+                              ]),
+                            );
+                          }),
+        ),
+      ]),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// _CheckoutButton — tombol turunkan siswa dari list penumpang hari ini
+// Dipanggil dari driver dashboard, bukan dari scan sheet
+// ══════════════════════════════════════════════════════════════
+class _CheckoutButton extends StatefulWidget {
+  final String qrId;
+  final String studentName;
+  final VoidCallback onDone; // refresh list setelah checkout berhasil
+
+  const _CheckoutButton({
+    required this.qrId,
+    required this.studentName,
+    required this.onDone,
+  });
+
+  @override
+  State<_CheckoutButton> createState() => _CheckoutButtonState();
+}
+
+class _CheckoutButtonState extends State<_CheckoutButton> {
+  bool _loading = false;
+
+  Future<void> _doCheckout() async {
+    // Konfirmasi dulu
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Konfirmasi Turun',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w700)),
+        content: Text(
+          'Tandai ${widget.studentName} sudah turun dari bus?',
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Ya, Sudah Turun',
+                style: TextStyle(
+                    fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() => _loading = true);
+
+    // Ambil posisi GPS driver saat ini
+    Position? pos;
+    try {
+      pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 8)));
+    } catch (_) {}
+
+    final ok = await DriverService().checkoutStudent(
+      qrId: widget.qrId,
+      latitude: pos?.latitude ?? -7.6298,
+      longitude: pos?.longitude ?? 111.5239,
+    );
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: [
+          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Text('${widget.studentName} berhasil turun',
+              style: const TextStyle(
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+        ]),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 3),
+      ));
+      widget.onDone(); // refresh list penumpang
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Gagal checkout. Coba lagi.',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _loading ? null : _doCheckout,
+      icon: _loading
+          ? const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.orange))
+          : const Icon(Icons.logout_rounded, size: 14, color: AppColors.orange),
+      label: Text(
+        _loading ? 'Memproses...' : 'Turunkan Siswa',
+        style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.orange),
+      ),
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: AppColors.orange, width: 1.2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+      ),
     );
   }
 }

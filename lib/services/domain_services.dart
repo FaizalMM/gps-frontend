@@ -99,8 +99,25 @@ class StudentService {
       'latitude': latitude,
       'longitude': longitude,
     });
-    if (!res.success) return null;
+    if (!res.success) {
+      // Kembalikan map khusus berisi pesan error agar UI bisa tampilkan detail
+      return {
+        '__error':
+            res.message.isNotEmpty ? res.message : 'Gagal generate QR Code'
+      };
+    }
     return res.data!['data'] as Map<String, dynamic>?;
+  }
+
+  /// Ambil status absensi siswa hari ini (sudah naik / belum / sudah turun)
+  Future<Map<String, dynamic>?> getMyAttendanceToday(int studentId) async {
+    // Pakai endpoint baru /student/attendance/today (tanpa ID di URL)
+    // agar tidak kena 403 karena /students/{id}/attendance/today hanya untuk admin
+    final res = await _api.get('/student/attendance/today');
+    if (!res.success || res.data == null) return null;
+    final data = res.data!['data'];
+    if (data == null) return null;
+    return data as Map<String, dynamic>;
   }
 
   // Siswa: get info bus yang di-assign
@@ -254,6 +271,16 @@ class DriverService {
       'longitude': longitude,
     });
     return res.success;
+  }
+
+  /// Ambil daftar siswa yang sudah naik bus hari ini
+  /// Endpoint: GET /driver/buses/{busId}/attendance/today (driver route)
+  Future<List<Map<String, dynamic>>> getBusAttendanceToday(int busId) async {
+    final res = await _api.get('/driver/buses/$busId/attendance/today');
+    if (!res.success || res.data == null) return [];
+    final raw = res.data!['data'];
+    if (raw is! List) return [];
+    return List<Map<String, dynamic>>.from(raw);
   }
 
   // Driver: laporan harian

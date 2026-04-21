@@ -273,38 +273,57 @@ class BusService {
 
   /// Tracking bus untuk siswa — return BusModel dengan rute+halte lengkap
   /// plus my_halte (halte penjemputan siswa ini) sebagai field terpisah.
-  Future<({BusModel? bus, Map<String, dynamic>? myHalte})>
+  Future<({BusModel? bus, Map<String, dynamic>? myHalte, String? driverName})>
       getMyBusTrackingFull() async {
     final res = await _api.get('/student/bus/tracking');
-    if (!res.success || res.data == null) return (bus: null, myHalte: null);
+    if (!res.success || res.data == null) {
+      return (bus: null, myHalte: null, driverName: null);
+    }
     final d = res.data!['data'] as Map<String, dynamic>?;
-    if (d == null) return (bus: null, myHalte: null);
+    if (d == null) return (bus: null, myHalte: null, driverName: null);
 
     final pos = d['position'] as Map<String, dynamic>?;
+    final gpsActive = (d['gps_active'] as bool? ?? false) && pos != null;
+
     final bus = BusModel.fromJson({
       'id': d['bus_id'],
       'kode_bus': d['bus_code'],
       'plat_nomor': d['bus_plate'],
       'status': 'aktif',
-      'gps_active': d['gps_active'] ?? false,
+      'gps_active': gpsActive,
+      // inject driver name jika ada
+      'driver': d['driver_name'] != null
+          ? {
+              'user': {'name': d['driver_name']}
+            }
+          : null,
       // inject posisi langsung agar BusModel punya lat/lng/speed
-      'current_position': pos,
+      'current_position': gpsActive ? pos : null,
       'routes': d['routes'] ?? [],
       'created_at': DateTime.now().toIso8601String(),
     });
 
     // Terapkan posisi GPS ke field bus secara eksplisit
-    if (pos != null) {
+    if (gpsActive && pos != null) {
       bus.updateGps(
         latitude: (pos['latitude'] as num?)?.toDouble() ?? 0,
         longitude: (pos['longitude'] as num?)?.toDouble() ?? 0,
         speed: (pos['speed'] as num?)?.toDouble() ?? 0,
-        gpsActive: d['gps_active'] as bool? ?? false,
+        gpsActive: true,
+      );
+    } else {
+      // GPS off — reset posisi agar tidak tampilkan marker lama
+      bus.updateGps(
+        latitude: 0,
+        longitude: 0,
+        speed: 0,
+        gpsActive: false,
       );
     }
 
     final myHalte = d['my_halte'] as Map<String, dynamic>?;
-    return (bus: bus, myHalte: myHalte);
+    final driverName = d['driver_name'] as String?;
+    return (bus: bus, myHalte: myHalte, driverName: driverName);
   }
 
   /// Versi lama — tetap ada untuk kompatibilitas

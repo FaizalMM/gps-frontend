@@ -191,8 +191,15 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              fallbackUrl:
+                  'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.mobitra.app',
               maxZoom: 19,
+              maxNativeZoom: 19,
+              additionalOptions: const {
+                'User-Agent':
+                    'Mobitra/1.0 (school bus tracker; contact@mobitra.app)',
+              },
             ),
             if (_picked != null)
               MarkerLayer(markers: [

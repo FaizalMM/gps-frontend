@@ -901,23 +901,51 @@ class _RouteLegend extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Marker bus (sudah ada, tidak berubah)
+// Marker bus — warna & nomor berbeda per bus agar mudah dibedakan
 // ─────────────────────────────────────────────────────────────
 class _BusMarker extends StatelessWidget {
   final BusModel bus;
   final bool isFocused;
   final bool isSelected;
+
+  // Palet warna berbeda untuk tiap bus (loop berdasarkan bus.id)
+  static const List<Color> _busColors = [
+    Color(0xFF1565C0), // biru tua
+    Color(0xFFE53935), // merah
+    Color(0xFF2E7D32), // hijau tua
+    Color(0xFFE65100), // oranye tua
+    Color(0xFF6A1B9A), // ungu
+    Color(0xFF00838F), // teal
+    Color(0xFF558B2F), // hijau olive
+    Color(0xFFAD1457), // pink tua
+  ];
+
   const _BusMarker({
     required this.bus,
     this.isFocused = false,
     this.isSelected = false,
   });
 
+  Color get _color {
+    final base = _busColors[bus.id % _busColors.length];
+    if (isFocused || isSelected) return base;
+    // Bus tidak difokus: sedikit lebih transparan
+    return base;
+  }
+
+  /// Label singkat untuk marker: ambil angka dari nama bus, fallback huruf pertama
+  String get _label {
+    final digits = bus.nama.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isNotEmpty)
+      return digits.length > 2 ? digits.substring(0, 2) : digits;
+    return bus.nama.isNotEmpty ? bus.nama[0].toUpperCase() : '?';
+  }
+
   @override
   Widget build(BuildContext context) {
-    final color =
-        (isFocused || isSelected) ? AppColors.primary : AppColors.primaryDark;
-    final size = isSelected ? 40.0 : (isFocused ? 36.0 : 30.0);
+    final color = _color;
+    final size = isSelected ? 44.0 : (isFocused ? 38.0 : 32.0);
+    final fontSize = isSelected ? 13.0 : (isFocused ? 12.0 : 10.0);
     final border = (isFocused || isSelected) ? 3.0 : 2.0;
 
     return AnimatedContainer(
@@ -930,14 +958,24 @@ class _BusMarker extends StatelessWidget {
         border: Border.all(color: Colors.white, width: border),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: isSelected ? 0.7 : 0.45),
-            blurRadius: isSelected ? 16 : 6,
-            spreadRadius: isSelected ? 5 : 1,
+            color: color.withValues(alpha: isSelected ? 0.75 : 0.50),
+            blurRadius: isSelected ? 18 : 8,
+            spreadRadius: isSelected ? 4 : 1,
           ),
         ],
       ),
-      child: const Icon(Icons.directions_bus_rounded,
-          color: Colors.white, size: 16),
+      child: Center(
+        child: Text(
+          _label,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w800,
+            fontFamily: 'Poppins',
+            height: 1.0,
+          ),
+        ),
+      ),
     );
   }
 }

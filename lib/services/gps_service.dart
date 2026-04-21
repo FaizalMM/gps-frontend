@@ -157,19 +157,44 @@ class GpsService {
   }
 
   /// Ambil posisi sekali (untuk QR scan, init, dll)
+  /// Strategi berlapis agar tidak mudah gagal:
+  /// 1. Coba high accuracy (15 detik)
+  /// 2. Kalau gagal/tidak akurat, fallback ke medium accuracy (10 detik)
+  /// 3. Kalau masih gagal, pakai lastPosition dari tracking aktif (kalau ada)
   Future<Position?> getCurrentPosition() async {
     if (!await requestPermission()) return null;
+
+    // Coba high accuracy dulu
     try {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: LocationSettings(
           accuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 15),
+        ),
+      );
+      if (pos.latitude != 0 && pos.longitude != 0) return pos;
+    } catch (_) {}
+
+    // Fallback: medium accuracy dengan timeout lebih longgar
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.medium,
           timeLimit: const Duration(seconds: 10),
         ),
       );
-      return _isValidPosition(pos) ? pos : null;
-    } catch (_) {
-      return null;
+      if (pos.latitude != 0 && pos.longitude != 0) return pos;
+    } catch (_) {}
+
+    // Fallback terakhir: pakai posisi terakhir dari tracking aktif
+    // (berguna saat GPS driver sedang hangat dan siswa mau scan QR)
+    if (_lastPosition != null &&
+        _lastPosition!.latitude != 0 &&
+        _lastPosition!.longitude != 0) {
+      return _lastPosition;
     }
+
+    return null;
   }
 
   void dispose() {

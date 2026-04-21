@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -9,7 +10,12 @@ import '../../services/gps_service.dart';
 
 class QrCodeScreen extends StatefulWidget {
   final UserModel siswa;
-  const QrCodeScreen({super.key, required this.siswa});
+
+  /// Callback saat tombol back ditekan. Jika null, pakai Navigator.pop biasa.
+  /// Harus diisi saat QrCodeScreen dipakai dalam IndexedStack (bukan Navigator push)
+  /// agar tidak terjadi layar hitam.
+  final VoidCallback? onBack;
+  const QrCodeScreen({super.key, required this.siswa, this.onBack});
   @override
   State<QrCodeScreen> createState() => _QrCodeScreenState();
 }
@@ -24,38 +30,146 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   String? _namaHalte;
   double? _jarakKeHalte;
 
+  // Status polling absensi — setelah QR berhasil dibuat, poll tiap 10 detik
+  // untuk cek apakah driver sudah menscan QR siswa
+  Timer? _pollTimer;
+  bool _isScanned = false; // QR sudah discan driver
+  bool _isOnTrip = false; // Siswa sedang dalam perjalanan
+  String? _scannedAt; // Waktu scan (jam naik)
+  String? _scannedHalte; // Halte naik
+  String? _scannedBus; // Bus yang dinaiki
+
   @override
   void initState() {
     super.initState();
     if (widget.siswa.status == AccountStatus.active) {
       _generateQr();
+      _checkAttendanceStatus(); // langsung cek apakah hari ini sudah ada attendance
     }
   }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Cek status absensi hari ini — apakah sudah discan driver
+  Future<void> _checkAttendanceStatus() async {
+    try {
+      final result = await StudentService()
+          .getMyAttendanceToday(int.parse(widget.siswa.idStr));
+      if (!mounted) return;
+      final list = result?['data'];
+      if (list is List && list.isNotEmpty) {
+        final latest = list.last as Map<String, dynamic>;
+        final waktuNaik = latest['waktu_naik'] as String?;
+        final waktuTurun = latest['waktu_turun'] as String?;
+        if (waktuNaik != null) {
+          final dt = DateTime.tryParse(waktuNaik);
+          final jamNaik = dt != null
+              ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
+              : waktuNaik;
+          setState(() {
+            _isScanned = true;
+            _isOnTrip =
+                waktuTurun == null; // masih di perjalanan jika belum checkout
+            _scannedAt = jamNaik;
+            _scannedHalte = latest['halte_naik'] as String?;
+            _scannedBus = latest['bus_code'] as String?;
+          });
+          // Sudah discan — stop polling
+          _pollTimer?.cancel();
+          return;
+        }
+      }
+      // Belum discan — mulai/lanjut polling
+      _startPolling();
+    } catch (_) {
+      _startPolling();
+    }
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    if (!mounted || _isScanned) return;
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted || _isScanned) {
+        _pollTimer?.cancel();
+        return;
+      }
+      _checkAttendanceStatus();
+    });
+  }
+
+  // Status apakah sedang di fase ambil GPS (sebelum hit server)
+  bool _isGettingGps = false;
+  // Jarak terakhir ke halte & bus (untuk info ke siswa)
+  String? _jarakInfo;
 
   Future<void> _generateQr() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
+      _isGettingGps = true;
       _errorMsg = null;
+      _jarakInfo = null;
     });
+
+    // Fase 1: dapatkan koordinat GPS
     final pos = await _gpsService.getCurrentPosition();
     if (!mounted) return;
+
     if (pos == null) {
       setState(() {
         _isLoading = false;
-        _errorMsg = 'Tidak bisa mendapat lokasi GPS. Pastikan GPS aktif.';
+        _isGettingGps = false;
+        _errorMsg = 'Tidak bisa mendapat lokasi GPS.\n'
+            'Pastikan GPS diaktifkan dan izin lokasi sudah diberikan, lalu coba lagi.';
       });
       return;
     }
+
+    // Fase 2: kirim koordinat ke server
+    setState(() => _isGettingGps = false);
+
     final result = await StudentService().generateQrCode(
       latitude: pos.latitude,
       longitude: pos.longitude,
     );
     if (!mounted) return;
+
     setState(() {
       _isLoading = false;
-      if (result != null) {
-        // Encode ke JSON string agar bisa di-decode driver saat scan
+      if (result == null) {
+        _errorMsg = 'Tidak ada respons dari server. Periksa koneksi internet.';
+      } else if (result.containsKey('__error')) {
+        final errMsg = result['__error'] as String;
+        // Buat pesan error lebih ramah & kontekstual
+        if (errMsg.contains('halte') || errMsg.contains('dekat')) {
+          _errorMsg = errMsg;
+          // Ekstrak info jarak dari pesan jika ada
+          final jarakMatch = RegExp(r'(\d+(?:\.\d+)?)m').allMatches(errMsg);
+          if (jarakMatch.isNotEmpty) {
+            final distances = jarakMatch.map((m) => m.group(0)!).toList();
+            _jarakInfo = distances.join(' | ');
+          }
+        } else if (errMsg.contains('perjalanan')) {
+          _errorMsg = 'Kamu masih tercatat dalam perjalanan.\n'
+              'Minta driver untuk melakukan checkout terlebih dahulu.';
+        } else if (errMsg.contains('bus aktif') ||
+            errMsg.contains('ditugaskan')) {
+          _errorMsg =
+              'Kamu belum ditugaskan ke bus manapun.\nHubungi admin sekolah.';
+        } else if (errMsg.contains('rute') || errMsg.contains('Rute')) {
+          _errorMsg =
+              'Rute bus belum diatur oleh admin.\nHubungi admin sekolah.';
+        } else {
+          _errorMsg = errMsg;
+        }
+      } else {
+        // Sukses — parse data QR
+        _jarakInfo = null;
         if (result['qr_data'] != null) {
           final qrMap = result['qr_data'];
           _qrData = qrMap is String ? qrMap : jsonEncode(qrMap);
@@ -67,9 +181,8 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         final halteInfo = result['halte_info'] as Map<String, dynamic>?;
         _namaHalte = halteInfo?['nama_halte'] as String?;
         _jarakKeHalte = (result['distance_to_halte'] as num?)?.toDouble();
-      } else {
-        _errorMsg =
-            'Gagal generate QR Code. Pastikan kamu berada di dekat halte (<100m).';
+        // Mulai polling setelah QR berhasil dibuat
+        _startPolling();
       }
     });
   }
@@ -93,7 +206,15 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: AppColors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Gunakan callback jika tersedia (mode IndexedStack)
+            // agar tidak terjadi layar hitam saat di-pop dari dalam stack
+            if (widget.onBack != null) {
+              widget.onBack!();
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: const Text('Digital ID',
             style: TextStyle(
@@ -196,7 +317,102 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               ),
             ]),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
+
+          // ── Banner status absensi (muncul setelah QR discan driver) ──
+          if (_isScanned) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: _isOnTrip
+                    ? const Color(0xFFE8F5E9)
+                    : AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: _isOnTrip
+                        ? Colors.green.withValues(alpha: 0.4)
+                        : AppColors.primary.withValues(alpha: 0.3)),
+              ),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: _isOnTrip
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : AppColors.primaryLight,
+                      shape: BoxShape.circle),
+                  child: Icon(
+                    _isOnTrip
+                        ? Icons.directions_bus_rounded
+                        : Icons.check_circle_rounded,
+                    color: _isOnTrip ? Colors.green : AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isOnTrip
+                              ? '🚌 Kamu sedang dalam perjalanan!'
+                              : '✅ Perjalanan selesai hari ini',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _isOnTrip
+                                  ? Colors.green.shade800
+                                  : AppColors.primary),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (_scannedAt != null) 'Naik jam $_scannedAt',
+                            if (_scannedHalte != null) 'di $_scannedHalte',
+                            if (_scannedBus != null) '• Bus $_scannedBus',
+                          ].join(' '),
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              color: _isOnTrip
+                                  ? Colors.green.shade700
+                                  : AppColors.primaryDark),
+                        ),
+                      ]),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+          ] else if (_qrData != null && !_isLoading) ...[
+            // QR sudah dibuat tapi belum discan — tampilkan hint polling
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                  color: AppColors.surface2,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Row(children: [
+                const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 1.5, color: AppColors.textGrey)),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Menunggu driver scan QR kamu...',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.textGrey),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // ── Kartu ID ──────────────────────────────────
           Container(
@@ -277,35 +493,114 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                   if (isActive) ...[
                     // QR aktif atau loading
                     if (_isLoading)
-                      const SizedBox(
-                          height: 180,
-                          width: 180,
+                      SizedBox(
+                          height: 200,
+                          width: 200,
                           child: Center(
-                              child: CircularProgressIndicator(
-                                  color: AppColors.primary)))
-                    else if (_errorMsg != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                            color: AppColors.red.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: AppColors.red.withValues(alpha: 0.2))),
-                        child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.location_off_rounded,
-                                  size: 40, color: AppColors.red),
-                              const SizedBox(height: 8),
-                              Text(_errorMsg!,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(
+                                    color: AppColors.primary),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _isGettingGps
+                                      ? 'Mendapatkan lokasi GPS...'
+                                      : 'Membuat QR Code...',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                       fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: AppColors.textGrey),
+                                ),
+                              ],
+                            ),
+                          ))
+                    else if (_errorMsg != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                            color: _errorMsg!.contains('halte') ||
+                                    _errorMsg!.contains('dekat') ||
+                                    _errorMsg!.contains('Tunggu')
+                                ? AppColors.orange.withValues(alpha: 0.06)
+                                : AppColors.red.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: _errorMsg!.contains('halte') ||
+                                        _errorMsg!.contains('dekat') ||
+                                        _errorMsg!.contains('Tunggu')
+                                    ? AppColors.orange.withValues(alpha: 0.3)
+                                    : AppColors.red.withValues(alpha: 0.2))),
+                        child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _errorMsg!.contains('GPS') ||
+                                        _errorMsg!.contains('lokasi')
+                                    ? Icons.location_off_rounded
+                                    : _errorMsg!.contains('halte') ||
+                                            _errorMsg!.contains('dekat') ||
+                                            _errorMsg!.contains('Tunggu')
+                                        ? Icons.place_rounded
+                                        : _errorMsg!.contains('perjalanan')
+                                            ? Icons.directions_bus_rounded
+                                            : Icons.error_outline_rounded,
+                                size: 36,
+                                color: _errorMsg!.contains('halte') ||
+                                        _errorMsg!.contains('dekat') ||
+                                        _errorMsg!.contains('Tunggu')
+                                    ? AppColors.orange
+                                    : AppColors.red,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _errorMsg!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: _errorMsg!.contains('halte') ||
+                                            _errorMsg!.contains('dekat') ||
+                                            _errorMsg!.contains('Tunggu')
+                                        ? AppColors.orange
+                                        : AppColors.red,
+                                    height: 1.5),
+                              ),
+                              // Info jarak jika tersedia
+                              if (_jarakInfo != null) ...[
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                      color: AppColors.orange
+                                          .withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20)),
+                                  child: Text(
+                                    '📍 $_jarakInfo',
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 10,
+                                        color: AppColors.orange,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                              // Tips tindakan
+                              if (_errorMsg!.contains('halte') ||
+                                  _errorMsg!.contains('Tunggu')) ...[
+                                const SizedBox(height: 8),
+                                const Text(
+                                  '💡 Mendekat ke halte atau tunggu bus tiba',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
                                       fontSize: 10,
-                                      color: AppColors.red,
-                                      height: 1.4)),
+                                      color: AppColors.textGrey),
+                                ),
+                              ],
                             ]),
                       ),
                       const SizedBox(height: 10),

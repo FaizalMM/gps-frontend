@@ -100,10 +100,9 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     if (!mounted) return;
     setState(() => _isExportingPdf = false);
     if (path != null) {
-      _showSuccessSnack('PDF tersimpan', path);
-      await OpenFilex.open(path);
+      _showFileDialog(path, 'PDF');
     } else {
-      _showErrorSnack('Gagal mengunduh PDF. Periksa koneksi.');
+      _showErrorSnack('Gagal mengunduh PDF. Periksa koneksi internet.');
     }
   }
 
@@ -121,11 +120,208 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     if (!mounted) return;
     setState(() => _isExportingExcel = false);
     if (path != null) {
-      _showSuccessSnack('Excel tersimpan', path);
-      await OpenFilex.open(path);
+      _showFileDialog(path, 'Excel');
     } else {
-      _showErrorSnack('Gagal mengunduh Excel. Periksa koneksi.');
+      _showErrorSnack('Gagal mengunduh Excel. Periksa koneksi internet.');
     }
+  }
+
+  /// Dialog sukses yang jelas — tampilkan nama file, lokasi, dan tombol aksi
+  void _showFileDialog(String path, String tipe) {
+    final fileName = path.split('/').last;
+    final isDownloads = path.contains('/Download');
+    final isInternal =
+        path.contains('/data/data') || path.contains('/data/user');
+    final isPdf = fileName.toLowerCase().endsWith('.pdf');
+
+    // Tentukan lokasi yang mudah dipahami
+    String lokasiJudul;
+    String lokasiPanduan;
+    IconData lokasiIcon;
+    Color lokasiColor;
+
+    if (isDownloads) {
+      lokasiJudul = 'Folder Download';
+      lokasiPanduan = 'Buka aplikasi File Manager → folder "Download"';
+      lokasiIcon = Icons.folder_rounded;
+      lokasiColor = Colors.green;
+    } else if (isInternal) {
+      lokasiJudul = 'Penyimpanan internal app';
+      lokasiPanduan =
+          'File Manager → Internal → Android → data → com.mobitra.app → files';
+      lokasiIcon = Icons.phone_android_rounded;
+      lokasiColor = AppColors.orange;
+    } else {
+      lokasiJudul = 'Penyimpanan eksternal';
+      lokasiPanduan = 'File Manager → Internal Storage → Android → data';
+      lokasiIcon = Icons.sd_storage_rounded;
+      lokasiColor = AppColors.blue;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon sukses
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                    color: AppColors.primaryLight, shape: BoxShape.circle),
+                child: Icon(
+                  isPdf
+                      ? Icons.picture_as_pdf_rounded
+                      : Icons.table_chart_rounded,
+                  color: AppColors.primary,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                '$tipe Berhasil Tersimpan!',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.black),
+              ),
+              const SizedBox(height: 6),
+
+              // Nama file
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(10)),
+                child: Row(children: [
+                  Icon(
+                    isPdf
+                        ? Icons.picture_as_pdf_rounded
+                        : Icons.grid_on_rounded,
+                    size: 16,
+                    color: isPdf ? Colors.red : Colors.green.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      fileName,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.black),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+
+              // Lokasi file
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: lokasiColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border:
+                      Border.all(color: lokasiColor.withValues(alpha: 0.25)),
+                ),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(lokasiIcon, size: 16, color: lokasiColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Lokasi: $lokasiJudul',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: lokasiColor),
+                        ),
+                      ]),
+                      const SizedBox(height: 4),
+                      Text(
+                        lokasiPanduan,
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: lokasiColor.withValues(alpha: 0.8),
+                            height: 1.4),
+                      ),
+                    ]),
+              ),
+              const SizedBox(height: 16),
+
+              // Tombol aksi
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.lightGrey),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Tutup',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            color: AppColors.textGrey)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(ctx);
+                      await OpenFilex.open(path);
+                    },
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: Text('Buka $tipe',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ]),
+
+              // Tips jika file tidak bisa dibuka
+              const SizedBox(height: 10),
+              Text(
+                'Jika file tidak terbuka otomatis, cari manual\nmenggunakan panduan lokasi di atas.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    color: AppColors.textGrey,
+                    height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -216,47 +412,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
         ),
       ),
     );
-  }
-
-  void _showSuccessSnack(String msg, String path) {
-    final fileName = path.split('/').last;
-    final isDownloads = path.contains('/Download');
-
-    // Tampilkan folder lokasi yang jelas kepada user
-    final folderPath = path.substring(0, path.lastIndexOf('/'));
-    final locationLabel = isDownloads
-        ? '📁 Folder: Download'
-        : '📁 Folder: Penyimpanan internal app';
-    final locationHint = isDownloads
-        ? 'Buka File Manager → Download'
-        : 'File Manager → Internal → Android → data';
-
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('$msg berhasil! File otomatis terbuka.',
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(locationLabel,
-              style: const TextStyle(fontSize: 12, color: Colors.white)),
-          Text(locationHint,
-              style: const TextStyle(fontSize: 11, color: Colors.white70)),
-          const SizedBox(height: 2),
-          Text('📄 $fileName',
-              style: const TextStyle(fontSize: 11, color: Colors.white70)),
-          Text('📂 $folderPath',
-              style: const TextStyle(fontSize: 10, color: Colors.white54),
-              overflow: TextOverflow.ellipsis),
-        ],
-      ),
-      backgroundColor: AppColors.primary,
-      behavior: SnackBarBehavior.floating,
-      duration: const Duration(seconds: 6),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    ));
   }
 
   void _showErrorSnack(String msg) {

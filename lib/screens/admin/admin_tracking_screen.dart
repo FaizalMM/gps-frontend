@@ -251,9 +251,33 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                               ]),
                             ),
                             const Divider(height: 1),
-                            // List bus
-                            ...active.map((b) {
+                            // List bus — setiap bus punya warna berbeda
+                            ...active.asMap().entries.map((entry) {
+                              final idx = entry.key;
+                              final b = entry.value;
                               final isSel = _focusedBus?.id == b.id;
+                              // Palet warna sesuai _BusMarker di bus_map_widget
+                              const busColors = [
+                                Color(0xFF1565C0),
+                                Color(0xFFE53935),
+                                Color(0xFF2E7D32),
+                                Color(0xFFE65100),
+                                Color(0xFF6A1B9A),
+                                Color(0xFF00838F),
+                                Color(0xFF558B2F),
+                                Color(0xFFAD1457),
+                              ];
+                              final busColor =
+                                  busColors[b.id % busColors.length];
+                              final digits =
+                                  b.nama.replaceAll(RegExp(r'[^0-9]'), '');
+                              final label = digits.isNotEmpty
+                                  ? (digits.length > 2
+                                      ? digits.substring(0, 2)
+                                      : digits)
+                                  : (b.nama.isNotEmpty
+                                      ? b.nama[0].toUpperCase()
+                                      : '?');
                               return GestureDetector(
                                 onTap: () => _selectBus(b),
                                 child: AnimatedContainer(
@@ -262,7 +286,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                       horizontal: 14, vertical: 10),
                                   decoration: BoxDecoration(
                                     color: isSel
-                                        ? AppColors.primaryLight
+                                        ? busColor.withValues(alpha: 0.08)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(
                                         b == active.last ? 14 : 0),
@@ -273,15 +297,21 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                       height: 30,
                                       decoration: BoxDecoration(
                                           color: isSel
-                                              ? AppColors.primary
-                                              : AppColors.primaryLight,
+                                              ? busColor
+                                              : busColor.withValues(
+                                                  alpha: 0.12),
                                           borderRadius:
                                               BorderRadius.circular(8)),
-                                      child: Icon(Icons.directions_bus_rounded,
-                                          size: 15,
-                                          color: isSel
-                                              ? Colors.white
-                                              : AppColors.primary),
+                                      child: Center(
+                                        child: Text(label,
+                                            style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                                color: isSel
+                                                    ? Colors.white
+                                                    : busColor)),
+                                      ),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
@@ -295,7 +325,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                                   fontSize: 12,
                                                   fontWeight: FontWeight.w600,
                                                   color: isSel
-                                                      ? AppColors.primary
+                                                      ? busColor
                                                       : AppColors.black)),
                                           if (b.driverName.isNotEmpty)
                                             Text(b.driverName,
@@ -312,7 +342,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                             fontSize: 10,
                                             fontWeight: FontWeight.w700,
                                             color: isSel
-                                                ? AppColors.primary
+                                                ? busColor
                                                 : AppColors.textGrey)),
                                   ]),
                                 ),

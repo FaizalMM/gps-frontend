@@ -200,9 +200,13 @@ class AppDataService {
               gpsBus.driverName.isNotEmpty && e.driverName != gpsBus.driverName;
 
           if (activeChanged || latChanged || lngChanged || spdChanged) {
+            // Jangan update posisi ke 0,0 — artinya belum ada GPS hari ini
+            // Biarkan posisi terakhir yang valid tetap ditampilkan
+            // hingga koordinat nyata masuk
+            final hasRealCoords = gpsBus.latitude != 0 && gpsBus.longitude != 0;
             e.updateGps(
-              latitude: gpsBus.latitude,
-              longitude: gpsBus.longitude,
+              latitude: hasRealCoords ? gpsBus.latitude : e.latitude,
+              longitude: hasRealCoords ? gpsBus.longitude : e.longitude,
               speed: gpsBus.gpsActive ? gpsBus.speed : 0,
               gpsActive: gpsBus.gpsActive,
             );
