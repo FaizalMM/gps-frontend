@@ -74,6 +74,21 @@ class _BusMapWidgetState extends State<BusMapWidget> {
     _mapController = widget.mapController ?? MapController();
   }
 
+  // Flag: user sedang menggeser / zoom map secara manual
+  // Selagi true, auto-follow dinonaktifkan agar map tidak balik ke posisi bus
+  bool _userInteracting = false;
+  // Timer reset interaksi: 5 detik setelah user berhenti geser, auto-follow aktif kembali
+  DateTime? _lastInteractionTime;
+  static const _interactionCooldown = Duration(seconds: 5);
+
+  bool get _isUserInteracting {
+    if (!_userInteracting) return false;
+    if (_lastInteractionTime == null) return false;
+    // Jika sudah lebih dari 5 detik sejak interaksi terakhir, anggap selesai
+    return DateTime.now().difference(_lastInteractionTime!) <
+        _interactionCooldown;
+  }
+
   @override
   void didUpdateWidget(BusMapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -89,6 +104,9 @@ class _BusMapWidgetState extends State<BusMapWidget> {
         _updateBusPolylineIndex(bus);
       }
     }
+
+    // JANGAN pindahkan kamera jika user sedang berinteraksi dengan map
+    if (_isUserInteracting) return;
 
     if (widget.driverLocation != null &&
         widget.driverLocation != oldWidget.driverLocation) {
@@ -217,17 +235,13 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   _selectedHalteId = null;
                   _selectedBusId = null;
                 }),
-                // [FIX] Pastikan center di-apply ulang saat map siap
-                // Ini mengatasi masalah "harus klik tombol lokasi dulu"
-                onMapReady: () {
-                  Future.microtask(() {
-                    if (mounted) {
-                      _mapController.move(
-                        _getCenter(),
-                        widget.showAllBuses ? 13.0 : 15.0,
-                      );
-                    }
-                  });
+                // Deteksi saat user mulai menggeser / zoom map secara manual
+                // Selagi interaksi, auto-follow dinonaktifkan agar map tidak balik
+                onPositionChanged: (position, hasGesture) {
+                  if (hasGesture) {
+                    _userInteracting = true;
+                    _lastInteractionTime = DateTime.now();
+                  }
                 },
               ),
               children: [

@@ -24,6 +24,20 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
   bool _showDetail = false; // panel detail bawah
   bool _showBusList = false; // dropdown list bus kanan atas
 
+  // Flag: user sedang menjelajahi map secara manual (geser/zoom)
+  // Selagi true, auto-follow dari stream update dinonaktifkan
+  bool _userIsExploring = false;
+  DateTime? _lastExploreTime;
+  static const _exploreCooldown = Duration(seconds: 5);
+  // StreamSubscription untuk listen MapEvent dari MapController
+  dynamic _mapEventSub;
+
+  bool get _isExploring {
+    if (!_userIsExploring) return false;
+    if (_lastExploreTime == null) return false;
+    return DateTime.now().difference(_lastExploreTime!) < _exploreCooldown;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -32,10 +46,28 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
       _focusedBus = widget.initialFocus;
       _showDetail = false;
     }
+    // Deteksi gesture user via mapEventStream (cara resmi flutter_map)
+    // MapEventMoveStart = user mulai geser/zoom secara manual
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _mapEventSub = _mapController.mapEventStream.listen((event) {
+        if (event is MapEventMoveStart) {
+          // Cek apakah gerak ini dari gesture user (bukan dari move() programmatic)
+          if (event.source == MapEventSource.dragStart ||
+              event.source == MapEventSource.multiFingerGestureStart ||
+              event.source == MapEventSource.scrollWheel ||
+              event.source == MapEventSource.doubleTap ||
+              event.source == MapEventSource.doubleTapHold) {
+            _userIsExploring = true;
+            _lastExploreTime = DateTime.now();
+          }
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
+    _mapEventSub?.cancel();
     super.dispose();
   }
 
@@ -87,10 +119,24 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                 });
             });
           }
-          // Update data focused bus dari stream
+          // Update data focused bus dari stream (posisi terbaru)
+          // Tapi JANGAN pindahkan kamera jika user sedang menggeser map
           if (_focusedBus != null) {
             final updated = active.where((b) => b.id == _focusedBus!.id);
-            if (updated.isNotEmpty) _focusedBus = updated.first;
+            if (updated.isNotEmpty) {
+              _focusedBus = updated.first;
+              // Auto-follow: hanya pindah kamera jika user tidak sedang eksplorasi
+              if (!_isExploring && _focusedBus!.latitude != 0) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _mapController.move(
+                      LatLng(_focusedBus!.latitude, _focusedBus!.longitude),
+                      _mapController.camera.zoom,
+                    );
+                  }
+                });
+              }
+            }
           }
 
           return GestureDetector(

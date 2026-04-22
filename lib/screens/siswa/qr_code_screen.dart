@@ -43,8 +43,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   void initState() {
     super.initState();
     if (widget.siswa.status == AccountStatus.active) {
+      // Selalu generate QR saat buka halaman.
+      // Backend akan reuse qr_id yang sama jika hari ini sudah ada record pending.
       _generateQr();
-      _checkAttendanceStatus(); // langsung cek apakah hari ini sudah ada attendance
+      _checkAttendanceStatus();
     }
   }
 
@@ -650,14 +652,14 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                               color: AppColors.textGrey,
                               letterSpacing: 1.2)),
                       const SizedBox(height: 6),
-                      TextButton.icon(
-                        onPressed: _generateQr,
-                        icon: const Icon(Icons.refresh_rounded, size: 14),
-                        label: const Text('Perbarui QR',
-                            style:
-                                TextStyle(fontFamily: 'Poppins', fontSize: 12)),
-                        style: TextButton.styleFrom(
-                            foregroundColor: AppColors.textGrey),
+                      // QR sudah persisten sepanjang hari — tidak perlu tombol refresh.
+                      // Saat dibuka ulang, qr_id yang sama akan ditampilkan kembali.
+                      const Text(
+                        'QR ini berlaku hingga 23:59 hari ini',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey),
                       ),
                     ] else ...[
                       // Belum ada QR (belum generate)

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -519,13 +520,28 @@ class _SiswaTrackingTab extends StatefulWidget {
 
 class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
     with SingleTickerProviderStateMixin {
+  // ── Data bus & attendance ────────────────────────────────
   BusModel? _myBus;
-  Map<String, dynamic>? _myHalte; // halte penjemputan siswa ini
-  bool _loading = true;
-  bool _isTracking = false;
-  DateTime? _lastUpdate;
+  Map<String, dynamic>? _myHalte;
+  String? _driverName;
+  bool _loadingBus = true;
+
+  // Status absensi hari ini
+  // null = belum load, 'pending' = QR belum discan, 'checked_in' = sudah naik,
+  // 'checked_out'/'not_checked_out' = sudah turun
+  String? _attendanceStatus;
+  String? _waktuNaik;
+  String? _waktuTurun;
+  String? _halteNaik;
+  bool _loadingAttendance = true;
+
+  // ── Timer & service ──────────────────────────────────────
+  Timer? _busRefreshTimer;
+  Timer? _attendanceTimer;
+  final AppDataService _busDataService = AppDataService();
   final MapController _mapController = MapController();
 
+  // ── Animasi pulse ────────────────────────────────────────
   late AnimationController _pulseCtrl;
   late Animation<double> _pulseAnim;
 
@@ -536,60 +552,126 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
         AnimationController(vsync: this, duration: const Duration(seconds: 1))
           ..repeat(reverse: true);
     _pulseAnim = Tween(begin: 0.5, end: 1.0).animate(_pulseCtrl);
-    _loadTracking();
+
+    // Mulai GPS polling agar posisi bus update realtime (tiap 3 detik)
+    _busDataService.startGpsPolling();
+
+    _loadAll();
+
+    // Auto-refresh bus tiap 5 detik
+    _busRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _refreshBusPosition();
+    });
+
+    // Auto-refresh attendance tiap 8 detik (deteksi perubahan status)
+    _attendanceTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted) _loadAttendance(silent: true);
+    });
   }
 
   @override
   void dispose() {
+    _busRefreshTimer?.cancel();
+    _attendanceTimer?.cancel();
+    _busDataService.stopGpsPolling();
     _pulseCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _loadTracking({bool silent = false}) async {
-    if (!silent) setState(() => _loading = true);
-    final result = await BusService().getMyBusTrackingFull();
-    if (!mounted) return;
-    final hadBus = _myBus != null;
-    final bus = result.bus;
-    // Hanya tampilkan bus di peta kalau GPS benar-benar aktif
-    final gpsOn = bus != null && bus.gpsActive && bus.latitude != 0;
-    setState(() {
-      _myBus = bus;
-      _myHalte = result.myHalte;
-      _loading = false;
-      _lastUpdate = gpsOn ? DateTime.now() : null;
-    });
-    if (gpsOn && hadBus) {
-      _mapController.move(
-          LatLng(bus.latitude, bus.longitude), _mapController.camera.zoom);
+  // ── Load semua data ──────────────────────────────────────
+
+  Future<void> _loadAll() async {
+    await Future.wait([
+      _loadBus(),
+      _loadAttendance(),
+    ]);
+  }
+
+  Future<void> _loadBus({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loadingBus = true);
+    try {
+      final result = await BusService().getMyBusTrackingFull();
+      if (!mounted) return;
+      setState(() {
+        _myBus = result.bus;
+        _myHalte = result.myHalte;
+        _driverName = result.driverName;
+        _loadingBus = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingBus = false);
     }
   }
 
-  void _toggleTracking() {
-    setState(() => _isTracking = !_isTracking);
-    if (_isTracking) _startAutoRefresh();
+  // Refresh posisi bus dari GPS polling stream (lebih ringan dari full reload)
+  Future<void> _refreshBusPosition() async {
+    if (_myBus == null) return;
+    try {
+      final result = await BusService().getMyBusTrackingFull();
+      if (!mounted) return;
+      final updatedBus = result.bus;
+      if (updatedBus == null) return;
+      setState(() {
+        _myBus = updatedBus;
+        if (result.driverName != null) _driverName = result.driverName;
+        // Pindahkan kamera hanya jika bus aktif GPS
+        if (updatedBus.gpsActive && updatedBus.latitude != 0) {
+          _mapController.move(
+            LatLng(updatedBus.latitude, updatedBus.longitude),
+            _mapController.camera.zoom,
+          );
+        }
+      });
+    } catch (_) {}
   }
 
-  void _startAutoRefresh() async {
-    while (_isTracking && mounted) {
-      await Future.delayed(const Duration(seconds: 5));
-      if (!mounted || !_isTracking) break;
-      await _loadTracking(silent: true);
+  Future<void> _loadAttendance({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loadingAttendance = true);
+    try {
+      final res = await StudentService().getMyAttendanceToday(0);
+      if (!mounted) return;
+      final list = res?['data'];
+      if (list is List && list.isNotEmpty) {
+        final latest = list.last as Map<String, dynamic>;
+        final status = latest['status'] as String? ?? 'pending';
+        final wn = latest['waktu_naik'] as String?;
+        final wt = latest['waktu_turun'] as String?;
+        setState(() {
+          _attendanceStatus = status;
+          _waktuNaik = wn != null ? _fmtTime(wn) : null;
+          _waktuTurun = wt != null ? _fmtTime(wt) : null;
+          _halteNaik = latest['halte_naik'] as String?;
+          _loadingAttendance = false;
+        });
+      } else {
+        setState(() {
+          _attendanceStatus = null;
+          _waktuNaik = null;
+          _waktuTurun = null;
+          _halteNaik = null;
+          _loadingAttendance = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAttendance = false);
     }
   }
 
-  String _timeAgo() {
-    if (_lastUpdate == null) return '';
-    final diff = DateTime.now().difference(_lastUpdate!).inSeconds;
-    if (diff < 10) return 'baru saja';
-    if (diff < 60) return '$diff detik lalu';
-    return '\${diff ~/ 60} menit lalu';
+  // ── Helper ───────────────────────────────────────────────
+
+  String _fmtTime(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return iso;
+    }
   }
 
-  /// ETA bus ke halte penjemputan siswa (bukan ke posisi siswa)
   String _etaKeHalte() {
-    if (_myBus == null) return '—';
-    if (!_myBus!.gpsActive) return 'Bus belum aktif';
+    if (_myBus == null || !_myBus!.gpsActive || _myBus!.latitude == 0) {
+      return 'Bus belum aktif';
+    }
     final halte = _myHalte;
     if (halte == null) return '—';
     final hLat = (halte['latitude'] as num?)?.toDouble() ?? 0;
@@ -603,19 +685,28 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
     final mins = (dist / (speed / 3.6 * 60)).ceil();
     if (mins <= 1) return '< 1 menit';
     if (mins > 60) return '> 1 jam';
-    return '\$mins menit lagi';
+    return '$mins menit lagi';
   }
+
+  bool get _isOnBus => _attendanceStatus == 'checked_in';
+
+  bool get _isDone =>
+      _attendanceStatus == 'checked_out' ||
+      _attendanceStatus == 'not_checked_out';
+
+  // ── Build ────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final buses = _myBus != null ? [_myBus!] : <BusModel>[];
+
     return ColoredBox(
       color: AppColors.background,
       child: SafeArea(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Header
+          // ── Header ──────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(children: [
               const Expanded(
                   child: Text('Lacak Bus',
@@ -624,55 +715,51 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: AppColors.black))),
-              // Tombol Live tracking toggle
-              GestureDetector(
-                onTap: _toggleTracking,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
+              // Status badge realtime
+              AnimatedBuilder(
+                animation: _pulseAnim,
+                builder: (_, __) => Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: _isTracking
+                    color: _myBus != null && _myBus!.gpsActive
                         ? AppColors.primary
-                        : AppColors.primaryLight,
+                            .withValues(alpha: 0.1 + 0.1 * _pulseAnim.value)
+                        : AppColors.surface2,
                     borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: _myBus != null && _myBus!.gpsActive
+                            ? AppColors.primary.withValues(alpha: 0.4)
+                            : AppColors.lightGrey),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    AnimatedBuilder(
-                      animation: _pulseAnim,
-                      builder: (_, __) => Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: _isTracking ? Colors.white : AppColors.primary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: _isTracking
-                            ? Transform.scale(
-                                scale: _pulseAnim.value,
-                                child: Container(
-                                    decoration: const BoxDecoration(
-                                        color: Colors.white,
-                                        shape: BoxShape.circle)))
-                            : null,
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: _myBus != null && _myBus!.gpsActive
+                            ? AppColors.primary
+                            : AppColors.textGrey,
+                        shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 5),
-                    Text(_isTracking ? 'Live ON' : 'Live OFF',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _isTracking
-                                ? Colors.white
-                                : AppColors.primary)),
+                    Text(
+                      _myBus != null && _myBus!.gpsActive ? 'Live' : 'Offline',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _myBus != null && _myBus!.gpsActive
+                              ? AppColors.primary
+                              : AppColors.textGrey),
+                    ),
                   ]),
                 ),
               ),
               const SizedBox(width: 8),
-              // Tombol refresh manual
               GestureDetector(
-                onTap: () => _loadTracking(),
+                onTap: () => _loadAll(),
                 child: Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
@@ -685,370 +772,609 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
             ]),
           ),
 
-          // Status bar
-          if (_myBus != null || _lastUpdate != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Row(children: [
-                Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: _myBus != null ? Colors.green : AppColors.textGrey,
-                      shape: BoxShape.circle,
-                    )),
-                const SizedBox(width: 6),
+          // ── Status absensi (banner atas peta) ───────────
+          if (!_loadingAttendance) _buildAttendanceBanner(),
+
+          // ── Peta ────────────────────────────────────────
+          Expanded(
+            child: _loadingBus
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary))
+                : _myBus == null
+                    ? _buildNoBusView()
+                    : (!_myBus!.gpsActive || _myBus!.latitude == 0)
+                        ? _buildGpsOffView()
+                        : Stack(children: [
+                            BusMapWidget(
+                              buses: buses,
+                              height: double.infinity,
+                              showAllBuses: true,
+                              interactive: true,
+                              showRoutes: true,
+                              routes: _myBus?.routeList ?? [],
+                              mapController: _mapController,
+                              userLocation: null,
+                            ),
+                            // Overlay saat siswa sudah di dalam bus
+                            if (_isOnBus)
+                              Positioned(
+                                top: 12,
+                                left: 12,
+                                right: 12,
+                                child: _OnBusOverlay(
+                                  busName: _myBus!.nama,
+                                  speed: _myBus!.speed,
+                                  waktuNaik: _waktuNaik,
+                                  halteNaik: _halteNaik,
+                                ),
+                              ),
+                            // Alert bus hampir tiba (sebelum naik)
+                            if (!_isOnBus && !_isDone && _myHalte != null)
+                              _buildArrivalAlert(),
+                          ]),
+          ),
+
+          // ── Info card bawah ──────────────────────────────
+          if (!_loadingBus && _myBus != null) _buildBottomCard(),
+        ]),
+      ),
+    );
+  }
+
+  // ── Banner status absensi ────────────────────────────────
+
+  Widget _buildAttendanceBanner() {
+    if (_attendanceStatus == null) {
+      // Belum ada absensi hari ini — belum naik
+      return _StatusBanner(
+        color: AppColors.surface2,
+        borderColor: AppColors.lightGrey,
+        icon: Icons.qr_code_2_rounded,
+        iconColor: AppColors.textGrey,
+        title: 'Belum naik bus hari ini',
+        subtitle: 'Tunjukkan QR Code saat bus tiba di haltemu',
+        badge: null,
+      );
+    }
+    if (_attendanceStatus == 'pending') {
+      return _StatusBanner(
+        color: const Color(0xFFFFF8E1),
+        borderColor: AppColors.orange.withValues(alpha: 0.4),
+        icon: Icons.qr_code_2_rounded,
+        iconColor: AppColors.orange,
+        title: 'QR sudah siap, menunggu scan driver',
+        subtitle: 'Tunjukkan QR Code kamu ke driver',
+        badge: null,
+      );
+    }
+    if (_isOnBus) {
+      return _StatusBanner(
+        color: const Color(0xFFE8F5E9),
+        borderColor: Colors.green.withValues(alpha: 0.4),
+        icon: Icons.directions_bus_rounded,
+        iconColor: Colors.green,
+        title: 'Kamu sedang dalam perjalanan 🚌',
+        subtitle: _waktuNaik != null
+            ? 'Naik jam $_waktuNaik${_halteNaik != null ? " di $_halteNaik" : ""}'
+            : 'Sudah check-in',
+        badge: 'ON TRIP',
+        badgeColor: Colors.green,
+      );
+    }
+    if (_isDone) {
+      return _StatusBanner(
+        color: AppColors.primaryLight,
+        borderColor: AppColors.primary.withValues(alpha: 0.3),
+        icon: Icons.check_circle_rounded,
+        iconColor: AppColors.primary,
+        title: 'Perjalanan hari ini selesai ✅',
+        subtitle: _waktuNaik != null && _waktuTurun != null
+            ? 'Naik $_waktuNaik — Turun $_waktuTurun'
+            : 'Sudah checkout',
+        badge: 'SELESAI',
+        badgeColor: AppColors.primary,
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  // ── Overlay saat di dalam bus (di atas peta) ─────────────
+
+  // ── Alert bus hampir tiba ────────────────────────────────
+
+  Widget _buildArrivalAlert() {
+    if (_myBus == null || _myHalte == null) return const SizedBox.shrink();
+    final hLat = (_myHalte!['latitude'] as num?)?.toDouble() ?? 0;
+    final hLng = (_myHalte!['longitude'] as num?)?.toDouble() ?? 0;
+    if (hLat == 0 && hLng == 0) return const SizedBox.shrink();
+    const d = Distance();
+    final dist = d.as(LengthUnit.Meter,
+        LatLng(_myBus!.latitude, _myBus!.longitude), LatLng(hLat, hLng));
+    if (dist > 300) return const SizedBox.shrink();
+    final isVeryClose = dist < 80;
+    return Positioned(
+      bottom: 12,
+      left: 12,
+      right: 12,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isVeryClose
+              ? Colors.green.withValues(alpha: 0.95)
+              : AppColors.orange.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: (isVeryClose ? Colors.green : AppColors.orange)
+                    .withValues(alpha: 0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4))
+          ],
+        ),
+        child: Row(children: [
+          Text(isVeryClose ? '🚌' : '⚠️', style: const TextStyle(fontSize: 24)),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 Text(
-                  _myBus != null
-                      ? 'Bus ${_myBus!.nama} • diperbarui ${_timeAgo()}'
-                      : 'Bus tidak aktif saat ini',
+                  isVeryClose
+                      ? 'Bus sudah tiba di haltemu!'
+                      : 'Bus hampir tiba! (${dist.round()}m)',
                   style: const TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 12,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
+                ),
+                Text(
+                  isVeryClose
+                      ? 'Siapkan QR Code — buka tab ID Saya'
+                      : 'Segera ke halte dan siapkan QR Code',
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: Colors.white70),
+                ),
+              ])),
+        ]),
+      ),
+    );
+  }
+
+  // ── Bottom info card ─────────────────────────────────────
+
+  Widget _buildBottomCard() {
+    final bus = _myBus!;
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4))
+        ],
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Bus info row
+        Row(children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: _isOnBus
+                  ? Colors.green.withValues(alpha: 0.12)
+                  : AppColors.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.directions_bus_rounded,
+                color: _isOnBus ? Colors.green : AppColors.primary, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(bus.nama,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.black)),
+                Text(
+                  [
+                    bus.platNomor,
+                    if (_driverName != null) '• Driver: $_driverName',
+                  ].join('  '),
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
                       color: AppColors.textGrey),
                 ),
-              ]),
-            ),
-
-          // Map
-          if (_loading)
-            const Expanded(
-                child: Center(
-                    child: CircularProgressIndicator(color: AppColors.primary)))
-          else if (_myBus == null)
-            Expanded(
-                child: Center(
-                    child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                  Icon(Icons.directions_bus_outlined,
-                      size: 64,
-                      color: AppColors.primary.withValues(alpha: 0.3)),
-                  const SizedBox(height: 12),
-                  const Text('Bus belum beroperasi',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textGrey)),
-                  const SizedBox(height: 6),
-                  const Text('Coba lagi nanti atau hubungi sekolah',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13,
-                          color: AppColors.textGrey)),
-                  const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: () => _loadTracking(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: const Text('Refresh',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary)),
-                    ),
-                  ),
-                ])))
-          // Bus ada tapi GPS dimatikan driver — jangan tampilkan posisi lama
-          else if (!_myBus!.gpsActive || _myBus!.latitude == 0)
-            Expanded(
-                child: Center(
-                    child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                        color: AppColors.surface2, shape: BoxShape.circle),
-                    child: Icon(Icons.gps_off_rounded,
-                        size: 48,
-                        color: AppColors.textGrey.withValues(alpha: 0.5)),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('GPS ${_myBus!.nama} Tidak Aktif',
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.black)),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Driver belum mengaktifkan GPS.\nPosisi bus tidak dapat ditampilkan.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        color: AppColors.textGrey,
-                        height: 1.5),
-                  ),
-                  const SizedBox(height: 20),
-                  GestureDetector(
-                    onTap: () => _loadTracking(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: const Text('Refresh',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary)),
-                    ),
-                  ),
-                ])))
-          else
-            Expanded(
-                child: BusMapWidget(
-                    buses: buses,
-                    height: double.infinity,
-                    showAllBuses: true,
-                    interactive: true,
-                    showRoutes: true,
-                    routes: _myBus?.routeList ?? [],
-                    mapController: _mapController)),
-
-          // Info bus bawah — ETA + halte + status
-          if (!_loading && _myBus != null) ...[
-            // Banner peringatan saat bus sudah sangat dekat
-            Builder(builder: (context) {
-              if (_myBus == null || !_myBus!.gpsActive || _myBus!.latitude == 0)
-                return const SizedBox.shrink();
-              final halte = _myHalte;
-              if (halte == null) return const SizedBox.shrink();
-              final hLat = (halte['latitude'] as num?)?.toDouble() ?? 0;
-              final hLng = (halte['longitude'] as num?)?.toDouble() ?? 0;
-              if (hLat == 0 && hLng == 0) return const SizedBox.shrink();
-              const d = Distance();
-              final distBusToHalte = d.as(
-                  LengthUnit.Meter,
-                  LatLng(_myBus!.latitude, _myBus!.longitude),
-                  LatLng(hLat, hLng));
-              // Tampilkan alert jika bus sudah <200m dari halte siswa
-              if (distBusToHalte > 200) return const SizedBox.shrink();
-              return Container(
-                margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: distBusToHalte < 75
-                      ? Colors.green.withValues(alpha: 0.12)
-                      : AppColors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: distBusToHalte < 75
-                          ? Colors.green.withValues(alpha: 0.4)
-                          : AppColors.orange.withValues(alpha: 0.35)),
-                ),
-                child: Row(children: [
-                  Text(
-                    distBusToHalte < 75 ? '🚌' : '⚠️',
-                    style: const TextStyle(fontSize: 22),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            distBusToHalte < 75
-                                ? 'Bus sudah tiba di haltemu!'
-                                : 'Bus hampir tiba! (${distBusToHalte.round()}m)',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: distBusToHalte < 75
-                                    ? Colors.green.shade800
-                                    : AppColors.orange),
-                          ),
-                          Text(
-                            distBusToHalte < 75
-                                ? 'Buka tab ID Saya dan generate QR sekarang!'
-                                : 'Segera siapkan QR Code kamu di tab ID Saya',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                color: distBusToHalte < 75
-                                    ? Colors.green.shade700
-                                    : AppColors.orange),
-                          ),
-                        ]),
-                  ),
-                ]),
-              );
-            }),
-
+              ])),
+          // Speed badge
+          if (bus.gpsActive)
             Container(
-              margin: const EdgeInsets.all(12),
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2))
-                ],
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Row 1: ikon bus + nama + LIVE badge
-                  Row(children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                          color: AppColors.primaryLight,
-                          shape: BoxShape.circle),
-                      child: const Icon(Icons.directions_bus_rounded,
-                          color: AppColors.primary, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Text(_myBus!.nama,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700)),
-                          Text(
-                            '${_myBus!.platNomor}  •  ${_myBus!.speed.toStringAsFixed(0)} km/h',
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                color: AppColors.textGrey),
-                          ),
-                        ])),
-                    if (_isTracking)
-                      AnimatedBuilder(
-                        animation: _pulseAnim,
-                        builder: (_, __) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.green
-                                .withValues(alpha: _pulseAnim.value * 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.green.withValues(alpha: 0.5)),
-                          ),
-                          child: const Text('● LIVE',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.green)),
-                        ),
-                      ),
-                  ]),
-
-                  // Divider
-                  const SizedBox(height: 10),
-                  const Divider(height: 1, color: AppColors.lightGrey),
-                  const SizedBox(height: 10),
-
-                  // Row 2: ETA ke halte penjemputan + nama halte
-                  Row(children: [
-                    // ETA
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _myBus!.gpsActive
-                              ? AppColors.primaryLight
-                              : AppColors.surface2,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tiba di haltemumu',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: _myBus!.gpsActive
-                                        ? AppColors.primary
-                                        : AppColors.textGrey,
-                                    letterSpacing: 0.3),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _etaKeHalte(),
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    color: _myBus!.gpsActive
-                                        ? AppColors.primary
-                                        : AppColors.textGrey),
-                              ),
-                            ]),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Halte penjemputan
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Halte naik kamu',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textGrey,
-                                    letterSpacing: 0.3),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _myHalte?['nama_halte'] as String? ??
-                                    'Belum diatur',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.black),
-                              ),
-                            ]),
-                      ),
-                    ),
-                  ]),
-                ],
+              child: Text(
+                '${bus.speed.toStringAsFixed(0)} km/h',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary),
               ),
             ),
-          ], // end if (!_loading && _myBus != null)
         ]),
-      ), // SafeArea
-    ); // ColoredBox
+
+        const SizedBox(height: 10),
+        const Divider(height: 1, color: AppColors.lightGrey),
+        const SizedBox(height: 10),
+
+        // Kondisi berbeda: sebelum naik vs saat naik vs selesai
+        if (_isOnBus) ...[
+          // ── Sudah naik: tampilkan info perjalanan ──────
+          Row(children: [
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.login_rounded,
+              label: 'Jam Naik',
+              value: _waktuNaik ?? '—',
+              color: Colors.green,
+            )),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.location_on_rounded,
+              label: 'Halte Naik',
+              value: _halteNaik ?? '—',
+              color: Colors.green,
+            )),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.speed_rounded,
+              label: 'Kecepatan',
+              value:
+                  bus.gpsActive ? '${bus.speed.toStringAsFixed(0)} km/h' : '—',
+              color: AppColors.primary,
+            )),
+          ]),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3))),
+            child: const Row(children: [
+              Icon(Icons.info_outline_rounded, color: Colors.green, size: 14),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Kamu sedang di bus. Driver akan checkout saat kamu turun.',
+                  style: TextStyle(
+                      fontFamily: 'Poppins', fontSize: 11, color: Colors.green),
+                ),
+              ),
+            ]),
+          ),
+        ] else if (_isDone) ...[
+          // ── Sudah selesai: ringkasan perjalanan ────────
+          Row(children: [
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.login_rounded,
+              label: 'Jam Naik',
+              value: _waktuNaik ?? '—',
+              color: AppColors.primary,
+            )),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.logout_rounded,
+              label: 'Jam Turun',
+              value: _waktuTurun ?? '—',
+              color: AppColors.primary,
+            )),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.location_on_rounded,
+              label: 'Halte Naik',
+              value: _halteNaik ?? '—',
+              color: AppColors.primary,
+            )),
+          ]),
+        ] else ...[
+          // ── Belum naik: tampilkan ETA ke halte ────────
+          Row(children: [
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.timer_rounded,
+              label: 'Tiba di Haltemu',
+              value: bus.gpsActive ? _etaKeHalte() : 'Bus belum aktif',
+              color: bus.gpsActive ? AppColors.primary : AppColors.textGrey,
+            )),
+            const SizedBox(width: 8),
+            Expanded(
+                child: _InfoTile(
+              icon: Icons.place_rounded,
+              label: 'Halte Naik',
+              value: _myHalte?['nama_halte'] as String? ?? 'Belum diatur',
+              color: AppColors.orange,
+            )),
+          ]),
+        ],
+      ]),
+    );
+  }
+
+  Widget _buildNoBusView() => Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(Icons.directions_bus_outlined,
+            size: 64, color: AppColors.primary.withValues(alpha: 0.3)),
+        const SizedBox(height: 12),
+        const Text('Bus belum ditugaskan',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textGrey)),
+        const SizedBox(height: 6),
+        const Text('Hubungi admin sekolah',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: AppColors.textGrey)),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: () => _loadAll(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(20)),
+            child: const Text('Refresh',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
+          ),
+        ),
+      ]));
+
+  Widget _buildGpsOffView() => Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration:
+              BoxDecoration(color: AppColors.surface2, shape: BoxShape.circle),
+          child: Icon(Icons.gps_off_rounded,
+              size: 48, color: AppColors.textGrey.withValues(alpha: 0.5)),
+        ),
+        const SizedBox(height: 16),
+        Text('GPS ${_myBus!.nama} Tidak Aktif',
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.black)),
+        const SizedBox(height: 6),
+        const Text(
+          'Driver belum mengaktifkan GPS.\nPosisi bus tidak dapat ditampilkan.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 13,
+              color: AppColors.textGrey,
+              height: 1.5),
+        ),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: () => _loadAll(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(20)),
+            child: const Text('Refresh',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
+          ),
+        ),
+      ]));
+}
+
+// ── _StatusBanner — banner status absensi di atas peta ───────
+
+class _StatusBanner extends StatelessWidget {
+  final Color color;
+  final Color borderColor;
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final String? badge;
+  final Color? badgeColor;
+
+  const _StatusBanner({
+    required this.color,
+    required this.borderColor,
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    this.badge,
+    this.badgeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(children: [
+        Icon(icon, color: iconColor, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: iconColor)),
+          Text(subtitle,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: AppColors.textGrey)),
+        ])),
+        if (badge != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+                color: badgeColor ?? AppColors.primary,
+                borderRadius: BorderRadius.circular(6)),
+            child: Text(badge!,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+          ),
+      ]),
+    );
   }
 }
 
-// ── Profile Tab ───────────────────────────────────────────────
+// ── _OnBusOverlay — overlay di atas peta saat siswa di bus ───
+
+class _OnBusOverlay extends StatelessWidget {
+  final String busName;
+  final double speed;
+  final String? waktuNaik;
+  final String? halteNaik;
+
+  const _OnBusOverlay({
+    required this.busName,
+    required this.speed,
+    this.waktuNaik,
+    this.halteNaik,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(alpha: 0.93),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.green.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 3))
+        ],
+      ),
+      child: Row(children: [
+        const Icon(Icons.directions_bus_rounded, color: Colors.white, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Kamu di $busName',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white)),
+          if (waktuNaik != null)
+            Text(
+              'Naik $waktuNaik${halteNaik != null ? " di $halteNaik" : ""}',
+              style: const TextStyle(
+                  fontFamily: 'Poppins', fontSize: 10, color: Colors.white70),
+            ),
+        ])),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            '${speed.toStringAsFixed(0)} km/h',
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.white),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── _InfoTile — tile info kecil di bottom card ────────────────
+
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _InfoTile(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(height: 4),
+        Text(value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color)),
+        Text(label,
+            style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 9, color: AppColors.textGrey)),
+      ]),
+    );
+  }
+}
+
 class _SiswaProfileTab extends StatefulWidget {
   final UserModel siswa;
   const _SiswaProfileTab({required this.siswa});

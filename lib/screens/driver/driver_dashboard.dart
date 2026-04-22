@@ -269,9 +269,12 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     await _updateNavigation(driverPos, route.haltes);
   }
 
+  // Flag cegah request navigasi paralel yang bisa tumpang tindih
+  bool _navRequestInProgress = false;
+
   Future<void> _updateNavigation(
       LatLng driverPos, List<RouteHalteModel> haltes) async {
-    if (haltes.isEmpty) return;
+    if (haltes.isEmpty || _navRequestInProgress) return;
 
     final nextIdx = _routingService.getNextHalteIndex(
       driverPos: driverPos,
@@ -279,16 +282,21 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
       currentIndex: _targetHalteIndex,
     );
 
-    if (nextIdx != _targetHalteIndex && mounted) {
-      setState(() => _targetHalteIndex = nextIdx);
+    // Halte berganti — hapus cache rute lama agar rute baru di-fetch
+    if (nextIdx != _targetHalteIndex) {
+      final oldHalte = _targetHalteIndex < haltes.length
+          ? haltes[_targetHalteIndex].halte
+          : null;
+      if (oldHalte != null) {
+        _routingService
+            .clearCacheForHalte(LatLng(oldHalte.latitude, oldHalte.longitude));
+      }
+      if (mounted) setState(() => _targetHalteIndex = nextIdx);
     }
 
+    // Semua halte sudah dilewati — rute selesai, jangan kosongkan polyline
     if (_targetHalteIndex >= haltes.length) {
-      if (mounted)
-        setState(() {
-          _navPolyline = [];
-          _targetHalte = null;
-        });
+      if (mounted) setState(() => _targetHalte = null);
       return;
     }
 
@@ -296,14 +304,18 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     if (halte == null) return;
 
     final target = LatLng(halte.latitude, halte.longitude);
+
+    _navRequestInProgress = true;
     final polyline = await _routingService.getNavigationRoute(
       from: driverPos,
       to: target,
     );
+    _navRequestInProgress = false;
 
     if (mounted) {
       setState(() {
-        _navPolyline = polyline;
+        // Hanya update jika polyline valid — jaga rute lama tetap tampil jika gagal
+        if (polyline.isNotEmpty) _navPolyline = polyline;
         _targetHalte = halte;
       });
     }
