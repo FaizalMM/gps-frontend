@@ -26,6 +26,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
 
+    <!-- Wake Lock: wajib untuk geolocator foreground service agar CPU tidak sleep -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
     <application
         android:label="Mobitra"
         android:name="${applicationName}"

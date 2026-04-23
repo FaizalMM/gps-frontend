@@ -182,6 +182,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   // Absensi hari ini — diperbarui setiap 15 detik saat GPS aktif
   List<Map<String, dynamic>> _attendanceToday = [];
   Timer? _attendancePollTimer;
+  bool _isLoadingAttendance = false; // guard: cegah request dobel
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
@@ -228,11 +229,15 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
 
   Future<void> _loadAttendanceToday() async {
     final bus = widget.bus;
-    if (bus == null || !mounted) return;
+    if (bus == null || !mounted || _isLoadingAttendance) return;
+    _isLoadingAttendance = true;
     try {
       final list = await DriverService().getBusAttendanceToday(bus.id);
       if (mounted) setState(() => _attendanceToday = list);
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _isLoadingAttendance = false;
+    }
   }
 
   @override

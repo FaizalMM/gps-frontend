@@ -6,15 +6,23 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Konfigurasi Base URL — ganti sesuai server Laravel kamu
 class ApiConfig {
-  // Ganti dengan IP/domain server Laravel saat deploy
-  // Contoh local: 'http://192.168.1.x:8000/api'
-  // Contoh production: 'https://api.mobitra.id/api'
-  // static const String baseUrl =
-  //     'http://10.0.2.2:8000/api'; // Android emulator → localhost
-
-  // Base URL server Laravel melalui ngrok  
+  // ─── GANTI SESUAI ENVIRONMENT ────────────────────────────────────────────
+  //
+  // Development (emulator Android):
+  //   'http://10.0.2.2:8000/api'
+  //
+  // Development (device fisik, sesuaikan IP lokal):
+  //   'http://192.168.1.100:8000/api'
+  //
+  // Staging / ngrok (ganti setiap kali ngrok restart):
+  //   'https://xxxx-xxxx.ngrok-free.app/api'
+  //
+  // Production (domain tetap):
+  //   'https://api.mobitra.id/api'
+  //
+  // ─────────────────────────────────────────────────────────────────────────
   static const String baseUrl =
-      'https://unregal-keshia-contrapuntal.ngrok-free.dev/api';
+      'https://unregal-keshia-contrapuntal.ngrok-free.dev/api'; // TODO: ganti ke domain production
 
   static const Duration timeout = Duration(seconds: 15);
 }
