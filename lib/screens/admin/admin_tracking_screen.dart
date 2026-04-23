@@ -21,71 +21,39 @@ class AdminTrackingScreen extends StatefulWidget {
 class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
   final MapController _mapController = MapController();
   BusModel? _focusedBus;
-  bool _showDetail = false; // panel detail bawah
-  bool _showBusList = false; // dropdown list bus kanan atas
-
-  // Flag: user sedang menjelajahi map secara manual (geser/zoom)
-  // Selagi true, auto-follow dari stream update dinonaktifkan
-  bool _userIsExploring = false;
-  DateTime? _lastExploreTime;
-  static const _exploreCooldown = Duration(seconds: 5);
-  // StreamSubscription untuk listen MapEvent dari MapController
-  dynamic _mapEventSub;
-
-  bool get _isExploring {
-    if (!_userIsExploring) return false;
-    if (_lastExploreTime == null) return false;
-    return DateTime.now().difference(_lastExploreTime!) < _exploreCooldown;
-  }
+  bool _showDetail = false;
+  bool _showBusList = false;
 
   @override
   void initState() {
     super.initState();
-    // Panel detail tidak langsung muncul — hanya muncul saat marker di-tap
     if (widget.initialFocus != null) {
       _focusedBus = widget.initialFocus;
-      _showDetail = false;
     }
-    // Deteksi gesture user via mapEventStream (cara resmi flutter_map)
-    // MapEventMoveStart = user mulai geser/zoom secara manual
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _mapEventSub = _mapController.mapEventStream.listen((event) {
-        if (event is MapEventMoveStart) {
-          // Cek apakah gerak ini dari gesture user (bukan dari move() programmatic)
-          if (event.source == MapEventSource.dragStart ||
-              event.source == MapEventSource.multiFingerGestureStart ||
-              event.source == MapEventSource.scrollWheel ||
-              event.source == MapEventSource.doubleTap ||
-              event.source == MapEventSource.doubleTapHold) {
-            _userIsExploring = true;
-            _lastExploreTime = DateTime.now();
-          }
-        }
-      });
-    });
   }
 
-  @override
-  void dispose() {
-    _mapEventSub?.cancel();
-    super.dispose();
+  /// Pindahkan kamera ke lokasi bus
+  void _moveCameraTo(BusModel b, {double zoom = 16.0}) {
+    _mapController.move(LatLng(b.latitude, b.longitude), zoom);
   }
 
+  /// Klik item di list bus → fokus kamera + tutup dropdown
   void _selectBus(BusModel b) {
     setState(() {
       _focusedBus = b;
-      _showBusList = false; // tutup dropdown, tapi panel TIDAK dibuka otomatis
+      _showBusList = false;
     });
-    _mapController.move(LatLng(b.latitude, b.longitude), 16.0);
+    _moveCameraTo(b);
   }
 
+  /// Tap marker di peta → buka panel detail
   void _tapBus(BusModel b) {
     setState(() {
       _focusedBus = b;
-      _showDetail = true; // panel detail dibuka HANYA saat tap marker
+      _showDetail = true;
       _showBusList = false;
     });
-    _mapController.move(LatLng(b.latitude, b.longitude), 16.0);
+    _moveCameraTo(b);
   }
 
   @override
@@ -102,45 +70,35 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
           final buses = s.data ?? widget.dataService.buses;
           final active = buses.where((b) => b.gpsActive).toList();
 
-          // Auto-focus bus pertama (tanpa buka panel)
+          // Auto-focus bus pertama saat pertama kali ada data
           if (_focusedBus == null && active.isNotEmpty) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _selectBus(active.first);
             });
           }
-          // Reset jika bus focused sudah tidak aktif
+
+          // Reset jika bus yang difokus sudah tidak aktif
           if (_focusedBus != null &&
               !active.any((b) => b.id == _focusedBus!.id)) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted)
+              if (mounted) {
                 setState(() {
                   _focusedBus = active.isNotEmpty ? active.first : null;
-                  _showDetail = _focusedBus != null;
+                  _showDetail = false;
                 });
+              }
             });
           }
-          // Update data focused bus dari stream (posisi terbaru)
-          // Tapi JANGAN pindahkan kamera jika user sedang menggeser map
+
+          // Update data focused bus dari stream (posisi terbaru) tanpa gerak kamera
           if (_focusedBus != null) {
             final updated = active.where((b) => b.id == _focusedBus!.id);
             if (updated.isNotEmpty) {
               _focusedBus = updated.first;
-              // Auto-follow: hanya pindah kamera jika user tidak sedang eksplorasi
-              if (!_isExploring && _focusedBus!.latitude != 0) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    _mapController.move(
-                      LatLng(_focusedBus!.latitude, _focusedBus!.longitude),
-                      _mapController.camera.zoom,
-                    );
-                  }
-                });
-              }
             }
           }
 
           return GestureDetector(
-            // Tap di luar dropdown → tutup dropdown
             onTap: _showBusList
                 ? () => setState(() => _showBusList = false)
                 : null,
@@ -194,13 +152,11 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                   left: 12,
                   right: 12,
                   child: Row(children: [
-                    // Kembali
                     _CircleBtn(
                       icon: Icons.arrow_back_rounded,
                       onTap: () => Navigator.pop(context),
                     ),
                     const SizedBox(width: 10),
-                    // Judul
                     Expanded(
                       child: Container(
                         height: 42,
@@ -242,7 +198,6 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // Tombol list bus
                     if (active.isNotEmpty)
                       _CircleBtn(
                         icon: Icons.format_list_bulleted_rounded,
@@ -253,12 +208,12 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                   ]),
                 ),
 
-                // ── DROPDOWN LIST BUS (kanan atas) ───────────
+                // ── DROPDOWN LIST BUS ───────────────────────
                 if (_showBusList && active.isNotEmpty)
                   Positioned(
                     top: top + 62,
                     right: 12,
-                    width: 220,
+                    width: 230,
                     child: Material(
                       elevation: 8,
                       borderRadius: BorderRadius.circular(14),
@@ -270,7 +225,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Header dropdown
+                            // Header
                             Padding(
                               padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
                               child: Row(children: [
@@ -297,12 +252,10 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                               ]),
                             ),
                             const Divider(height: 1),
-                            // List bus — setiap bus punya warna berbeda
+                            // List item bus
                             ...active.asMap().entries.map((entry) {
-                              final idx = entry.key;
                               final b = entry.value;
                               final isSel = _focusedBus?.id == b.id;
-                              // Palet warna sesuai _BusMarker di bus_map_widget
                               const busColors = [
                                 Color(0xFF1565C0),
                                 Color(0xFFE53935),
@@ -339,8 +292,8 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                   ),
                                   child: Row(children: [
                                     Container(
-                                      width: 30,
-                                      height: 30,
+                                      width: 32,
+                                      height: 32,
                                       decoration: BoxDecoration(
                                           color: isSel
                                               ? busColor
@@ -382,19 +335,54 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                         ],
                                       ),
                                     ),
-                                    Text('${b.speed.toStringAsFixed(0)} km/h',
-                                        style: TextStyle(
-                                            fontFamily: 'Poppins',
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w700,
-                                            color: isSel
-                                                ? busColor
-                                                : AppColors.textGrey)),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                            '${b.speed.toStringAsFixed(0)} km/h',
+                                            style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: isSel
+                                                    ? busColor
+                                                    : AppColors.textGrey)),
+                                        const SizedBox(height: 2),
+                                        Icon(
+                                          isSel
+                                              ? Icons.location_on_rounded
+                                              : Icons
+                                                  .location_searching_rounded,
+                                          size: 12,
+                                          color: isSel
+                                              ? busColor
+                                              : AppColors.textGrey,
+                                        ),
+                                      ],
+                                    ),
                                   ]),
                                 ),
                               );
                             }),
-                            const SizedBox(height: 4),
+                            // Footer hint
+                            const Padding(
+                              padding: EdgeInsets.fromLTRB(14, 6, 14, 10),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.touch_app_rounded,
+                                      size: 11, color: AppColors.textGrey),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Ketuk bus untuk fokus ke lokasinya',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 9,
+                                        color: AppColors.textGrey),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -426,7 +414,6 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Handle
                           GestureDetector(
                             onTap: () => setState(() => _showDetail = false),
                             child: Container(
@@ -576,7 +563,6 @@ class _BusDetailCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 12),
-        // Info rows
         _Row(
             icon: Icons.person_rounded,
             label: 'Driver',
