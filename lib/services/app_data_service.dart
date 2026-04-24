@@ -304,22 +304,28 @@ class AppDataService {
     if (ok) await loadStudents();
   }
 
-  /// Approve siswa dan return students.id — dipakai admin untuk assign bus
-  /// langsung setelah approve tanpa perlu call terpisah.
+  /// Approve siswa dan return students.id — dipakai admin untuk assign bus.
+  /// Return null jika approve API GAGAL agar caller tahu dan tidak lanjut assign.
+  /// loadStudents() TIDAK dipanggil di sini — caller harus panggil sendiri
+  /// setelah assign selesai agar tidak ada race condition.
   Future<int?> approveAndGetStudentId(String userId,
       {int? studentDetailId}) async {
     final id = int.tryParse(userId);
-    if (id == null) return studentDetailId;
-    // Jika studentDetailId sudah ada (dari cache), tidak perlu hit API lagi
-    if (studentDetailId != null && studentDetailId > 0) {
-      // Tetap approve via API
-      await _studentService.approveStudent(id);
-      await loadStudents();
-      return studentDetailId;
+    if (id == null) return null;
+
+    // Panggil approve API — hasil WAJIB dicek, jangan diabaikan
+    final approvedStudentId = await _studentService.approveStudent(id);
+
+    if (approvedStudentId == null) {
+      // Approve API gagal (network error, 409, dll) — jangan lanjut assign
+      return null;
     }
-    final studentDbId = await _studentService.approveStudent(id);
-    if (studentDbId != null) await loadStudents();
-    return studentDbId;
+
+    // Approve berhasil — return students.id yang paling akurat
+    // Prioritas: dari response API → dari cache studentDetailId
+    if (approvedStudentId > 0) return approvedStudentId;
+    if (studentDetailId != null && studentDetailId > 0) return studentDetailId;
+    return null;
   }
 
   Future<void> deleteUser(String userId) async {

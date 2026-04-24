@@ -842,9 +842,10 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
         borderColor: AppColors.orange.withValues(alpha: 0.4),
         icon: Icons.qr_code_2_rounded,
         iconColor: AppColors.orange,
-        title: 'QR sudah siap, menunggu scan driver',
-        subtitle: 'Tunjukkan QR Code kamu ke driver',
-        badge: null,
+        title: 'QR siap — tunjukkan ke driver saat naik!',
+        subtitle: 'QR sudah aktif, menunggu driver scan',
+        badge: 'MENUNGGU SCAN',
+        badgeColor: AppColors.orange,
       );
     }
     if (_isOnBus) {

@@ -673,7 +673,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         }
                         Navigator.pop(ctx);
 
-                        // Approve dan dapatkan students.id yang valid
+                        // Step 1: Approve siswa — cek hasilnya, jangan diabaikan
                         final studentDbId =
                             await widget.dataService.approveAndGetStudentId(
                           user.idStr,
@@ -682,29 +682,38 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
 
                         if (!mounted) return;
 
-                        // Assign ke bus menggunakan students.id yang pasti benar
-                        bool assigned = false;
-                        if (studentDbId != null && studentDbId > 0) {
-                          assigned = await BusService().assignStudentToBus(
-                            selectedBus!.id,
-                            studentDbId,
-                            selectedHalte!.id,
-                          );
+                        // Approve gagal — hentikan proses, jangan assign bus
+                        if (studentDbId == null) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(
+                                '❌ Gagal menyetujui akun ${user.namaLengkap}. Periksa koneksi dan coba lagi.'),
+                            backgroundColor: AppColors.red,
+                            behavior: SnackBarBehavior.floating,
+                            duration: const Duration(seconds: 4),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ));
+                          return;
                         }
+
+                        // Step 2: Assign ke bus — approve sudah dipastikan berhasil
+                        final assigned = await BusService().assignStudentToBus(
+                          selectedBus!.id,
+                          studentDbId,
+                          selectedHalte!.id,
+                        );
+
+                        // Step 3: Refresh data siswa SETELAH semua proses selesai
+                        await widget.dataService.loadStudents();
 
                         if (!mounted) return;
                         setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text(assigned
                               ? '✅ ${user.namaLengkap} disetujui & ditugaskan ke ${selectedBus!.nama}'
-                              : studentDbId == null
-                                  ? '❌ Gagal menyetujui akun ${user.namaLengkap}'
-                                  : '⚠️ ${user.namaLengkap} disetujui, tapi gagal assign bus. Coba assign manual dari menu Siswa.'),
-                          backgroundColor: assigned
-                              ? AppColors.primary
-                              : studentDbId == null
-                                  ? AppColors.red
-                                  : AppColors.orange,
+                              : '⚠️ ${user.namaLengkap} disetujui, tapi gagal assign bus. Coba assign manual dari menu Siswa.'),
+                          backgroundColor:
+                              assigned ? AppColors.primary : AppColors.orange,
                           behavior: SnackBarBehavior.floating,
                           duration: const Duration(seconds: 4),
                           shape: RoundedRectangleBorder(
@@ -716,25 +725,65 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                     Center(
                         child: TextButton(
                       onPressed: () {
-                        Navigator.pop(ctx);
-                        widget.dataService
-                            .updateUserStatus(
-                          user.idStr,
-                          AccountStatus.active,
-                          studentDetailId: user.studentDetail?.id,
-                        )
-                            .then((_) {
-                          if (!mounted) return;
-                          setState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(
-                                '${user.namaLengkap} disetujui (belum ada bus)'),
-                            backgroundColor: AppColors.primary,
-                            behavior: SnackBarBehavior.floating,
+                        // Konfirmasi dulu sebelum setujui tanpa bus
+                        showDialog(
+                          context: ctx,
+                          builder: (dCtx) => AlertDialog(
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ));
-                        });
+                                borderRadius: BorderRadius.circular(16)),
+                            title: const Text('Setujui Tanpa Bus?',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 16)),
+                            content: Text(
+                              '${user.namaLengkap} akan disetujui tapi belum ditugaskan ke bus manapun.\n\nSiswa tidak bisa tracking bus sampai admin assign bus secara manual.',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins', fontSize: 13),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(dCtx),
+                                child: const Text('Batal',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        color: AppColors.textGrey)),
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  Navigator.pop(dCtx);
+                                  Navigator.pop(ctx);
+                                  final studentId = await widget.dataService
+                                      .approveAndGetStudentId(
+                                    user.idStr,
+                                    studentDetailId: user.studentDetail?.id,
+                                  );
+                                  await widget.dataService.loadStudents();
+                                  if (!mounted) return;
+                                  setState(() {});
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(
+                                    content: Text(studentId != null
+                                        ? '${user.namaLengkap} disetujui (belum ada bus — assign manual dari menu Siswa)'
+                                        : '❌ Gagal menyetujui ${user.namaLengkap}'),
+                                    backgroundColor: studentId != null
+                                        ? AppColors.orange
+                                        : AppColors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10)),
+                                  ));
+                                },
+                                child: const Text('Setujui Tanpa Bus',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        color: AppColors.orange,
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                       child: const Text('Setujui tanpa assign bus',
                           style: TextStyle(

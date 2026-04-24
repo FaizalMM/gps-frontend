@@ -33,8 +33,11 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   // Status polling absensi — setelah QR berhasil dibuat, poll tiap 10 detik
   // untuk cek apakah driver sudah menscan QR siswa
   Timer? _pollTimer;
-  bool _isScanned = false; // QR sudah discan driver
+  bool _isScanned =
+      false; // QR sudah discan driver (status checked_in/checked_out)
   bool _isOnTrip = false; // Siswa sedang dalam perjalanan
+  bool _isPendingServer =
+      false; // QR sudah teregister di server (status pending, menunggu scan)
   String? _scannedAt; // Waktu scan (jam naik)
   String? _scannedHalte; // Halte naik
   String? _scannedBus; // Bus yang dinaiki
@@ -65,8 +68,22 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       final list = result?['data'];
       if (list is List && list.isNotEmpty) {
         final latest = list.last as Map<String, dynamic>;
+        final status = latest['status'] as String?;
         final waktuNaik = latest['waktu_naik'] as String?;
         final waktuTurun = latest['waktu_turun'] as String?;
+
+        // Status 'pending': QR sudah teregister di server, menunggu scan driver
+        if (status == 'pending' && waktuNaik == null) {
+          setState(() {
+            _isPendingServer = true;
+            _isScanned = false;
+          });
+          // Tetap polling — menunggu driver scan
+          _startPolling();
+          return;
+        }
+
+        // Status checked_in / checked_out / not_checked_out: QR sudah discan driver
         if (waktuNaik != null) {
           final dt = DateTime.tryParse(waktuNaik);
           final jamNaik = dt != null
@@ -74,18 +91,19 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               : waktuNaik;
           setState(() {
             _isScanned = true;
+            _isPendingServer = false;
             _isOnTrip =
                 waktuTurun == null; // masih di perjalanan jika belum checkout
             _scannedAt = jamNaik;
             _scannedHalte = latest['halte_naik'] as String?;
             _scannedBus = latest['bus_code'] as String?;
           });
-          // Sudah discan — stop polling
+          // Sudah discan driver — stop polling
           _pollTimer?.cancel();
           return;
         }
       }
-      // Belum discan — mulai/lanjut polling
+      // Tidak ada attendance atau status tidak dikenal — lanjut polling
       _startPolling();
     } catch (_) {
       _startPolling();
@@ -323,6 +341,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
 
           // ── Banner status absensi (muncul setelah QR discan driver) ──
           if (_isScanned) ...[
+            // ── Sudah discan driver: checked_in atau selesai ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -388,8 +407,62 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               ]),
             ),
             const SizedBox(height: 12),
+          ] else if (_isPendingServer && !_isLoading) ...[
+            // ── QR sudah teregister di server (status pending) — menunggu scan driver ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(14),
+                border:
+                    Border.all(color: AppColors.orange.withValues(alpha: 0.4)),
+              ),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: AppColors.orange.withValues(alpha: 0.12),
+                      shape: BoxShape.circle),
+                  child: const Icon(Icons.qr_code_2_rounded,
+                      color: AppColors.orange, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'QR siap — tunjukkan ke driver!',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.orange),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(children: [
+                          const SizedBox(
+                              width: 10,
+                              height: 10,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 1.5, color: AppColors.orange)),
+                          const SizedBox(width: 6),
+                          const Text(
+                            'Menunggu driver scan...',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: AppColors.orange),
+                          ),
+                        ]),
+                      ]),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
           ] else if (_qrData != null && !_isLoading) ...[
-            // QR sudah dibuat tapi belum discan — tampilkan hint polling
+            // ── QR baru dibuat, belum ada konfirmasi dari server ──
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
