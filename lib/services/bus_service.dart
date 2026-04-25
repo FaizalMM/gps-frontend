@@ -283,7 +283,12 @@ class BusService {
       final d = res.data!['data'] as Map<String, dynamic>?;
       if (d != null) {
         final pos = d['position'] as Map<String, dynamic>?;
-        final gpsActive = (d['gps_active'] as bool? ?? false) && pos != null;
+        // PERBAIKAN: gpsActive = true jika driver sudah toggle ON,
+        // terlepas apakah koordinat pertama sudah dikirim atau belum.
+        // Sebelumnya: && pos != null menyebabkan gpsActive selalu false
+        // saat driver baru saja aktifkan GPS (koordinat belum masuk).
+        final gpsActive = d['gps_active'] as bool? ?? false;
+        final hasPosition = gpsActive && pos != null;
 
         final bus = BusModel.fromJson({
           'id': d['bus_id'],
@@ -296,18 +301,21 @@ class BusService {
                   'user': {'name': d['driver_name']}
                 }
               : null,
-          'current_position': gpsActive ? pos : null,
+          'current_position': hasPosition ? pos : null,
           'routes': d['routes'] ?? [],
           'created_at': DateTime.now().toIso8601String(),
         });
 
-        if (gpsActive && pos != null) {
+        if (hasPosition) {
           bus.updateGps(
-            latitude: (pos['latitude'] as num?)?.toDouble() ?? 0,
+            latitude: (pos!['latitude'] as num?)?.toDouble() ?? 0,
             longitude: (pos['longitude'] as num?)?.toDouble() ?? 0,
             speed: (pos['speed'] as num?)?.toDouble() ?? 0,
             gpsActive: true,
           );
+        } else if (gpsActive) {
+          // GPS aktif tapi koordinat belum masuk — set aktif dengan posisi 0,0
+          bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: true);
         } else {
           bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: false);
         }

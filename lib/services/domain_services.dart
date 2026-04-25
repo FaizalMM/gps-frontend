@@ -278,7 +278,11 @@ class DriverService {
   Future<List<Map<String, dynamic>>> getBusAttendanceToday(int busId) async {
     final res = await _api.get('/driver/buses/$busId/attendance/today');
     if (!res.success || res.data == null) return [];
-    final raw = res.data!['data'];
+    // PERBAIKAN BUG: backend responseSuccess membungkus dalam {success, data: {bus_id, data:[...]}}
+    // res.data!['data'] = {bus_id, bus_code, date, data:[...]} bukan List langsung
+    // sehingga raw is! List → selalu return [] → penumpang tidak pernah tampil
+    final wrapper = res.data!['data'];
+    final raw = wrapper is Map ? wrapper['data'] : wrapper;
     if (raw is! List) return [];
     return List<Map<String, dynamic>>.from(raw);
   }

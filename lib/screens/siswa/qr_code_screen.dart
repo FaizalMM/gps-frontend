@@ -85,7 +85,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
 
         // Status checked_in / checked_out / not_checked_out: QR sudah discan driver
         if (waktuNaik != null) {
-          final dt = DateTime.tryParse(waktuNaik);
+          // PERBAIKAN TIMEZONE: backend simpan waktu dalam UTC (timezone = 'UTC' di config/app.php).
+          // Harus .toLocal() agar jam ditampilkan sesuai timezone device (WIB = UTC+7).
+          // Tanpa toLocal(): jam 10:41 WIB tersimpan 03:41 UTC → tampil "03:41" (salah).
+          final dt = DateTime.tryParse(waktuNaik)?.toLocal();
           final jamNaik = dt != null
               ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
               : waktuNaik;

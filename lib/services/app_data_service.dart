@@ -159,6 +159,62 @@ class AppDataService {
     onUnauthorized = null;
   }
 
+  // ── Polling khusus SISWA ─────────────────────────────────
+  // PERBAIKAN BUG: startGpsPolling() memanggil /gps-tracks/dashboard
+  // yang admin-only (403 Forbidden). Siswa harus pakai endpoint sendiri:
+  // /student/bus/tracking via BusService.getMyBusTrackingFull().
+
+  Timer? _studentPollingTimer;
+  bool _studentPollingActive = false;
+  void Function(
+          ({BusModel? bus, Map<String, dynamic>? myHalte, String? driverName}))?
+      onStudentBusUpdated;
+
+  /// Mulai polling bus tracking khusus siswa. Interval 5 detik.
+  /// Panggil dari SiswaTrackingTab.initState(), bukan startGpsPolling().
+  void startStudentPolling({
+    void Function(
+            ({
+              BusModel? bus,
+              Map<String, dynamic>? myHalte,
+              String? driverName
+            }))?
+        onUpdate,
+  }) {
+    if (_studentPollingActive) return;
+    _studentPollingActive = true;
+    onStudentBusUpdated = onUpdate;
+    _pollStudentBus(); // langsung poll sekali
+    _studentPollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (_studentPollingActive) _pollStudentBus();
+    });
+  }
+
+  /// Stop polling siswa. Panggil di dispose SiswaTrackingTab.
+  void stopStudentPolling() {
+    _studentPollingActive = false;
+    _studentPollingTimer?.cancel();
+    _studentPollingTimer = null;
+    onStudentBusUpdated = null;
+  }
+
+  Future<void> _pollStudentBus() async {
+    if (!_studentPollingActive) return;
+    try {
+      final hasToken = await _busService.hasValidToken();
+      if (!hasToken) {
+        stopStudentPolling();
+        onUnauthorized?.call();
+        return;
+      }
+      final result = await _busService.getMyBusTrackingFull();
+      if (!_studentPollingActive) return;
+      onStudentBusUpdated?.call(result);
+    } catch (_) {
+      // Abaikan error jaringan — polling coba lagi di interval berikutnya
+    }
+  }
+
   Future<void> _pollGps() async {
     try {
       // Cek token dulu sebelum request — jika tidak ada, hentikan polling

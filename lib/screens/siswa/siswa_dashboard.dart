@@ -105,6 +105,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
   Position? _userLocation;
   // ID bus yang di-assign ke siswa ini — diambil dari studentDetail
   int? _myBusId;
+  bool _myBusGpsActive = false;
   // Nama bus & driver yang di-assign ke siswa ini
   String? _myBusName;
   String? _myDriverName;
@@ -134,6 +135,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
       if (result.bus != null) {
         setState(() {
           _myBusId = result.bus!.id;
+          _myBusGpsActive = result.bus!.gpsActive; // update status GPS
           _myBusName = result.bus!.nama;
           // Prioritas: driverName dari field baru, fallback ke BusModel.driverName
           _myDriverName = (result.driverName?.isNotEmpty == true)
@@ -388,59 +390,96 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                             color: AppColors.black))),
-                StreamBuilder<List<BusModel>>(
-                  stream: widget.dataService.busesStream,
-                  builder: (_, s) {
-                    final n = (s.data ?? widget.dataService.buses)
-                        .where((b) => b.gpsActive)
-                        .length;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(20)),
-                      child: Text('$n aktif',
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary)),
-                    );
-                  },
-                ),
+                // PERBAIKAN: busesStream diisi oleh startGpsPolling() yang admin-only
+                // → siswa selalu dapat 0. Ganti pakai status bus siswa sendiri dari
+                // _SiswaTrackingTab via shared state atau cukup tunjukkan status 1 bus milik siswa.
+                Builder(builder: (_) {
+                  // Cek apakah bus milik siswa ini sedang aktif GPS
+                  // Info ini sudah tersedia dari _myBusId dan BusService polling
+                  final isActive = _myBusGpsActive;
+                  return Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: isActive
+                            ? AppColors.primaryLight
+                            : AppColors.surface2,
+                        borderRadius: BorderRadius.circular(20)),
+                    child: Text(isActive ? '1 aktif' : '0 aktif',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isActive
+                                ? AppColors.primary
+                                : AppColors.textGrey)),
+                  );
+                }),
               ]),
             ),
             const SizedBox(height: 10),
 
-            StreamBuilder<List<BusModel>>(
-              stream: widget.dataService.busesStream,
-              builder: (_, s) {
-                final buses = (s.data ?? widget.dataService.buses)
-                    .where((b) => b.gpsActive)
-                    .toList();
-                if (buses.isEmpty)
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                    child: Center(
-                        child: Text('Belum ada bus beroperasi',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                color: AppColors.textGrey))),
-                  );
-                return Column(
-                  children: buses
-                      .map((bus) => Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                            child: _BusListTile(
-                                bus: bus,
-                                eta: _eta(bus),
-                                onTap: () => widget.onSwitchTab(1)),
-                          ))
-                      .toList(),
+            // PERBAIKAN: busesStream kosong untuk siswa karena admin-only.
+            // Tampilkan bus milik siswa ini jika GPS aktif, dari _loadMyBusId hasil.
+            Builder(builder: (_) {
+              if (_myBusId == null || !_myBusGpsActive) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  child: Center(
+                      child: Text('Belum ada bus beroperasi',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              color: AppColors.textGrey))),
                 );
-              },
-            ),
+              }
+              // Ada bus dan GPS aktif — tampilkan tile bus milik siswa
+              // Data lengkap diambil ulang saat tab Lacak dibuka
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: GestureDetector(
+                  onTap: () => widget.onSwitchTab(1),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.directions_bus_rounded,
+                            color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(_myBusName ?? 'Bus Saya',
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            Text('GPS Aktif • Tap untuk lacak',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: AppColors.primary)),
+                          ])),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: AppColors.primary),
+                    ]),
+                  ),
+                ),
+              );
+            }),
             const SizedBox(height: 30),
           ]),
         ),
