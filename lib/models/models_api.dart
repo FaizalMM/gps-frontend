@@ -104,7 +104,7 @@ class UserModel {
     }
 
     return UserModel(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       namaLengkap: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: role,
@@ -190,8 +190,8 @@ class StudentDetail {
     final halteJson = json['halte'] as Map<String, dynamic>?;
 
     return StudentDetail(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      userId: (json['user_id'] as num?)?.toInt() ?? 0,
       nis: json['nis'] as String? ?? '',
       sekolah: json['sekolah'] as String? ?? '',
       kelas: json['kelas'] as String? ?? '',
@@ -231,8 +231,8 @@ class DriverDetail {
 
   factory DriverDetail.fromJson(Map<String, dynamic> json) {
     return DriverDetail(
-      id: json['id'] as int,
-      userId: json['user_id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      userId: (json['user_id'] as num?)?.toInt() ?? 0,
       nik: json['nik'] as String? ?? '',
       noHp: json['no_hp'] as String? ?? '',
       alamat: json['alamat'] as String? ?? '',
@@ -427,7 +427,7 @@ class BusModel {
     }
 
     return BusModel(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       nama: json['kode_bus'] as String? ?? json['bus_code'] as String? ?? 'Bus',
       platNomor:
           json['plat_nomor'] as String? ?? json['bus_plate'] as String? ?? '-',
@@ -495,7 +495,7 @@ class HalteModel {
 
   factory HalteModel.fromJson(Map<String, dynamic> json) {
     return HalteModel(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       namaHalte: json['nama_halte'] as String? ?? '',
       alamat: json['alamat'] as String? ?? '',
       latitude: _parseDouble(json['latitude'], -7.6298),
@@ -542,8 +542,8 @@ class LaporanPerjalanan {
 
   factory LaporanPerjalanan.fromJson(Map<String, dynamic> json) {
     return LaporanPerjalanan(
-      id: json['id'] as int,
-      busId: json['bus_id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      busId: (json['bus_id'] as num?)?.toInt() ?? 0,
       busNama: json['bus']?['kode_bus'] as String? ?? '',
       driverId: json['driver_id']?.toString() ?? '',
       driverName: json['driver']?['user']?['name'] as String? ?? '',
@@ -807,7 +807,7 @@ class RouteHalteModel {
       halteData = HalteModel.fromJson(json['halte'] as Map<String, dynamic>);
     }
     return RouteHalteModel(
-      id: json['id'] as int,
+      id: (json['id'] as num?)?.toInt() ?? 0,
       routeId: json['route_id'] as int? ?? 0,
       halteId: json['halte_id'] as int? ?? 0,
       urutan: json['urutan'] as int? ?? 0,

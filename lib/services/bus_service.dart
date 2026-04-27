@@ -144,47 +144,66 @@ class BusService {
     final wrapper = res.data!['data'];
     debugPrint('[BusService] wrapper type: ${wrapper.runtimeType}');
 
+    // Backend responsePaginated mengembalikan data langsung sebagai List di key 'data'
+    // Fallback ke 'items' atau nested 'data' untuk antisipasi perubahan struktur
     final raw = wrapper is List
         ? wrapper
         : wrapper is Map
-            ? (wrapper['data'] ?? [])
+            ? (wrapper['data'] ?? wrapper['items'] ?? [])
             : [];
     debugPrint('[BusService] raw count: ${(raw as List).length}');
     if (raw is! List) return [];
+
     final List<UserModel> result = [];
     for (final e in raw) {
       try {
         final student = e as Map<String, dynamic>;
         final user = student['user'] as Map<String, dynamic>?;
 
-        // Jika user null, buat dummy user dari data student
+        // FIX: user bisa null jika eager load gagal atau relasi belum diset.
+        // Fallback berantai: user.id → user_id langsung di student object
         final userId = user?['id'] ?? student['user_id'];
-        if (userId == null) continue;
+
+        if (userId == null) {
+          debugPrint(
+              '[BusService] SKIP student id=${student['id']}: userId null, user=$user');
+          continue;
+        }
 
         final merged = {
-          // Data dari user object
+          // Data dari user object, fallback ke field student jika user null
           'id': userId,
-          'name': user?['name'] ?? 'Siswa',
-          'email': user?['email'] ?? '',
+          'name': user?['name'] ?? student['name'] ?? 'Siswa',
+          'email': user?['email'] ?? student['email'] ?? '',
           'role': user?['role'] ?? 'siswa',
-          'photo': user?['photo'],
-          'photo_url': user?['photo_url'],
+          'photo': user?['photo'] ?? student['photo'],
+          'photo_url': user?['photo_url'] ?? student['photo_url'],
+          'created_at': user?['created_at'] ??
+              student['created_at'] ??
+              DateTime.now().toIso8601String(),
           // Data student sebagai nested object
           'student': {
-            'id': student['id'],
+            'id': student['id'] ?? 0,
+            'user_id':
+                userId, // FIX: wajib ada agar StudentDetail.fromJson tidak crash
             'nis': student['nis'] ?? '',
             'sekolah': student['sekolah'] ?? '',
             'kelas': student['kelas'] ?? '',
             'alamat': student['alamat'] ?? '',
             'no_hp': student['no_hp'] ?? '',
+            'halte_id': student['pivot']?['halte_id'] ?? student['halte_id'],
             'approval_status': student['approval_status'] ?? 'approved',
           },
         };
         result.add(UserModel.fromJson(merged));
-      } catch (_) {
+        debugPrint(
+            '[BusService] OK parsed student userId=$userId name=${merged['name']}');
+      } catch (ex) {
+        debugPrint('[BusService] ERROR parsing student item: $ex — data: $e');
         continue;
       }
     }
+    debugPrint('[BusService] total parsed: ${result.length}');
     return result;
   }
 

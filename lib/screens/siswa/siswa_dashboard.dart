@@ -553,15 +553,23 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
           ..repeat(reverse: true);
     _pulseAnim = Tween(begin: 0.5, end: 1.0).animate(_pulseCtrl);
 
-    // Mulai GPS polling agar posisi bus update realtime (tiap 3 detik)
-    _busDataService.startGpsPolling();
+    // FIX: siswa tidak boleh akses /gps-tracks/dashboard (admin-only → 403).
+    // Gunakan startStudentPolling() yang pakai /student/bus/tracking.
+    _busDataService.startStudentPolling(
+      onUpdate: (result) {
+        if (!mounted) return;
+        setState(() {
+          _myBus = result.bus;
+          _myHalte = result.myHalte;
+          _driverName = result.driverName;
+        });
+      },
+    );
 
     _loadAll();
 
-    // Auto-refresh bus tiap 5 detik
-    _busRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) _refreshBusPosition();
-    });
+    // _busRefreshTimer dihapus — sudah digantikan oleh startStudentPolling()
+    // yang polling tiap 5 detik via /student/bus/tracking.
 
     // Auto-refresh attendance tiap 8 detik (deteksi perubahan status)
     _attendanceTimer = Timer.periodic(const Duration(seconds: 8), (_) {
@@ -573,7 +581,8 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
   void dispose() {
     _busRefreshTimer?.cancel();
     _attendanceTimer?.cancel();
-    _busDataService.stopGpsPolling();
+    _busDataService
+        .stopStudentPolling(); // FIX: was stopGpsPolling (admin-only)
     _pulseCtrl.dispose();
     super.dispose();
   }
