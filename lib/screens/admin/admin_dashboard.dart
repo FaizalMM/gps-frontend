@@ -16,7 +16,6 @@ import 'admin_pending_screen.dart';
 import 'admin_bus_screen.dart';
 import 'admin_halte_screen.dart';
 import 'admin_analitik_screen.dart';
-import 'admin_generate_qr_screen.dart';
 import 'admin_tracking_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -672,62 +671,6 @@ class _HomeTabState extends State<_HomeTab> {
             ),
             const SizedBox(height: 16),
 
-            // QR Generator quick access
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: GestureDetector(
-                onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => AdminGenerateQrScreen(
-                            dataService: widget.dataService))),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3))
-                    ],
-                  ),
-                  child: Row(children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                          color: AppColors.blue.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.qr_code_2_rounded,
-                          color: AppColors.blue, size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Generator QR Code',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.black)),
-                            Text('Generate & cetak kartu identitas siswa',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 12,
-                                    color: AppColors.textGrey)),
-                          ]),
-                    ),
-                    const Icon(Icons.chevron_right_rounded,
-                        color: AppColors.textGrey, size: 20),
-                  ]),
-                ),
-              ),
-            ),
             const SizedBox(height: 28),
           ],
         ),

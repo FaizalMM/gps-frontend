@@ -1618,7 +1618,9 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
       return;
     }
     try {
-      final list = await BusService().getBusStudents(bus.id);
+      // PERBAIKAN: /buses/{id}/students adalah admin-only (403 untuk driver).
+      // Gunakan endpoint driver: /driver/buses/{id}/students (myBusStudents)
+      final list = await BusService().getDriverBusStudents(bus.id);
       if (!mounted) return;
       setState(() {
         _siswa = list;

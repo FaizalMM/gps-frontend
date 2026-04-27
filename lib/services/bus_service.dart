@@ -133,6 +133,62 @@ class BusService {
     }
   }
 
+  /// Khusus driver — pakai /driver/buses/{id}/students agar tidak 403
+  Future<List<UserModel>> getDriverBusStudents(int busId) async {
+    final res = await _api.get('/driver/buses/$busId/students');
+    if (!res.success || res.data == null) return [];
+
+    // Debug: print struktur response
+    debugPrint('[BusService] raw data: ${res.data}');
+
+    final wrapper = res.data!['data'];
+    debugPrint('[BusService] wrapper type: ${wrapper.runtimeType}');
+
+    final raw = wrapper is List
+        ? wrapper
+        : wrapper is Map
+            ? (wrapper['data'] ?? [])
+            : [];
+    debugPrint('[BusService] raw count: ${(raw as List).length}');
+    if (raw is! List) return [];
+    final List<UserModel> result = [];
+    for (final e in raw) {
+      try {
+        final student = e as Map<String, dynamic>;
+        final user = student['user'] as Map<String, dynamic>?;
+
+        // Jika user null, buat dummy user dari data student
+        final userId = user?['id'] ?? student['user_id'];
+        if (userId == null) continue;
+
+        final merged = {
+          // Data dari user object
+          'id': userId,
+          'name': user?['name'] ?? 'Siswa',
+          'email': user?['email'] ?? '',
+          'role': user?['role'] ?? 'siswa',
+          'photo': user?['photo'],
+          'photo_url': user?['photo_url'],
+          // Data student sebagai nested object
+          'student': {
+            'id': student['id'],
+            'nis': student['nis'] ?? '',
+            'sekolah': student['sekolah'] ?? '',
+            'kelas': student['kelas'] ?? '',
+            'alamat': student['alamat'] ?? '',
+            'no_hp': student['no_hp'] ?? '',
+            'approval_status': student['approval_status'] ?? 'approved',
+          },
+        };
+        result.add(UserModel.fromJson(merged));
+      } catch (_) {
+        continue;
+      }
+    }
+    return result;
+  }
+
+  /// Khusus admin — pakai /buses/{id}/students
   Future<List<UserModel>> getBusStudents(int busId) async {
     final res = await _api.get('/buses/$busId/students');
     if (!res.success || res.data == null) return [];
@@ -283,12 +339,7 @@ class BusService {
       final d = res.data!['data'] as Map<String, dynamic>?;
       if (d != null) {
         final pos = d['position'] as Map<String, dynamic>?;
-        // PERBAIKAN: gpsActive = true jika driver sudah toggle ON,
-        // terlepas apakah koordinat pertama sudah dikirim atau belum.
-        // Sebelumnya: && pos != null menyebabkan gpsActive selalu false
-        // saat driver baru saja aktifkan GPS (koordinat belum masuk).
-        final gpsActive = d['gps_active'] as bool? ?? false;
-        final hasPosition = gpsActive && pos != null;
+        final gpsActive = (d['gps_active'] as bool? ?? false) && pos != null;
 
         final bus = BusModel.fromJson({
           'id': d['bus_id'],
@@ -301,21 +352,18 @@ class BusService {
                   'user': {'name': d['driver_name']}
                 }
               : null,
-          'current_position': hasPosition ? pos : null,
+          'current_position': gpsActive ? pos : null,
           'routes': d['routes'] ?? [],
           'created_at': DateTime.now().toIso8601String(),
         });
 
-        if (hasPosition) {
+        if (gpsActive && pos != null) {
           bus.updateGps(
-            latitude: (pos!['latitude'] as num?)?.toDouble() ?? 0,
+            latitude: (pos['latitude'] as num?)?.toDouble() ?? 0,
             longitude: (pos['longitude'] as num?)?.toDouble() ?? 0,
             speed: (pos['speed'] as num?)?.toDouble() ?? 0,
             gpsActive: true,
           );
-        } else if (gpsActive) {
-          // GPS aktif tapi koordinat belum masuk — set aktif dengan posisi 0,0
-          bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: true);
         } else {
           bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: false);
         }
@@ -355,7 +403,6 @@ class BusService {
     return (bus: bus, myHalte: null, driverName: driverName);
   }
 
-  /// Versi lama — tetap ada untuk kompatibilitas
   Future<BusModel?> getMyBusTracking() async {
     final result = await getMyBusTrackingFull();
     return result.bus;

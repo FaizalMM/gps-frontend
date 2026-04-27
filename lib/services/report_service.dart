@@ -82,7 +82,14 @@ class DriverReportData {
 
   factory DriverReportData.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? json;
-    final rawRows = data['reports'] as List<dynamic>? ?? [];
+    // PERBAIKAN BUG: generateDriverReport() backend mengembalikan 2 key berbeda:
+    // - 'reports'            → data dari tabel DailyReport (tidak ada checkout/waktu_turun)
+    // - 'attendance_reports' → data dari tabel Attendance (ada checkout, waktu_turun, dll)
+    // Flutter sebelumnya baca 'reports' sehingga field checkout/status selalu kosong/salah.
+    // Fix: prioritaskan 'attendance_reports', fallback ke 'reports' jika tidak ada.
+    final rawRows = (data['attendance_reports'] as List<dynamic>?) ??
+        (data['reports'] as List<dynamic>?) ??
+        [];
     return DriverReportData(
       totalAttendances: data['total_attendances'] as int? ?? rawRows.length,
       rows: rawRows

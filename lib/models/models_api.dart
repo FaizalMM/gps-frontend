@@ -108,8 +108,18 @@ class UserModel {
       namaLengkap: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: role,
-      noHp: studentDetail?.noHp ?? driverDetail?.noHp ?? '',
-      alamat: studentDetail?.alamat ?? driverDetail?.alamat ?? '',
+      // PERBAIKAN: untuk admin, studentDetail dan driverDetail keduanya null
+      // sehingga noHp dan alamat selalu '' meski sudah disimpan di DB.
+      // Fix: baca langsung dari json['no_hp'] dan json['alamat'] (kolom users)
+      // sebagai fallback terakhir agar admin bisa simpan dan baca data profil.
+      noHp: studentDetail?.noHp ??
+          driverDetail?.noHp ??
+          json['no_hp'] as String? ??
+          '',
+      alamat: studentDetail?.alamat ??
+          driverDetail?.alamat ??
+          json['alamat'] as String? ??
+          '',
       status: status,
       photoUrl: json['photo_url'] as String?,
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
