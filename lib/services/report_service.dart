@@ -129,6 +129,26 @@ class ReportService {
     }
   }
 
+  Future<String?> downloadAdminReportPdf({
+    required String tanggal,
+  }) async {
+    return _downloadFile(
+      endpoint: '/reports/admin/download-pdf',
+      params: {'tanggal': tanggal},
+      fallbackFilename: 'Laporan_Admin_$tanggal.pdf',
+    );
+  }
+
+  Future<String?> downloadAdminReportExcel({
+    required String tanggal,
+  }) async {
+    return _downloadFile(
+      endpoint: '/reports/admin/download-excel',
+      params: {'tanggal': tanggal},
+      fallbackFilename: 'Laporan_Admin_$tanggal.xlsx',
+    );
+  }
+
   Future<String?> downloadDriverReportPdf({
     required int busId,
     required String tanggal,

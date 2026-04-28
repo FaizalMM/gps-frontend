@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/models_api.dart';
 import '../../services/api_client.dart';
 import '../../services/app_data_service.dart';
+import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
 
 // ── Helper format tanggal ────────────────────────────────────
@@ -808,10 +809,149 @@ class _AbsensiCard extends StatelessWidget {
   }
 }
 
-class _LaporanCard extends StatelessWidget {
+class _LaporanCard extends StatefulWidget {
   final _ReportSummary report;
   final List<BusModel> buses;
   const _LaporanCard({required this.report, required this.buses});
+
+  @override
+  State<_LaporanCard> createState() => _LaporanCardState();
+}
+
+class _LaporanCardState extends State<_LaporanCard> {
+  final _reportService = ReportService();
+  bool _isDownloadingPdf = false;
+
+  String _todayStr() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _downloadPdf() async {
+    setState(() => _isDownloadingPdf = true);
+    final path =
+        await _reportService.downloadAdminReportPdf(tanggal: _todayStr());
+    if (!mounted) return;
+    setState(() => _isDownloadingPdf = false);
+    if (path != null) {
+      _showFileDialog(path);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Gagal mengunduh PDF. Periksa koneksi internet.'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  void _showFileDialog(String path) {
+    final fileName = path.split('/').last;
+    final isDownload = path.contains('/Download');
+    final isInternal =
+        path.contains('/data/data') || path.contains('/data/user');
+    final lokasiJudul = isDownload
+        ? 'Folder Download'
+        : isInternal
+            ? 'Penyimpanan internal app'
+            : 'Penyimpanan eksternal';
+    final lokasiPanduan = isDownload
+        ? 'Buka File Manager → folder "Download"'
+        : isInternal
+            ? 'File Manager → Internal → Android → data → com.mobitra.app → files'
+            : 'File Manager → Internal Storage → Android → data';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                  color: AppColors.primaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.picture_as_pdf_rounded,
+                  color: AppColors.primary, size: 32),
+            ),
+            const SizedBox(height: 14),
+            const Text('PDF Berhasil Tersimpan!',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.black)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Icon(Icons.insert_drive_file_rounded,
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(fileName,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.black),
+                        overflow: TextOverflow.ellipsis)),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: Colors.green.withValues(alpha: 0.2))),
+              child: Row(children: [
+                const Icon(Icons.folder_rounded, color: Colors.green, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(lokasiJudul,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green)),
+                      Text(lokasiPanduan,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              color: AppColors.textGrey)),
+                    ])),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12)),
+                child: const Text('Oke',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -831,26 +971,59 @@ class _LaporanCard extends StatelessWidget {
           Expanded(
               child: _MiniStatCard(
                   label: 'Laporan Masuk',
-                  value: '${report.totalLaporan}',
+                  value: '${widget.report.totalLaporan}',
                   color: AppColors.primary,
                   icon: Icons.assignment_turned_in_rounded)),
           const SizedBox(width: 10),
           Expanded(
               child: _MiniStatCard(
                   label: 'Total Penumpang',
-                  value: '${report.totalPenumpang}',
+                  value: '${widget.report.totalPenumpang}',
                   color: AppColors.purple,
                   icon: Icons.people_rounded)),
         ]),
-        if (buses.isNotEmpty) ...[
-          const SizedBox(height: 10),
+        if (widget.buses.isNotEmpty) ...[
+          const SizedBox(height: 8),
           Text(
-              '${report.totalLaporan} dari ${buses.length} bus melaporkan hari ini',
+              '${widget.report.totalLaporan} dari ${widget.buses.length} bus melaporkan hari ini',
               style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,
                   color: AppColors.textGrey)),
         ],
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _isDownloadingPdf ? null : _downloadPdf,
+            icon: _isDownloadingPdf
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.picture_as_pdf_rounded,
+                    size: 18, color: Colors.white),
+            label: Text(
+              _isDownloadingPdf ? 'Mengunduh...' : 'Unduh Laporan PDF',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: Colors.white),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+          ),
+        ),
       ]),
     );
   }
@@ -1237,12 +1410,58 @@ class _LoadingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 80,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: AppColors.white, borderRadius: BorderRadius.circular(14)),
-      child: const Center(
-          child: CircularProgressIndicator(
-              strokeWidth: 2, color: AppColors.primary)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E0E0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 120,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Container(
+                    width: 80,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8E8E8),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Container(
+                width: 50,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8E8E8),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
