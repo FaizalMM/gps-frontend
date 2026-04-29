@@ -10,6 +10,8 @@ import '../../services/gps_service.dart';
 import '../../services/routing_service.dart';
 import '../../services/bus_service.dart';
 import '../../services/domain_services.dart';
+import '../../services/api_client.dart';
+import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/bus_map_widget.dart';
@@ -906,6 +908,11 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                 onTap: () =>
                                     _showRuteSheet(context, widget.bus))),
                       ]),
+                      const SizedBox(height: 12),
+                      _SelesaiBertugasButton(
+                        bus: widget.bus,
+                        attendanceCount: _attendanceToday.length,
+                      ),
                     ]),
                     const SizedBox(height: 24),
 
@@ -1115,6 +1122,292 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     if (heading < 247.5) return 'Barat Daya ↙';
     if (heading < 292.5) return 'Barat ←';
     return 'Barat Laut ↖';
+  }
+}
+
+// ── _SelesaiBertugasButton ────────────────────────────────────
+class _SelesaiBertugasButton extends StatefulWidget {
+  final dynamic bus;
+  final int attendanceCount;
+  const _SelesaiBertugasButton({
+    required this.bus,
+    required this.attendanceCount,
+  });
+
+  @override
+  State<_SelesaiBertugasButton> createState() => _SelesaiBertugasButtonState();
+}
+
+class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
+  bool _isSubmitting = false;
+  bool _sudahSubmit = false;
+  final _catatanController = TextEditingController();
+
+  @override
+  void dispose() {
+    _catatanController.dispose();
+    super.dispose();
+  }
+
+  String _todayStr() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  void _showForm() {
+    if (widget.bus == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Belum ada bus yang ditugaskan.'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Selesai Bertugas',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.black)),
+              const SizedBox(height: 4),
+              Text(
+                'Hari ini kamu mengangkut ${widget.attendanceCount} penumpang.',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    color: AppColors.textGrey),
+              ),
+              const SizedBox(height: 20),
+              // Info ringkas
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.directions_bus_rounded,
+                      color: AppColors.primary, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                      child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${widget.bus?.nama ?? '-'} — ${widget.bus?.platNomor ?? '-'}',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.black),
+                      ),
+                      Text(_todayStr(),
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              color: AppColors.textGrey)),
+                    ],
+                  )),
+                  Text('${widget.attendanceCount} siswa',
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary)),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              // Input catatan
+              const Text('Catatan (opsional)',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.black)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _catatanController,
+                maxLines: 3,
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                decoration: InputDecoration(
+                  hintText:
+                      'Contoh: Ban kempes di jalan, siswa X tidak naik, dll.',
+                  hintStyle: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      color: AppColors.textGrey),
+                  filled: true,
+                  fillColor: AppColors.background,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.all(14),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Tombol submit
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _submit(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                  child: const Text('Kirim Laporan',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit(BuildContext sheetCtx) async {
+    setState(() => _isSubmitting = true);
+    Navigator.pop(sheetCtx);
+
+    try {
+      final api = ApiClient();
+      final today = _todayStr();
+
+      final response = await api.post('/daily-reports', {
+        'bus_id': widget.bus?.id,
+        'tanggal': today,
+        'total_penumpang': widget.attendanceCount,
+        'catatan_driver': _catatanController.text.trim(),
+      });
+
+      if (!mounted) return;
+
+      if (response.success) {
+        setState(() {
+          _isSubmitting = false;
+          _sudahSubmit = true;
+        });
+        _catatanController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Laporan berhasil dikirim!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ));
+      } else {
+        setState(() => _isSubmitting = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(response.message ?? 'Gagal mengirim laporan.'),
+            backgroundColor: Colors.red,
+          ));
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_sudahSubmit) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.primaryLight,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.check_circle_rounded,
+              color: AppColors.primary, size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text('Laporan hari ini sudah dikirim',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
+          ),
+        ]),
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _isSubmitting ? null : _showForm,
+        icon: _isSubmitting
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.check_circle_outline_rounded,
+                size: 18, color: Colors.white),
+        label: Text(
+          _isSubmitting ? 'Mengirim laporan...' : 'Selesai Bertugas',
+          style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              color: Colors.white),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF2E7D32),
+          disabledBackgroundColor:
+              const Color(0xFF2E7D32).withValues(alpha: 0.5),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 0,
+        ),
+      ),
+    );
   }
 }
 

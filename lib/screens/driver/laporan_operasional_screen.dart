@@ -29,12 +29,16 @@ class LaporanOperasionalScreen extends StatefulWidget {
 
 class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   DateTime _selectedDate = DateTime.now();
+  _FilterMode _filterMode = _FilterMode.harian;
   final _reportService = ReportService();
 
   bool _isLoading = false;
   bool _hasError = false;
   String _errorMessage = '';
   DriverReportData? _reportData;
+  // Untuk mode mingguan — kumpulkan data per hari dalam seminggu
+  List<_DayReport> _weekReports = [];
+  bool _isLoadingWeek = false;
 
   bool _isExportingPdf = false;
   bool _isExportingExcel = false;
@@ -45,7 +49,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   void initState() {
     super.initState();
     initializeDateFormatting('id_ID', null).then((_) {
-      // ← TAMBAH INI (fallback safety)
       if (mounted) _fetchReport();
     });
   }
@@ -323,6 +326,60 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
         ),
       ),
     );
+  }
+
+  // Hari pertama minggu ini (Senin)
+  DateTime get _weekStart {
+    final d = _selectedDate;
+    return d.subtract(Duration(days: d.weekday - 1));
+  }
+
+  DateTime get _weekEnd => _weekStart.add(const Duration(days: 6));
+
+  void _prevWeek() {
+    setState(() {
+      _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+      _weekReports = [];
+    });
+    _loadWeekReport();
+  }
+
+  void _nextWeek() {
+    final next = _selectedDate.add(const Duration(days: 7));
+    if (next.isAfter(DateTime.now())) return;
+    setState(() {
+      _selectedDate = next;
+      _weekReports = [];
+    });
+    _loadWeekReport();
+  }
+
+  Future<void> _loadWeekReport() async {
+    final busId = widget.busId;
+    if (busId == null || busId == 0) return;
+    setState(() => _isLoadingWeek = true);
+
+    final results = <_DayReport>[];
+    for (int i = 0; i < 7; i++) {
+      final day = _weekStart.add(Duration(days: i));
+      if (day.isAfter(DateTime.now())) break;
+      final tanggal = DateFormat('yyyy-MM-dd').format(day);
+      final data = await _reportService.fetchDriverReport(
+        busId: busId,
+        tanggal: tanggal,
+      );
+      results.add(_DayReport(
+        tanggal: day,
+        totalPenumpang: data?.totalAttendances ?? 0,
+        checkout: data?.rows.where((r) => r.checkout == 'Yes').length ?? 0,
+      ));
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _weekReports = results;
+      _isLoadingWeek = false;
+    });
   }
 
   Future<void> _pickDate() async {
@@ -613,81 +670,171 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
                     color: AppColors.textGrey),
               ),
               const SizedBox(height: 20),
-              if (_isLoading)
-                const _LoadingCard()
-              else if (_hasError)
-                _ErrorCard(message: _errorMessage, onRetry: _fetchReport)
-              else ...[
-                Row(children: [
-                  Expanded(
-                      child: _BigStatCard(
-                          icon: Icons.people_rounded,
-                          value: '$totalSiswa',
-                          label: 'Total Siswa')),
-                  const SizedBox(width: 14),
-                  Expanded(
-                      child: _BigStatCard(
-                          icon: Icons.access_time_rounded,
-                          value: routeTime,
-                          label: 'Durasi Operasi')),
-                ]),
-                const SizedBox(height: 24),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: Column(children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                      child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Log Siswa',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.black)),
-                            if (rows.isNotEmpty)
-                              GestureDetector(
-                                onTap: _showAllStudents,
-                                child: const Text('Lihat Semua',
-                                    style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.primary)),
-                              ),
-                          ]),
-                    ),
-                    if (rows.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(18, 0, 18, 20),
-                        child: Text(
-                          'Belum ada data absensi untuk tanggal ini.',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              color: AppColors.textGrey,
-                              fontSize: 13),
-                        ),
-                      )
-                    else
-                      ...rows.take(4).toList().asMap().entries.map((e) {
-                        return _StudentLogRow(
-                          row: e.value,
-                          showDivider: e.key < (rows.take(4).length - 1),
-                        );
-                      }),
-                    const SizedBox(height: 8),
-                  ]),
+              // ── Filter Mode Chip ──────────────────────────
+              Row(children: [
+                _FilterChip(
+                  label: 'Harian',
+                  selected: _filterMode == _FilterMode.harian,
+                  onTap: () {
+                    if (_filterMode == _FilterMode.harian) return;
+                    setState(() {
+                      _filterMode = _FilterMode.harian;
+                      _weekReports = [];
+                    });
+                    _fetchReport();
+                  },
                 ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Mingguan',
+                  selected: _filterMode == _FilterMode.mingguan,
+                  onTap: () {
+                    if (_filterMode == _FilterMode.mingguan) return;
+                    setState(() {
+                      _filterMode = _FilterMode.mingguan;
+                      _reportData = null;
+                    });
+                    _loadWeekReport();
+                  },
+                ),
+              ]),
+              const SizedBox(height: 16),
+
+              // ── Konten berdasarkan mode ───────────────────
+              if (_filterMode == _FilterMode.mingguan) ...[
+                // Navigasi minggu
+                Row(children: [
+                  GestureDetector(
+                    onTap: _prevWeek,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.lightGrey),
+                      ),
+                      child: const Icon(Icons.chevron_left_rounded,
+                          size: 20, color: AppColors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '${DateFormat('d MMM', 'id_ID').format(_weekStart)} — ${DateFormat('d MMM yyyy', 'id_ID').format(_weekEnd)}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: _nextWeek,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.lightGrey),
+                      ),
+                      child: Icon(Icons.chevron_right_rounded,
+                          size: 20,
+                          color:
+                              DateTime.now().difference(_selectedDate).inDays <
+                                      7
+                                  ? AppColors.lightGrey
+                                  : AppColors.black),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                _isLoadingWeek
+                    ? const _LoadingCard()
+                    : _weekReports.isEmpty
+                        ? _ErrorCard(
+                            message: 'Tidak ada data minggu ini.',
+                            onRetry: _loadWeekReport,
+                          )
+                        : _WeeklyChart(reports: _weekReports),
+              ] else ...[
+                if (_isLoading)
+                  const _LoadingCard()
+                else if (_hasError)
+                  _ErrorCard(message: _errorMessage, onRetry: _fetchReport)
+                else ...[
+                  Row(children: [
+                    Expanded(
+                        child: _BigStatCard(
+                            icon: Icons.people_rounded,
+                            value: '$totalSiswa',
+                            label: 'Total Siswa')),
+                    const SizedBox(width: 14),
+                    Expanded(
+                        child: _BigStatCard(
+                            icon: Icons.access_time_rounded,
+                            value: routeTime,
+                            label: 'Durasi Operasi')),
+                  ]),
+                  const SizedBox(height: 24),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: Column(children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+                        child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Log Siswa',
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.black)),
+                              if (rows.isNotEmpty)
+                                GestureDetector(
+                                  onTap: _showAllStudents,
+                                  child: const Text('Lihat Semua',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primary)),
+                                ),
+                            ]),
+                      ),
+                      if (rows.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(18, 0, 18, 20),
+                          child: Text(
+                            'Belum ada data absensi untuk tanggal ini.',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                color: AppColors.textGrey,
+                                fontSize: 13),
+                          ),
+                        )
+                      else
+                        ...rows.take(4).toList().asMap().entries.map((e) {
+                          return _StudentLogRow(
+                            row: e.value,
+                            showDivider: e.key < (rows.take(4).length - 1),
+                          );
+                        }),
+                      const SizedBox(height: 8),
+                    ]),
+                  ),
+                ],
               ],
               const SizedBox(height: 100),
             ],
@@ -981,4 +1128,277 @@ class _ExportButton extends StatelessWidget {
                 ]),
         ),
       );
+}
+
+// ── Enum filter mode ──────────────────────────────────────────
+enum _FilterMode { harian, mingguan }
+
+// ── Model data harian untuk chart mingguan ────────────────────
+class _DayReport {
+  final DateTime tanggal;
+  final int totalPenumpang;
+  final int checkout;
+  _DayReport({
+    required this.tanggal,
+    required this.totalPenumpang,
+    required this.checkout,
+  });
+}
+
+// ── Filter chip ───────────────────────────────────────────────
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.lightGrey,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textGrey,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Weekly chart ──────────────────────────────────────────────
+class _WeeklyChart extends StatelessWidget {
+  final List<_DayReport> reports;
+  const _WeeklyChart({required this.reports});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxVal = reports.isEmpty
+        ? 1
+        : reports.map((r) => r.totalPenumpang).reduce((a, b) => a > b ? a : b);
+    final totalMinggu = reports.fold(0, (s, r) => s + r.totalPenumpang);
+    final hariAktif = reports.where((r) => r.totalPenumpang > 0).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Summary row
+        Row(children: [
+          Expanded(
+            child: _WeekStatCard(
+              label: 'Total Penumpang',
+              value: '$totalMinggu',
+              icon: Icons.people_rounded,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _WeekStatCard(
+              label: 'Hari Aktif',
+              value: '$hariAktif hari',
+              icon: Icons.directions_bus_rounded,
+              color: AppColors.blue,
+            ),
+          ),
+        ]),
+        const SizedBox(height: 16),
+        // Bar chart
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Penumpang per Hari',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.black)),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 140,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: reports.map((r) {
+                    final fraction =
+                        maxVal > 0 ? r.totalPenumpang / maxVal : 0.0;
+                    final dayName = DateFormat('E', 'id_ID').format(r.tanggal);
+                    final isToday =
+                        DateFormat('yyyy-MM-dd').format(r.tanggal) ==
+                            DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (r.totalPenumpang > 0)
+                              Text('${r.totalPenumpang}',
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isToday
+                                          ? AppColors.primary
+                                          : AppColors.textGrey)),
+                            const SizedBox(height: 4),
+                            Container(
+                              height: fraction > 0 ? 100 * fraction + 8 : 8,
+                              decoration: BoxDecoration(
+                                color: r.totalPenumpang == 0
+                                    ? AppColors.lightGrey
+                                    : isToday
+                                        ? AppColors.primary
+                                        : AppColors.primary
+                                            .withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(dayName,
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 10,
+                                    fontWeight: isToday
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                    color: isToday
+                                        ? AppColors.primary
+                                        : AppColors.textGrey)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        // Detail per hari
+        ...reports.map((r) => _DayDetailTile(report: r)),
+      ],
+    );
+  }
+}
+
+class _WeekStatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  const _WeekStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Row(children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(width: 10),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
+          Text(label,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 10,
+                  color: AppColors.textGrey)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _DayDetailTile extends StatelessWidget {
+  final _DayReport report;
+  const _DayDetailTile({required this.report});
+
+  @override
+  Widget build(BuildContext context) {
+    final dayStr = DateFormat('EEEE, d MMM', 'id_ID').format(report.tanggal);
+    final isEmpty = report.totalPenumpang == 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGrey),
+      ),
+      child: Row(children: [
+        Icon(
+          isEmpty
+              ? Icons.remove_circle_outline_rounded
+              : Icons.check_circle_rounded,
+          size: 18,
+          color: isEmpty ? AppColors.lightGrey : AppColors.primary,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(dayStr,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: isEmpty ? AppColors.textGrey : AppColors.black)),
+        ),
+        Text(
+          isEmpty ? 'Tidak beroperasi' : '${report.totalPenumpang} penumpang',
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isEmpty ? AppColors.lightGrey : AppColors.primary),
+        ),
+      ]),
+    );
+  }
 }
