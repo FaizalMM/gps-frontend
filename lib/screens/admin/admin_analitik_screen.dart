@@ -354,6 +354,12 @@ class _RingkasanTab extends StatelessWidget {
                 : _AbsensiCard(attendance: attendance!),
         const SizedBox(height: 20),
 
+        // ── Download Laporan Admin ────────────────────────────
+        const _SectionHeader(title: 'Unduh Laporan Harian'),
+        const SizedBox(height: 10),
+        const _DownloadReportCard(),
+        const SizedBox(height: 20),
+
         // ── Laporan driver ────────────────────────────────────
         const _SectionHeader(title: 'Laporan Driver Hari Ini'),
         const SizedBox(height: 10),
@@ -802,6 +808,220 @@ class _AbsensiCard extends StatelessWidget {
             backgroundColor: AppColors.lightGrey,
             color: AppColors.primary,
             minHeight: 8,
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Download Laporan Admin — selalu tampil
+// ═══════════════════════════════════════════════════════════════
+class _DownloadReportCard extends StatefulWidget {
+  const _DownloadReportCard();
+
+  @override
+  State<_DownloadReportCard> createState() => _DownloadReportCardState();
+}
+
+class _DownloadReportCardState extends State<_DownloadReportCard> {
+  final _reportService = ReportService();
+  bool _isDownloadingPdf = false;
+
+  String _todayStr() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _downloadPdf() async {
+    setState(() => _isDownloadingPdf = true);
+    final path =
+        await _reportService.downloadAdminReportPdf(tanggal: _todayStr());
+    if (!mounted) return;
+    setState(() => _isDownloadingPdf = false);
+    if (path != null) {
+      _showFileDialog(path);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Gagal mengunduh PDF. Periksa koneksi internet.'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
+  void _showFileDialog(String path) {
+    final fileName = path.split('/').last;
+    final isDownload = path.contains('/Download');
+    final isInternal =
+        path.contains('/data/data') || path.contains('/data/user');
+    final lokasiJudul = isDownload
+        ? 'Folder Download'
+        : isInternal
+            ? 'Penyimpanan internal app'
+            : 'Penyimpanan eksternal';
+    final lokasiPanduan = isDownload
+        ? 'Buka File Manager → folder "Download"'
+        : isInternal
+            ? 'File Manager → Internal → Android → data → files'
+            : 'File Manager → Internal Storage → Android → data';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                  color: AppColors.primaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.picture_as_pdf_rounded,
+                  color: AppColors.primary, size: 32),
+            ),
+            const SizedBox(height: 14),
+            const Text('PDF Berhasil Tersimpan!',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.black)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Icon(Icons.insert_drive_file_rounded,
+                    color: AppColors.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(fileName,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.black),
+                        overflow: TextOverflow.ellipsis)),
+              ]),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border:
+                      Border.all(color: Colors.green.withValues(alpha: 0.2))),
+              child: Row(children: [
+                const Icon(Icons.folder_rounded, color: Colors.green, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(lokasiJudul,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.green)),
+                      Text(lokasiPanduan,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              color: AppColors.textGrey)),
+                    ])),
+              ]),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12)),
+                child: const Text('Oke',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2))
+          ]),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.picture_as_pdf_rounded,
+              color: AppColors.primary, size: 24),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Laporan Monitoring Bus',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.black)),
+          Text('Rekap operasional semua bus hari ini',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: AppColors.textGrey)),
+        ])),
+        const SizedBox(width: 10),
+        ElevatedButton.icon(
+          onPressed: _isDownloadingPdf ? null : _downloadPdf,
+          icon: _isDownloadingPdf
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.download_rounded,
+                  size: 16, color: Colors.white),
+          label: Text(_isDownloadingPdf ? 'Proses...' : 'Unduh PDF',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 0,
           ),
         ),
       ]),

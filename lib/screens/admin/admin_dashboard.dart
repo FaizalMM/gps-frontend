@@ -8,6 +8,7 @@ import '../../services/app_data_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/bus_map_widget.dart';
+import '../../widgets/skeleton_widgets.dart';
 import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
 import 'admin_siswa_screen.dart';
@@ -1122,11 +1123,15 @@ class _QuickCard extends StatelessWidget {
               ? halteCount!(s.data!)
               : (initialCount > 0 ? '$initialCount' : null);
           if (display == null) {
-            return SizedBox(
-              height: 14,
-              width: 14,
-              child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: color.withValues(alpha: 0.5)),
+            return ShimmerEffect(
+              child: Container(
+                width: 50,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             );
           }
           return Text(display, style: _countStyle);
@@ -1141,11 +1146,15 @@ class _QuickCard extends StatelessWidget {
               ? busCount!(s.data!)
               : (initialCount > 0 ? '$initialCount' : null);
           if (display == null) {
-            return SizedBox(
-              height: 14,
-              width: 14,
-              child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: color.withValues(alpha: 0.5)),
+            return ShimmerEffect(
+              child: Container(
+                width: 50,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             );
           }
           return Text(display, style: _countStyle);
@@ -1160,11 +1169,15 @@ class _QuickCard extends StatelessWidget {
               ? count(s.data!)
               : (initialCount > 0 ? '$initialCount' : null);
           if (display == null) {
-            return SizedBox(
-              height: 14,
-              width: 14,
-              child: CircularProgressIndicator(
-                  strokeWidth: 1.5, color: color.withValues(alpha: 0.5)),
+            return ShimmerEffect(
+              child: Container(
+                width: 50,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             );
           }
           return Text(display, style: _countStyle);

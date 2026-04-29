@@ -13,6 +13,7 @@ import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/bus_map_widget.dart';
+import '../../widgets/skeleton_widgets.dart';
 import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
 import 'scan_qr_screen.dart';
@@ -424,21 +425,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
               const SizedBox(height: 14),
               if (widget.isLoadingBus && bus == null)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Row(children: [
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.primary),
-                    ),
-                    SizedBox(width: 10),
-                    Text('Memuat data bus...',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 13,
-                            color: AppColors.textGrey)),
-                  ]),
+                  padding: EdgeInsets.symmetric(vertical: 4),
+                  child: SkeletonInfoCard(),
                 )
               else if (bus == null)
                 const Text('Belum ada bus yang ditugaskan ke akun ini',
@@ -833,21 +821,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                         ),
                       ],
                     ] else if (widget.isLoadingBus) ...[
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.circular(16)),
-                        child: const Column(children: [
-                          CircularProgressIndicator(color: AppColors.primary),
-                          SizedBox(height: 16),
-                          Text('Memuat informasi bus...',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13,
-                                  color: AppColors.textGrey)),
-                        ]),
-                      ),
+                      const SkeletonBusCard(),
                     ] else ...[
                       Container(
                         padding: const EdgeInsets.all(24),

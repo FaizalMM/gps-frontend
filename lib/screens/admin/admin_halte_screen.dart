@@ -6,6 +6,7 @@ import '../../models/models_api.dart';
 import '../../services/app_data_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/skeleton_widgets.dart';
 
 class AdminHalteScreen extends StatefulWidget {
   final AppDataService dataService;
@@ -446,7 +447,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
             // Halte list
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const SkeletonList(itemCount: 5)
                   : filtered.isEmpty
                       ? Center(
                           child: Column(

@@ -8,6 +8,7 @@ import '../../services/bus_service.dart';
 import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/skeleton_widgets.dart';
 // import '../../services/route_search_service.dart';
 import 'route_builder_screen.dart';
 
@@ -1019,8 +1020,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
         ]),
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
+          ? const SkeletonFullPage()
           : RefreshIndicator(
               onRefresh: _loadRoute,
               child: SingleChildScrollView(
@@ -1877,8 +1877,7 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
         ],
       ),
       body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.primary))
+          ? const SkeletonFullPage()
           : RefreshIndicator(
               onRefresh: _load,
               child: _siswa.isEmpty

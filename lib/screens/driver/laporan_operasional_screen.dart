@@ -6,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import '../../services/app_data_service.dart';
 import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
+import '../../widgets/skeleton_widgets.dart';
 
 class LaporanOperasionalScreen extends StatefulWidget {
   final AppDataService dataService;
@@ -702,20 +703,25 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
   @override
-  Widget build(BuildContext context) => Container(
-        height: 140,
-        decoration: BoxDecoration(
-            color: AppColors.white, borderRadius: BorderRadius.circular(20)),
-        child: const Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            SizedBox(height: 12),
-            Text('Memuat laporan...',
-                style: TextStyle(
-                    fontFamily: 'Poppins', color: AppColors.textGrey)),
-          ]),
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SkeletonInfoCard(),
+        const SizedBox(height: 12),
+        const SkeletonInfoCard(),
+        const SizedBox(height: 12),
+        ShimmerEffect(
+          child: Container(
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
         ),
-      );
+      ],
+    );
+  }
 }
 
 class _ErrorCard extends StatelessWidget {

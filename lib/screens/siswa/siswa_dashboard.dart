@@ -12,6 +12,7 @@ import '../../services/bus_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/bus_map_widget.dart';
+import '../../widgets/skeleton_widgets.dart';
 import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
 import 'qr_code_screen.dart';
@@ -237,7 +238,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _loadingBusInfo
-                  ? _LoadingBusCard()
+                  ? const SkeletonBusCard()
                   : StreamBuilder<List<BusModel>>(
                       stream: widget.dataService.busesStream,
                       builder: (_, s) {
@@ -782,13 +783,15 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
           ),
 
           // ── Status absensi (banner atas peta) ───────────
-          if (!_loadingAttendance) _buildAttendanceBanner(),
+          if (_loadingAttendance)
+            const SkeletonAttendanceBanner()
+          else
+            _buildAttendanceBanner(),
 
           // ── Peta ────────────────────────────────────────
           Expanded(
             child: _loadingBus
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary))
+                ? const SkeletonMapArea(height: 400)
                 : _myBus == null
                     ? _buildNoBusView()
                     : (!_myBus!.gpsActive || _myBus!.latitude == 0)
@@ -1629,34 +1632,8 @@ class _BusCard extends StatelessWidget {
   }
 }
 
-class _LoadingBusCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05), blurRadius: 10)
-          ]),
-      child: const Row(children: [
-        SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(
-                strokeWidth: 2.5, color: AppColors.primary)),
-        SizedBox(width: 14),
-        Text('Memuat informasi bus...',
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                color: AppColors.textGrey)),
-      ]),
-    );
-  }
-}
+// _LoadingBusCard diganti dengan SkeletonBusCard dari skeleton_widgets.dart
+// agar tampilan loading lebih modern (shimmer/skeleton loader).
 
 class _NoBusAssignedCard extends StatelessWidget {
   @override

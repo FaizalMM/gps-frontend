@@ -7,6 +7,7 @@ import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/bus_map_widget.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/skeleton_widgets.dart';
 import 'route_builder_screen.dart';
 
 class AdminRuteScreen extends StatefulWidget {
@@ -317,7 +318,7 @@ class _AdminRuteScreenState extends State<AdminRuteScreen>
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonFullPage()
           : TabBarView(
               controller: _tabCtrl,
               children: [
