@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import '../../models/models_api.dart';
 import '../../services/api_client.dart';
 import '../../services/app_data_service.dart';
@@ -57,17 +59,120 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
   _ReportSummary? _report;
   String? _error;
 
+  // ── Filter ───────────────────────────────────────────────────
+  _FilterMode _filterMode = _FilterMode.harian;
+  DateTime _selectedDate = DateTime.now();
+  List<_AdminDayReport> _weekReports = [];
+  bool _isLoadingWeek = false;
+
+  String _dateStr(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String get _todayParam => _dateStr(_selectedDate);
+
+  DateTime get _weekStart {
+    final d = _selectedDate;
+    return d.subtract(Duration(days: d.weekday - 1));
+  }
+
+  DateTime get _weekEnd => _weekStart.add(const Duration(days: 6));
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadData();
+    initializeDateFormatting('id_ID', null).then((_) {
+      if (mounted) _loadData();
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _report = null;
+        _attendance = null;
+        _weekReports = [];
+      });
+      if (_filterMode == _FilterMode.harian) {
+        _loadData();
+      } else {
+        _loadWeekReport();
+      }
+    }
+  }
+
+  void _prevWeek() {
+    setState(() {
+      _selectedDate = _selectedDate.subtract(const Duration(days: 7));
+      _weekReports = [];
+    });
+    _loadWeekReport();
+  }
+
+  void _nextWeek() {
+    final next = _selectedDate.add(const Duration(days: 7));
+    if (next.isAfter(DateTime.now())) return;
+    setState(() {
+      _selectedDate = next;
+      _weekReports = [];
+    });
+    _loadWeekReport();
+  }
+
+  Future<void> _loadWeekReport() async {
+    setState(() => _isLoadingWeek = true);
+    final results = <_AdminDayReport>[];
+    for (int i = 0; i < 7; i++) {
+      final day = _weekStart.add(Duration(days: i));
+      if (day.isAfter(DateTime.now())) break;
+      final tanggal = _dateStr(day);
+
+      final resAttend = await _api
+          .get('/attendance', params: {'tanggal': tanggal, 'per_page': '200'});
+      final resReport =
+          await _api.get('/reports/admin', params: {'tanggal': tanggal});
+
+      final raw =
+          ((resAttend.data?['data'] ?? resAttend.data?['attendance']) as List?)
+                  ?.cast<Map<String, dynamic>>() ??
+              [];
+      final d =
+          (resReport.data?['data'] ?? resReport.data) as Map<String, dynamic>?;
+      final rows =
+          ((d?['reports'] as List?) ?? []).cast<Map<String, dynamic>>();
+      final totalLaporan =
+          (d?['total_reports'] as num?)?.toInt() ?? rows.length;
+
+      results.add(_AdminDayReport(
+        tanggal: day,
+        totalPenumpang: raw.length,
+        checkout: raw.where((r) => r['checkout_time'] != null).length,
+        totalLaporan: totalLaporan,
+      ));
+    }
+    if (!mounted) return;
+    setState(() {
+      _weekReports = results;
+      _isLoadingWeek = false;
+    });
   }
 
   Future<void> _loadData() async {
@@ -123,7 +228,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
 
   Future<void> _fetchAttendance() async {
     final res = await _api.get('/attendance',
-        params: {'tanggal': _todayStr(), 'per_page': '200'});
+        params: {'tanggal': _todayParam, 'per_page': '200'});
     if (!res.success || res.data == null) return;
     final raw = ((res.data!['data'] ?? res.data!['attendance']) as List? ?? [])
         .cast<Map<String, dynamic>>();
@@ -138,7 +243,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
 
   Future<void> _fetchReport() async {
     final res =
-        await _api.get('/reports/admin', params: {'tanggal': _todayStr()});
+        await _api.get('/reports/admin', params: {'tanggal': _todayParam});
     if (!res.success || res.data == null) return;
     final d = (res.data!['data'] ?? res.data!) as Map<String, dynamic>;
     final rows = ((d['reports'] as List?) ?? []).cast<Map<String, dynamic>>();
@@ -172,53 +277,103 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Row(children: [
-            const Expanded(
+            Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text('Analitik',
+                  const Text('Analitik',
                       style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           color: AppColors.black)),
-                  Text('Ringkasan Data Real-time',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          color: AppColors.textGrey)),
+                  Text(
+                    _filterMode == _FilterMode.harian
+                        ? _dateStr(_selectedDate) == _dateStr(DateTime.now())
+                            ? 'Hari ini'
+                            : _dateStr(_selectedDate)
+                        : 'Minggu ini',
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.textGrey),
+                  ),
                 ])),
+            // Tombol download PDF
+            _DownloadPdfButton(loading: _loading, tanggal: _todayParam),
+            const SizedBox(width: 6),
+            // Tombol date picker — icon saja
             GestureDetector(
-              onTap: _loadData,
+              onTap: _pickDate,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.all(7),
                 decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: AppColors.lightGrey)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  _loading
-                      ? const SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 1.5, color: AppColors.primary))
-                      : const Icon(Icons.refresh_rounded,
-                          size: 13, color: AppColors.textGrey),
-                  const SizedBox(width: 5),
-                  Text(_loading ? 'Memuat...' : 'Hari ini',
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textGrey)),
-                ]),
+                child: const Icon(Icons.calendar_month_rounded,
+                    size: 15, color: AppColors.textGrey),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Tombol refresh — icon saja
+            GestureDetector(
+              onTap: _filterMode == _FilterMode.harian
+                  ? _loadData
+                  : _loadWeekReport,
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.lightGrey)),
+                child: (_loading || _isLoadingWeek)
+                    ? const SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 1.5, color: AppColors.primary))
+                    : const Icon(Icons.refresh_rounded,
+                        size: 15, color: AppColors.textGrey),
               ),
             ),
           ]),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+
+        // ── Filter Mode Chip ─────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(children: [
+            _AdminFilterChip(
+              label: 'Harian',
+              selected: _filterMode == _FilterMode.harian,
+              onTap: () {
+                if (_filterMode == _FilterMode.harian) return;
+                setState(() {
+                  _filterMode = _FilterMode.harian;
+                  _weekReports = [];
+                });
+                _loadData();
+              },
+            ),
+            const SizedBox(width: 8),
+            _AdminFilterChip(
+              label: 'Mingguan',
+              selected: _filterMode == _FilterMode.mingguan,
+              onTap: () {
+                if (_filterMode == _FilterMode.mingguan) return;
+                setState(() {
+                  _filterMode = _FilterMode.mingguan;
+                  _report = null;
+                  _attendance = null;
+                });
+                _loadWeekReport();
+              },
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
 
         // ── Tabs ────────────────────────────────────────────
         Container(
@@ -259,7 +414,17 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
                       activity: _activity,
                       attendance: _attendance,
                       report: _report,
-                      loading: _loading),
+                      loading: _loading,
+                      filterMode: _filterMode,
+                      weekReports: _weekReports,
+                      isLoadingWeek: _isLoadingWeek,
+                      weekLabel:
+                          '${_dateStr(_weekStart)} — ${_dateStr(_weekEnd)}',
+                      canGoNext: _selectedDate
+                          .add(const Duration(days: 7))
+                          .isBefore(DateTime.now()),
+                      onPrevWeek: _prevWeek,
+                      onNextWeek: _nextWeek),
                   _ArmadaTab(
                       buses: buses, report: _report, attendance: _attendance),
                   _PenggunaTab(
@@ -286,6 +451,13 @@ class _RingkasanTab extends StatelessWidget {
   final _AttendanceSummary? attendance;
   final _ReportSummary? report;
   final bool loading;
+  final _FilterMode filterMode;
+  final List<_AdminDayReport> weekReports;
+  final bool isLoadingWeek;
+  final String weekLabel;
+  final bool canGoNext;
+  final VoidCallback onPrevWeek;
+  final VoidCallback onNextWeek;
 
   const _RingkasanTab(
       {required this.buses,
@@ -297,12 +469,49 @@ class _RingkasanTab extends StatelessWidget {
       required this.activity,
       required this.attendance,
       required this.report,
-      required this.loading});
+      required this.loading,
+      required this.filterMode,
+      required this.weekReports,
+      required this.isLoadingWeek,
+      required this.weekLabel,
+      required this.canGoNext,
+      required this.onPrevWeek,
+      required this.onNextWeek});
 
   @override
   Widget build(BuildContext context) {
     final activeDrivers =
         drivers.where((d) => d.status == AccountStatus.active).length;
+
+    // Saat loading — tampilkan skeleton terpadu, bukan per section
+    if (loading) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Stat cards skeleton
+          Row(children: [
+            Expanded(child: _SkeletonStatBox()),
+            const SizedBox(width: 12),
+            Expanded(child: _SkeletonStatBox()),
+          ]),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: _SkeletonStatBox()),
+            const SizedBox(width: 12),
+            Expanded(child: _SkeletonStatBox()),
+          ]),
+          const SizedBox(height: 24),
+          // Section skeleton
+          _SkeletonSection(label: 'Absensi Hari Ini'),
+          const SizedBox(height: 20),
+          _SkeletonSection(label: 'Laporan Driver Hari Ini'),
+          const SizedBox(height: 20),
+          _SkeletonSection(label: 'Aktivitas Sistem (24 Jam)'),
+        ]),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -344,40 +553,84 @@ class _RingkasanTab extends StatelessWidget {
         ]),
         const SizedBox(height: 20),
 
-        // ── Absensi hari ini ──────────────────────────────────
-        const _SectionHeader(title: 'Absensi Hari Ini'),
-        const SizedBox(height: 10),
-        loading
-            ? const _LoadingCard()
-            : attendance == null
-                ? const _EmptyCard(msg: 'Data absensi belum tersedia')
-                : _AbsensiCard(attendance: attendance!),
-        const SizedBox(height: 20),
+        // ── Mode mingguan ─────────────────────────────────────
+        if (filterMode == _FilterMode.mingguan) ...[
+          // Navigasi minggu
+          Row(children: [
+            GestureDetector(
+              onTap: onPrevWeek,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.lightGrey),
+                ),
+                child: const Icon(Icons.chevron_left_rounded,
+                    size: 20, color: AppColors.black),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(weekLabel,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.black)),
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: onNextWeek,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.lightGrey),
+                ),
+                child: Icon(Icons.chevron_right_rounded,
+                    size: 20,
+                    color: canGoNext ? AppColors.black : AppColors.lightGrey),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          isLoadingWeek
+              ? const _LoadingCard()
+              : weekReports.isEmpty
+                  ? const _EmptyCard(msg: 'Tidak ada data minggu ini')
+                  : _AdminWeeklyChart(reports: weekReports),
+          const SizedBox(height: 20),
+        ],
 
-        // ── Download Laporan Admin ────────────────────────────
-        const _SectionHeader(title: 'Unduh Laporan Harian'),
-        const SizedBox(height: 10),
-        const _DownloadReportCard(),
-        const SizedBox(height: 20),
+        // ── Absensi hari ini ──────────────────────────────────
+        if (filterMode == _FilterMode.harian) ...[
+          const _SectionHeader(title: 'Absensi Hari Ini'),
+          const SizedBox(height: 10),
+          attendance == null
+              ? const _EmptyCard(msg: 'Data absensi belum tersedia')
+              : _AbsensiCard(attendance: attendance!),
+          const SizedBox(height: 20),
+        ], // end if harian
 
         // ── Laporan driver ────────────────────────────────────
-        const _SectionHeader(title: 'Laporan Driver Hari Ini'),
-        const SizedBox(height: 10),
-        loading
-            ? const _LoadingCard()
-            : (report == null || report!.totalLaporan == 0)
-                ? const _EmptyCard(msg: 'Belum ada laporan driver hari ini')
-                : _LaporanCard(report: report!, buses: buses),
-        const SizedBox(height: 20),
+        if (filterMode == _FilterMode.harian) ...[
+          const _SectionHeader(title: 'Laporan Driver Hari Ini'),
+          const SizedBox(height: 10),
+          (report == null || report!.totalLaporan == 0)
+              ? const _EmptyCard(msg: 'Belum ada laporan driver hari ini')
+              : _LaporanCard(report: report!, buses: buses),
+          const SizedBox(height: 20),
+        ], // end if harian laporan
 
         // ── Aktivitas sistem ──────────────────────────────────
         const _SectionHeader(title: 'Aktivitas Sistem (24 Jam)'),
         const SizedBox(height: 10),
-        loading
-            ? const _LoadingCard()
-            : activity == null
-                ? const _EmptyCard(msg: 'Data aktivitas tidak tersedia')
-                : _AktivitasCard(activity: activity!),
+        activity == null
+            ? const _EmptyCard(msg: 'Data aktivitas tidak tersedia')
+            : _AktivitasCard(activity: activity!),
         const SizedBox(height: 20),
 
         // ── Top pengguna aktif ────────────────────────────────
@@ -816,41 +1069,39 @@ class _AbsensiCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Download Laporan Admin — selalu tampil
+// Tombol Download PDF — compact, untuk header
 // ═══════════════════════════════════════════════════════════════
-class _DownloadReportCard extends StatefulWidget {
-  const _DownloadReportCard();
+class _DownloadPdfButton extends StatefulWidget {
+  final bool loading;
+  final String tanggal;
+  const _DownloadPdfButton({required this.loading, required this.tanggal});
 
   @override
-  State<_DownloadReportCard> createState() => _DownloadReportCardState();
+  State<_DownloadPdfButton> createState() => _DownloadPdfButtonState();
 }
 
-class _DownloadReportCardState extends State<_DownloadReportCard> {
+class _DownloadPdfButtonState extends State<_DownloadPdfButton> {
   final _reportService = ReportService();
-  bool _isDownloadingPdf = false;
+  bool _isDownloading = false;
 
-  String _todayStr() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _downloadPdf() async {
-    setState(() => _isDownloadingPdf = true);
+  Future<void> _download() async {
+    if (widget.loading) return;
+    setState(() => _isDownloading = true);
     final path =
-        await _reportService.downloadAdminReportPdf(tanggal: _todayStr());
+        await _reportService.downloadAdminReportPdf(tanggal: widget.tanggal);
     if (!mounted) return;
-    setState(() => _isDownloadingPdf = false);
+    setState(() => _isDownloading = false);
     if (path != null) {
-      _showFileDialog(path);
+      _showDialog(path);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Gagal mengunduh PDF. Periksa koneksi internet.'),
+        content: Text('Gagal mengunduh laporan.'),
         backgroundColor: Colors.red,
       ));
     }
   }
 
-  void _showFileDialog(String path) {
+  void _showDialog(String path) {
     final fileName = path.split('/').last;
     final isDownload = path.contains('/Download');
     final isInternal =
@@ -962,69 +1213,32 @@ class _DownloadReportCardState extends State<_DownloadReportCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 2))
-          ]),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(12)),
-          child: const Icon(Icons.picture_as_pdf_rounded,
-              color: AppColors.primary, size: 24),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Laporan Monitoring Bus',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.black)),
-          Text('Rekap operasional semua bus hari ini',
+    return GestureDetector(
+      onTap: _isDownloading ? null : _download,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.lightGrey)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          _isDownloading
+              ? const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: AppColors.primary))
+              : const Icon(Icons.download_rounded,
+                  size: 13, color: AppColors.primary),
+          const SizedBox(width: 5),
+          Text(_isDownloading ? 'Mengunduh...' : 'Ekspor PDF',
               style: const TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,
-                  color: AppColors.textGrey)),
-        ])),
-        const SizedBox(width: 10),
-        ElevatedButton.icon(
-          onPressed: _isDownloadingPdf ? null : _downloadPdf,
-          icon: _isDownloadingPdf
-              ? const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.download_rounded,
-                  size: 16, color: Colors.white),
-          label: Text(_isDownloadingPdf ? 'Proses...' : 'Unduh PDF',
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: Colors.white)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            elevation: 0,
-          ),
-        ),
-      ]),
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.primary)),
+        ]),
+      ),
     );
   }
 }
@@ -1041,11 +1255,6 @@ class _LaporanCard extends StatefulWidget {
 class _LaporanCardState extends State<_LaporanCard> {
   final _reportService = ReportService();
   bool _isDownloadingPdf = false;
-
-  String _todayStr() {
-    final now = DateTime.now();
-    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-  }
 
   Future<void> _downloadPdf() async {
     setState(() => _isDownloadingPdf = true);
@@ -1763,5 +1972,352 @@ class _ErrorView extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+// ── Enum & Model ──────────────────────────────────────────────
+enum _FilterMode { harian, mingguan }
+
+class _AdminDayReport {
+  final DateTime tanggal;
+  final int totalPenumpang;
+  final int checkout;
+  final int totalLaporan;
+  _AdminDayReport({
+    required this.tanggal,
+    required this.totalPenumpang,
+    required this.checkout,
+    required this.totalLaporan,
+  });
+}
+
+// ── Filter chip ───────────────────────────────────────────────
+class _AdminFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AdminFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.lightGrey,
+          ),
+        ),
+        child: Text(label,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : AppColors.textGrey,
+            )),
+      ),
+    );
+  }
+}
+
+// ── Weekly Chart Admin ────────────────────────────────────────
+class _AdminWeeklyChart extends StatelessWidget {
+  final List<_AdminDayReport> reports;
+  const _AdminWeeklyChart({required this.reports});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxVal = reports.isEmpty
+        ? 1
+        : reports.map((r) => r.totalPenumpang).reduce((a, b) => a > b ? a : b);
+    final totalMinggu = reports.fold(0, (s, r) => s + r.totalPenumpang);
+    final totalLaporan = reports.fold(0, (s, r) => s + r.totalLaporan);
+    final hariAktif = reports.where((r) => r.totalPenumpang > 0).length;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Stat row
+      Row(children: [
+        Expanded(
+            child: _AdminWeekStat(
+          label: 'Total Penumpang',
+          value: '$totalMinggu',
+          icon: Icons.people_rounded,
+          color: AppColors.primary,
+        )),
+        const SizedBox(width: 10),
+        Expanded(
+            child: _AdminWeekStat(
+          label: 'Laporan Masuk',
+          value: '$totalLaporan',
+          icon: Icons.assignment_turned_in_rounded,
+          color: AppColors.blue,
+        )),
+        const SizedBox(width: 10),
+        Expanded(
+            child: _AdminWeekStat(
+          label: 'Hari Aktif',
+          value: '$hariAktif hari',
+          icon: Icons.directions_bus_rounded,
+          color: AppColors.orange,
+        )),
+      ]),
+      const SizedBox(height: 14),
+      // Bar chart
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            )
+          ],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Penumpang per Hari',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.black)),
+          const SizedBox(height: 14),
+          ClipRect(
+            child: SizedBox(
+              height: 140,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: reports.map((r) {
+                  final fraction = maxVal > 0 ? r.totalPenumpang / maxVal : 0.0;
+                  final dayName = DateFormat('E', 'id_ID').format(r.tanggal);
+                  final isToday = DateFormat('yyyy-MM-dd').format(r.tanggal) ==
+                      DateFormat('yyyy-MM-dd').format(DateTime.now());
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (r.totalPenumpang > 0)
+                            Text('${r.totalPenumpang}',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: isToday
+                                        ? AppColors.primary
+                                        : AppColors.textGrey)),
+                          const SizedBox(height: 4),
+                          Container(
+                            height: fraction > 0
+                                ? (80 * fraction + 4).clamp(4.0, 80.0)
+                                : 4,
+                            decoration: BoxDecoration(
+                              color: r.totalPenumpang == 0
+                                  ? AppColors.lightGrey
+                                  : isToday
+                                      ? AppColors.primary
+                                      : AppColors.primary
+                                          .withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(dayName,
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: isToday
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                  color: isToday
+                                      ? AppColors.primary
+                                      : AppColors.textGrey)),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ), // SizedBox
+          ), // ClipRect
+        ]),
+      ),
+      const SizedBox(height: 12),
+      // Detail tile per hari
+      ...reports.map((r) => _AdminDayTile(report: r)),
+    ]);
+  }
+}
+
+class _AdminWeekStat extends StatelessWidget {
+  final String label, value;
+  final IconData icon;
+  final Color color;
+  const _AdminWeekStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(height: 6),
+        Text(value,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: color)),
+        Text(label,
+            style: const TextStyle(
+                fontFamily: 'Poppins', fontSize: 9, color: AppColors.textGrey)),
+      ]),
+    );
+  }
+}
+
+class _AdminDayTile extends StatelessWidget {
+  final _AdminDayReport report;
+  const _AdminDayTile({required this.report});
+
+  @override
+  Widget build(BuildContext context) {
+    final dayStr = DateFormat('EEEE, d MMM', 'id_ID').format(report.tanggal);
+    final isEmpty = report.totalPenumpang == 0;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.lightGrey),
+      ),
+      child: Row(children: [
+        Icon(
+          isEmpty
+              ? Icons.remove_circle_outline_rounded
+              : Icons.check_circle_rounded,
+          size: 18,
+          color: isEmpty ? AppColors.lightGrey : AppColors.primary,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Text(dayStr,
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: isEmpty ? AppColors.textGrey : AppColors.black))),
+        if (!isEmpty) ...[
+          Text('${report.totalPenumpang} penumpang',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('${report.totalLaporan} laporan',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
+          ),
+        ] else
+          Text('Tidak ada data',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  color: AppColors.lightGrey)),
+      ]),
+    );
+  }
+}
+
+// ── Skeleton helpers (tanpa animasi) ─────────────────────────
+class _SkeletonStatBox extends StatelessWidget {
+  const _SkeletonStatBox();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+          color: AppColors.white, borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+            width: 60,
+            height: 10,
+            decoration: BoxDecoration(
+                color: const Color(0xFFE0E0E0),
+                borderRadius: BorderRadius.circular(4))),
+        const SizedBox(height: 8),
+        Container(
+            width: 40,
+            height: 22,
+            decoration: BoxDecoration(
+                color: const Color(0xFFE8E8E8),
+                borderRadius: BorderRadius.circular(5))),
+        const SizedBox(height: 6),
+        Container(
+            width: 80,
+            height: 9,
+            decoration: BoxDecoration(
+                color: const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(4))),
+      ]),
+    );
+  }
+}
+
+class _SkeletonSection extends StatelessWidget {
+  final String label;
+  const _SkeletonSection({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: const TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.black)),
+      const SizedBox(height: 10),
+      Container(
+        height: 70,
+        decoration: BoxDecoration(
+            color: const Color(0xFFEEEEEE),
+            borderRadius: BorderRadius.circular(14)),
+      ),
+      const SizedBox(height: 20),
+    ]);
   }
 }

@@ -371,7 +371,7 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
       results.add(_DayReport(
         tanggal: day,
         totalPenumpang: data?.totalAttendances ?? 0,
-        checkout: data?.rows.where((r) => r.checkout == 'Yes').length ?? 0,
+        checkout: data?.rows.where((r) => r.checkout == true).length ?? 0,
       ));
     }
 
@@ -1245,64 +1245,69 @@ class _WeeklyChart extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       color: AppColors.black)),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 140,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: reports.map((r) {
-                    final fraction =
-                        maxVal > 0 ? r.totalPenumpang / maxVal : 0.0;
-                    final dayName = DateFormat('E', 'id_ID').format(r.tanggal);
-                    final isToday =
-                        DateFormat('yyyy-MM-dd').format(r.tanggal) ==
-                            DateFormat('yyyy-MM-dd').format(DateTime.now());
+              ClipRect(
+                child: SizedBox(
+                  height: 140,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: reports.map((r) {
+                      final fraction =
+                          maxVal > 0 ? r.totalPenumpang / maxVal : 0.0;
+                      final dayName =
+                          DateFormat('E', 'id_ID').format(r.tanggal);
+                      final isToday =
+                          DateFormat('yyyy-MM-dd').format(r.tanggal) ==
+                              DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            if (r.totalPenumpang > 0)
-                              Text('${r.totalPenumpang}',
+                      return Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (r.totalPenumpang > 0)
+                                Text('${r.totalPenumpang}',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: isToday
+                                            ? AppColors.primary
+                                            : AppColors.textGrey)),
+                              const SizedBox(height: 4),
+                              Container(
+                                height: fraction > 0
+                                    ? (80 * fraction + 4).clamp(4.0, 80.0)
+                                    : 4,
+                                decoration: BoxDecoration(
+                                  color: r.totalPenumpang == 0
+                                      ? AppColors.lightGrey
+                                      : isToday
+                                          ? AppColors.primary
+                                          : AppColors.primary
+                                              .withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(dayName,
                                   style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: isToday
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
                                       color: isToday
                                           ? AppColors.primary
                                           : AppColors.textGrey)),
-                            const SizedBox(height: 4),
-                            Container(
-                              height: fraction > 0 ? 100 * fraction + 8 : 8,
-                              decoration: BoxDecoration(
-                                color: r.totalPenumpang == 0
-                                    ? AppColors.lightGrey
-                                    : isToday
-                                        ? AppColors.primary
-                                        : AppColors.primary
-                                            .withValues(alpha: 0.5),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(dayName,
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 10,
-                                    fontWeight: isToday
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
-                                    color: isToday
-                                        ? AppColors.primary
-                                        : AppColors.textGrey)),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
+                      );
+                    }).toList(),
+                  ),
+                ), // SizedBox
+              ), // ClipRect
             ],
           ),
         ),
