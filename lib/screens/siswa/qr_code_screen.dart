@@ -431,11 +431,11 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       color: AppColors.orange, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
+                const Expanded(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'QR siap — tunjukkan ke driver!',
                           style: TextStyle(
                               fontFamily: 'Poppins',
@@ -443,15 +443,15 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                               fontWeight: FontWeight.w700,
                               color: AppColors.orange),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Row(children: [
-                          const SizedBox(
+                          SizedBox(
                               width: 10,
                               height: 10,
                               child: CircularProgressIndicator(
                                   strokeWidth: 1.5, color: AppColors.orange)),
-                          const SizedBox(width: 6),
-                          const Text(
+                          SizedBox(width: 6),
+                          Text(
                             'Menunggu driver scan...',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
@@ -471,14 +471,14 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               decoration: BoxDecoration(
                   color: AppColors.surface2,
                   borderRadius: BorderRadius.circular(12)),
-              child: Row(children: [
-                const SizedBox(
+              child: const Row(children: [
+                SizedBox(
                     width: 12,
                     height: 12,
                     child: CircularProgressIndicator(
                         strokeWidth: 1.5, color: AppColors.textGrey)),
-                const SizedBox(width: 10),
-                const Expanded(
+                SizedBox(width: 10),
+                Expanded(
                   child: Text(
                     'Menunggu driver scan QR kamu...',
                     style: TextStyle(
@@ -890,9 +890,9 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       const Icon(Icons.access_time_rounded,
                           size: 13, color: AppColors.textGrey),
                       const SizedBox(width: 6),
-                      Text(
+                      const Text(
                         'QR berlaku hari ini s/d 23:59',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 11,
                             color: AppColors.textGrey),

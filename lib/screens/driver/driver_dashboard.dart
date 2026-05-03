@@ -985,7 +985,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                           final waktuTurun = a['waktu_turun'] as String?;
                           String jam = '';
                           if (waktuNaik != null) {
-                            final dt = DateTime.tryParse(waktuNaik);
+                            final dt = DateTime.tryParse(waktuNaik)?.toLocal();
                             if (dt != null) {
                               jam =
                                   '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -993,7 +993,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                           }
                           String jamTurun = '';
                           if (waktuTurun != null) {
-                            final dt = DateTime.tryParse(waktuTurun);
+                            final dt = DateTime.tryParse(waktuTurun)?.toLocal();
                             if (dt != null) {
                               jamTurun =
                                   '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
@@ -1974,8 +1974,7 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
         // Content
         Expanded(
           child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary))
+              ? const SkeletonFullPage()
               : _error != null
                   ? Center(
                       child: Padding(

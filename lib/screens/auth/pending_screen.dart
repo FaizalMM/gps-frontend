@@ -184,7 +184,7 @@ class _PendingScreenState extends State<PendingScreen>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
@@ -193,8 +193,8 @@ class _PendingScreenState extends State<PendingScreen>
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: AppColors.pendingOrange),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
+                  SizedBox(width: 8),
+                  Text(
                     'Memantau status secara otomatis...',
                     style: TextStyle(
                         fontFamily: 'Poppins',
@@ -219,13 +219,13 @@ class _PendingScreenState extends State<PendingScreen>
                 ),
                 child: Column(
                   children: [
-                    _StatusStep(
+                    const _StatusStep(
                       icon: Icons.check_circle_rounded,
                       label: 'Registrasi Terkirim',
                       isCompleted: true,
                       isActive: false,
                     ),
-                    _StepConnector(isCompleted: true),
+                    const _StepConnector(isCompleted: true),
                     _StatusStep(
                       icon: Icons.hourglass_top_rounded,
                       label: 'Menunggu Persetujuan Admin',
@@ -233,8 +233,8 @@ class _PendingScreenState extends State<PendingScreen>
                       isCompleted: false,
                       isActive: _status == _ApprovalStatus.pending,
                     ),
-                    _StepConnector(isCompleted: false),
-                    _StatusStep(
+                    const _StepConnector(isCompleted: false),
+                    const _StatusStep(
                       icon: Icons.verified_rounded,
                       label: 'Akun Diaktifkan',
                       isCompleted: false,

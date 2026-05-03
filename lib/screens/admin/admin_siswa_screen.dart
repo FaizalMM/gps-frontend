@@ -1077,11 +1077,11 @@ class _SiswaCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border:
                     Border.all(color: AppColors.orange.withValues(alpha: 0.3))),
-            child: Row(children: [
-              const Icon(Icons.warning_amber_rounded,
+            child: const Row(children: [
+              Icon(Icons.warning_amber_rounded,
                   size: 12, color: AppColors.orange),
-              const SizedBox(width: 5),
-              const Expanded(
+              SizedBox(width: 5),
+              Expanded(
                 child: Text('Belum ditugaskan ke bus — tap 🔄 untuk assign',
                     style: TextStyle(
                         fontFamily: 'Poppins',

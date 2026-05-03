@@ -176,7 +176,7 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
               Container(
                 width: 64,
                 height: 64,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                     color: AppColors.primaryLight, shape: BoxShape.circle),
                 child: Icon(
                   isPdf
@@ -312,10 +312,10 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
 
               // Tips jika file tidak bisa dibuka
               const SizedBox(height: 10),
-              Text(
+              const Text(
                 'Jika file tidak terbuka otomatis, cari manual\nmenggunakan panduan lokasi di atas.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                     fontFamily: 'Poppins',
                     fontSize: 10,
                     color: AppColors.textGrey,
@@ -362,7 +362,14 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     final results = <_DayReport>[];
     for (int i = 0; i < 7; i++) {
       final day = _weekStart.add(Duration(days: i));
-      if (day.isAfter(DateTime.now())) break;
+      if (day.isAfter(DateTime.now())) {
+        results.add(_DayReport(
+          tanggal: day,
+          totalPenumpang: 0,
+          checkout: 0,
+        ));
+        continue;
+      }
       final tanggal = DateFormat('yyyy-MM-dd').format(day);
       final data = await _reportService.fetchDriverReport(
         busId: busId,
@@ -606,13 +613,15 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      bottomNavigationBar: _BottomExportBar(
-        isExportingPdf: _isExportingPdf,
-        isExportingExcel: _isExportingExcel,
-        canExport: widget.busId != null && widget.busId != 0,
-        onExportPdf: () => _showCatatanDialog('PDF'),
-        onExportExcel: () => _showCatatanDialog('Excel'),
-      ),
+      bottomNavigationBar: _filterMode == _FilterMode.mingguan
+          ? null
+          : _BottomExportBar(
+              isExportingPdf: _isExportingPdf,
+              isExportingExcel: _isExportingExcel,
+              canExport: widget.busId != null && widget.busId != 0,
+              onExportPdf: () => _showCatatanDialog('PDF'),
+              onExportExcel: () => _showCatatanDialog('Excel'),
+            ),
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,

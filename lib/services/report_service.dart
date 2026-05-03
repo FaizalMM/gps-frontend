@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_client.dart';
@@ -234,7 +235,15 @@ class ReportService {
       }
 
       final path = await _saveToDownloads(bytes, filename);
+      if (path == null) return null;
       if (kDebugMode) debugPrint('[ReportService] Tersimpan: $path');
+
+      // Trigger MediaScanner agar file muncul di histori unduhan Android
+      await _scanFile(path);
+
+      // Langsung buka file setelah tersimpan
+      await OpenFilex.open(path);
+
       return path;
     } catch (e) {
       if (kDebugMode) debugPrint('[ReportService] Error: $e');
@@ -323,6 +332,22 @@ class ReportService {
     if (kDebugMode)
       debugPrint('[ReportService] Internal fallback: ${file.path}');
     return file.path;
+  }
+
+  /// Trigger Android MediaScanner agar file muncul di File Manager & histori unduhan
+  Future<void> _scanFile(String path) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await Process.run('am', [
+        'broadcast',
+        '-a',
+        'android.intent.action.MEDIA_SCANNER_SCAN_FILE',
+        '-d',
+        'file://$path',
+      ]);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[ReportService] MediaScanner error: $e');
+    }
   }
 
   Future<int> _getAndroidSdkInt() async {

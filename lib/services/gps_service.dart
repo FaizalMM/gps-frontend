@@ -167,9 +167,9 @@ class GpsService {
     // Coba high accuracy dulu
     try {
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: LocationSettings(
+        locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 15),
+          timeLimit: Duration(seconds: 15),
         ),
       );
       if (pos.latitude != 0 && pos.longitude != 0) return pos;
@@ -178,9 +178,9 @@ class GpsService {
     // Fallback: medium accuracy dengan timeout lebih longgar
     try {
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: LocationSettings(
+        locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
-          timeLimit: const Duration(seconds: 10),
+          timeLimit: Duration(seconds: 10),
         ),
       );
       if (pos.latitude != 0 && pos.longitude != 0) return pos;

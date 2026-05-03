@@ -18,7 +18,8 @@ class AdminHalteScreen extends StatefulWidget {
 
 class _AdminHalteScreenState extends State<AdminHalteScreen> {
   String _searchQuery = '';
-  bool _loading = false;
+  bool _loading =
+      true; // true dari awal agar skeleton langsung tampil sebelum data pertama
 
   @override
   void initState() {

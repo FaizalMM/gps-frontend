@@ -424,11 +424,22 @@ class _SuccessSheetState extends State<_SuccessSheet> {
           ]),
         ),
         const SizedBox(height: 16),
+        // Tombol utama: Kembali ke Dashboard untuk cek daftar penumpang
         SizedBox(
           width: double.infinity,
           height: 50,
-          child: ElevatedButton(
-            onPressed: widget.onNext,
+          child: ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context); // tutup sheet
+              Navigator.pop(context); // kembali ke dashboard
+            },
+            icon:
+                const Icon(Icons.people_rounded, size: 18, color: Colors.white),
+            label: const Text('Lihat Penumpang Hari Ini',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -436,11 +447,28 @@ class _SuccessSheetState extends State<_SuccessSheet> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
             ),
-            child: const Text('Scan Berikutnya',
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Tombol sekunder: Scan siswa berikutnya
+        SizedBox(
+          width: double.infinity,
+          height: 46,
+          child: OutlinedButton.icon(
+            onPressed: widget.onNext,
+            icon: const Icon(Icons.qr_code_scanner_rounded,
+                size: 18, color: AppColors.primary),
+            label: const Text('Scan Siswa Berikutnya',
                 style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700)),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.primary, width: 1.5),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
           ),
         ),
       ]),

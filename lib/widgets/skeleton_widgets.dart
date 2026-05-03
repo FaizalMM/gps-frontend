@@ -183,17 +183,11 @@ class SkeletonBusCard extends StatelessWidget {
             // Info row: speed / ETA / status
             Row(
               children: [
-                Expanded(
-                  child: _buildInfoChip(),
-                ),
+                Expanded(child: _buildInfoChip()),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _buildInfoChip(),
-                ),
+                Expanded(child: _buildInfoChip()),
                 const SizedBox(width: 10),
-                Expanded(
-                  child: _buildInfoChip(),
-                ),
+                Expanded(child: _buildInfoChip()),
               ],
             ),
           ],
@@ -824,7 +818,6 @@ class SkeletonChart extends StatelessWidget {
             const SizedBox(height: 4),
             const _SkeletonBox(width: 80, height: 10, radius: 4),
             const Spacer(),
-            // Bar chart placeholder
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -877,7 +870,6 @@ class SkeletonFullPage extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(height: 16),
-          // AppBar area
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: ShimmerEffect(

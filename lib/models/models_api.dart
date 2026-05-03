@@ -122,8 +122,9 @@ class UserModel {
           '',
       status: status,
       photoUrl: json['photo_url'] as String?,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt:
+          (DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal()) ??
+              DateTime.now(),
       studentDetail: studentDetail,
       driverDetail: driverDetail,
     );
@@ -446,8 +447,9 @@ class BusModel {
       heading: json['current_position'] != null
           ? _parseDouble((json['current_position'] as Map)['heading'], 0)
           : 0,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt:
+          (DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal()) ??
+              DateTime.now(),
     );
   }
 
@@ -500,8 +502,9 @@ class HalteModel {
       alamat: json['alamat'] as String? ?? '',
       latitude: _parseDouble(json['latitude'], -7.6298),
       longitude: _parseDouble(json['longitude'], 111.5239),
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt:
+          (DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal()) ??
+              DateTime.now(),
     );
   }
 
@@ -608,10 +611,10 @@ class AttendanceModel {
       busName: json['bus_name'] as String? ?? json['nama_rute'] as String?,
       halteName: json['halte_naik'] as String? ?? '',
       waktuNaik: json['waktu_naik'] != null
-          ? DateTime.tryParse(json['waktu_naik'] as String)
+          ? DateTime.tryParse(json['waktu_naik'] as String)?.toLocal()
           : null,
       waktuTurun: json['waktu_turun'] != null
-          ? DateTime.tryParse(json['waktu_turun'] as String)
+          ? DateTime.tryParse(json['waktu_turun'] as String)?.toLocal()
           : null,
       status: json['status'] as String? ?? '',
       namaRute: routeInfo?['nama_rute'] as String? ?? '',
@@ -672,7 +675,8 @@ class GpsTrackData {
       latitude: _parseDouble(json['latitude'], 0),
       longitude: _parseDouble(json['longitude'], 0),
       speed: _parseDouble(json['speed'], 0),
-      recordedAt: DateTime.tryParse(json['recorded_at'] as String? ?? '') ??
+      recordedAt: (DateTime.tryParse(json['recorded_at'] as String? ?? '')
+              ?.toLocal()) ??
           DateTime.now(),
     );
   }

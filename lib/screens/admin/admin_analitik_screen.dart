@@ -142,11 +142,20 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
     final results = <_AdminDayReport>[];
     for (int i = 0; i < 7; i++) {
       final day = _weekStart.add(Duration(days: i));
-      if (day.isAfter(DateTime.now())) break;
+      // Hari yang belum terjadi — tampilkan dengan data kosong, jangan break
+      if (day.isAfter(DateTime.now())) {
+        results.add(_AdminDayReport(
+          tanggal: day,
+          totalPenumpang: 0,
+          checkout: 0,
+          totalLaporan: 0,
+        ));
+        continue;
+      }
       final tanggal = _dateStr(day);
 
       final resAttend = await _api
-          .get('/attendance', params: {'tanggal': tanggal, 'per_page': '200'});
+          .get('/attendance', params: {'date': tanggal, 'per_page': '200'});
       final resReport =
           await _api.get('/reports/admin', params: {'tanggal': tanggal});
 
@@ -164,7 +173,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
       results.add(_AdminDayReport(
         tanggal: day,
         totalPenumpang: raw.length,
-        checkout: raw.where((r) => r['checkout_time'] != null).length,
+        checkout: raw.where((r) => r['waktu_turun'] != null).length,
         totalLaporan: totalLaporan,
       ));
     }
@@ -227,8 +236,8 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
   }
 
   Future<void> _fetchAttendance() async {
-    final res = await _api.get('/attendance',
-        params: {'tanggal': _todayParam, 'per_page': '200'});
+    final res = await _api
+        .get('/attendance', params: {'date': _todayParam, 'per_page': '200'});
     if (!res.success || res.data == null) return;
     final raw = ((res.data!['data'] ?? res.data!['attendance']) as List? ?? [])
         .cast<Map<String, dynamic>>();
@@ -236,7 +245,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
     setState(() {
       _attendance = _AttendanceSummary(
         total: raw.length,
-        checkout: raw.where((r) => r['checkout_time'] != null).length,
+        checkout: raw.where((r) => r['waktu_turun'] != null).length,
       );
     });
   }
@@ -249,11 +258,26 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
     final rows = ((d['reports'] as List?) ?? []).cast<Map<String, dynamic>>();
     final totalPenumpang = rows.fold<int>(
         0, (s, r) => s + ((r['total_penumpang'] as num?)?.toInt() ?? 0));
+
+    // Jika daily_reports kosong (driver belum submit), ambil dari attendance
+    int penumpangFinal = totalPenumpang;
+    if (penumpangFinal == 0) {
+      final resAttend = await _api
+          .get('/attendance', params: {'date': _todayParam, 'per_page': '200'});
+      if (resAttend.success && resAttend.data != null) {
+        final raw = ((resAttend.data!['data'] ?? resAttend.data!['attendance'])
+                    as List? ??
+                [])
+            .cast<Map<String, dynamic>>();
+        penumpangFinal = raw.length;
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _report = _ReportSummary(
         totalLaporan: (d['total_reports'] as num?)?.toInt() ?? rows.length,
-        totalPenumpang: totalPenumpang,
+        totalPenumpang: penumpangFinal,
         rows: rows,
       );
     });
@@ -292,15 +316,16 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
                         ? _dateStr(_selectedDate) == _dateStr(DateTime.now())
                             ? 'Hari ini'
                             : _dateStr(_selectedDate)
-                        : 'Minggu ini',
+                        : '${DateFormat('d MMM', 'id_ID').format(_weekStart)} — ${DateFormat('d MMM yyyy', 'id_ID').format(_weekEnd)}',
                     style: const TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 12,
                         color: AppColors.textGrey),
                   ),
                 ])),
-            // Tombol download PDF
-            _DownloadPdfButton(loading: _loading, tanggal: _todayParam),
+            // Tombol download PDF — hanya di mode harian
+            if (_filterMode == _FilterMode.harian)
+              _DownloadPdfButton(loading: _loading, tanggal: _todayParam),
             const SizedBox(width: 6),
             // Tombol date picker — icon saja
             GestureDetector(
@@ -419,7 +444,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
                       weekReports: _weekReports,
                       isLoadingWeek: _isLoadingWeek,
                       weekLabel:
-                          '${_dateStr(_weekStart)} — ${_dateStr(_weekEnd)}',
+                          '${DateFormat('EEE, d MMM', 'id_ID').format(_weekStart)} — ${DateFormat('EEE, d MMM yyyy', 'id_ID').format(_weekEnd)}',
                       canGoNext: _selectedDate
                           .add(const Duration(days: 7))
                           .isBefore(DateTime.now()),
@@ -485,28 +510,28 @@ class _RingkasanTab extends StatelessWidget {
 
     // Saat loading — tampilkan skeleton terpadu, bukan per section
     if (loading) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-        physics: const NeverScrollableScrollPhysics(),
+      return const SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 80),
+        physics: NeverScrollableScrollPhysics(),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Stat cards skeleton
           Row(children: [
             Expanded(child: _SkeletonStatBox()),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(child: _SkeletonStatBox()),
           ]),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Row(children: [
             Expanded(child: _SkeletonStatBox()),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(child: _SkeletonStatBox()),
           ]),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           // Section skeleton
           _SkeletonSection(label: 'Absensi Hari Ini'),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _SkeletonSection(label: 'Laporan Driver Hari Ini'),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _SkeletonSection(label: 'Aktivitas Sistem (24 Jam)'),
         ]),
       );
@@ -1127,7 +1152,7 @@ class _DownloadPdfButtonState extends State<_DownloadPdfButton> {
             Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                   color: AppColors.primaryLight, shape: BoxShape.circle),
               child: const Icon(Icons.picture_as_pdf_rounded,
                   color: AppColors.primary, size: 32),
@@ -1298,7 +1323,7 @@ class _LaporanCardState extends State<_LaporanCard> {
             Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                   color: AppColors.primaryLight, shape: BoxShape.circle),
               child: const Icon(Icons.picture_as_pdf_rounded,
                   color: AppColors.primary, size: 32),
@@ -2251,8 +2276,8 @@ class _AdminDayTile extends StatelessWidget {
                     color: AppColors.primary)),
           ),
         ] else
-          Text('Tidak ada data',
-              style: const TextStyle(
+          const Text('Tidak ada data',
+              style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 11,
                   color: AppColors.lightGrey)),

@@ -788,46 +788,58 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
           else
             _buildAttendanceBanner(),
 
-          // ── Peta ────────────────────────────────────────
+          // ── Peta + card bawah mengapung ──────────────────
           Expanded(
-            child: _loadingBus
-                ? const SkeletonMapArea(height: 400)
-                : _myBus == null
-                    ? _buildNoBusView()
-                    : (!_myBus!.gpsActive || _myBus!.latitude == 0)
-                        ? _buildGpsOffView()
-                        : Stack(children: [
-                            BusMapWidget(
-                              buses: buses,
-                              height: double.infinity,
-                              showAllBuses: true,
-                              interactive: true,
-                              showRoutes: true,
-                              routes: _myBus?.routeList ?? [],
-                              mapController: _mapController,
-                              userLocation: null,
-                            ),
-                            // Overlay saat siswa sudah di dalam bus
-                            if (_isOnBus)
-                              Positioned(
-                                top: 12,
-                                left: 12,
-                                right: 12,
-                                child: _OnBusOverlay(
-                                  busName: _myBus!.nama,
-                                  speed: _myBus!.speed,
-                                  waktuNaik: _waktuNaik,
-                                  halteNaik: _halteNaik,
-                                ),
-                              ),
-                            // Alert bus hampir tiba (sebelum naik)
-                            if (!_isOnBus && !_isDone && _myHalte != null)
-                              _buildArrivalAlert(),
-                          ]),
+            child: Stack(
+              children: [
+                // Peta full
+                Positioned.fill(
+                  child: _loadingBus
+                      ? const SkeletonMapArea(height: 400)
+                      : _myBus == null
+                          ? _buildNoBusView()
+                          : (!_myBus!.gpsActive || _myBus!.latitude == 0)
+                              ? _buildGpsOffView()
+                              : Stack(children: [
+                                  BusMapWidget(
+                                    buses: buses,
+                                    height: double.infinity,
+                                    showAllBuses: true,
+                                    interactive: true,
+                                    showRoutes: true,
+                                    routes: _myBus?.routeList ?? [],
+                                    mapController: _mapController,
+                                    userLocation: null,
+                                  ),
+                                  // Overlay saat siswa sudah di dalam bus
+                                  if (_isOnBus)
+                                    Positioned(
+                                      top: 12,
+                                      left: 12,
+                                      right: 12,
+                                      child: _OnBusOverlay(
+                                        busName: _myBus!.nama,
+                                        speed: _myBus!.speed,
+                                        waktuNaik: _waktuNaik,
+                                        halteNaik: _halteNaik,
+                                      ),
+                                    ),
+                                  // Alert bus hampir tiba (sebelum naik)
+                                  if (!_isOnBus && !_isDone && _myHalte != null)
+                                    _buildArrivalAlert(),
+                                ]),
+                ),
+                // Card bawah mengapung di atas peta
+                if (!_loadingBus && _myBus != null)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildBottomCard(),
+                  ),
+              ],
+            ),
           ),
-
-          // ── Info card bawah ──────────────────────────────
-          if (!_loadingBus && _myBus != null) _buildBottomCard(),
         ]),
       ),
     );
@@ -2286,7 +2298,7 @@ class _HalteRouteSheetState extends State<_HalteRouteSheet> {
         // Content
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const SkeletonList(itemCount: 5)
               : _error != null
                   ? Center(
                       child: Padding(
