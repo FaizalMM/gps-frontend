@@ -111,6 +111,10 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
   String? _myDriverName;
   bool _loadingBusInfo = true;
 
+  // [FIX] State lokal untuk status bus — diupdate langsung dari homePolling
+  // sehingga tidak bergantung pada busesStream (yang hanya diisi admin polling)
+  BusModel? _myBusLive;
+
   @override
   void initState() {
     super.initState();
@@ -119,10 +123,18 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
           ..repeat(reverse: true);
     _getLocation();
     _loadMyBusId();
+    // [FIX] Mulai polling status bus dengan callback langsung update state lokal
+    // agar card di Home tab reaktif tanpa bergantung pada busesStream admin.
+    widget.dataService.startHomePolling(onUpdate: (bus) {
+      if (!mounted) return;
+      setState(() => _myBusLive = bus);
+    });
   }
 
   @override
   void dispose() {
+    // [FIX BUG 1] Stop polling saat Home tab dispose
+    widget.dataService.stopHomePolling();
     _pulseAnim.dispose();
     super.dispose();
   }
@@ -239,40 +251,25 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _loadingBusInfo
                   ? const SkeletonBusCard()
-                  : StreamBuilder<List<BusModel>>(
-                      stream: widget.dataService.busesStream,
-                      builder: (_, s) {
-                        final buses = s.data ?? widget.dataService.buses;
+                  : Builder(builder: (_) {
+                      if (_myBusId == null) return _NoBusAssignedCard();
 
-                        BusModel? myBus;
-                        if (_myBusId != null) {
-                          try {
-                            myBus = buses.firstWhere(
-                                (b) => b.id == _myBusId && b.gpsActive);
-                          } catch (_) {
-                            try {
-                              myBus = buses.firstWhere((b) => b.id == _myBusId);
-                            } catch (_) {}
-                          }
-                        }
-
-                        if (_myBusId == null) {
-                          return _NoBusAssignedCard();
-                        }
-                        if (myBus == null || !myBus.gpsActive) {
-                          return _BusNotActiveCard(
-                            busName: _myBusName,
-                            driverName: _myDriverName,
-                            onTrack: () => widget.onSwitchTab(1),
-                          );
-                        }
-                        return _BusCard(
-                            bus: myBus,
-                            eta: _eta(myBus),
-                            pulseAnim: _pulseAnim,
-                            onTrack: () => widget.onSwitchTab(1));
-                      },
-                    ),
+                      // [FIX] Pakai _myBusLive dari homePolling callback —
+                      // langsung reaktif tanpa bergantung busesStream admin.
+                      final myBus = _myBusLive;
+                      if (myBus == null || !myBus.gpsActive) {
+                        return _BusNotActiveCard(
+                          busName: _myBusName,
+                          driverName: _myDriverName,
+                          onTrack: () => widget.onSwitchTab(1),
+                        );
+                      }
+                      return _BusCard(
+                          bus: myBus,
+                          eta: _eta(myBus),
+                          pulseAnim: _pulseAnim,
+                          onTrack: () => widget.onSwitchTab(1));
+                    }),
             ),
             const SizedBox(height: 12),
 

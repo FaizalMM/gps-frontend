@@ -170,7 +170,7 @@ class _DriverHomeTab extends StatefulWidget {
 }
 
 class _DriverHomeTabState extends State<_DriverHomeTab>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final GpsService _gpsService = GpsService();
   final RoutingService _routingService = RoutingService();
   bool _gpsActive = false;
@@ -193,6 +193,10 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   @override
   void initState() {
     super.initState();
+    // [FIX RECORDING] Daftarkan observer lifecycle agar GPS bisa
+    // di-resume otomatis saat layar HP dinyalakan kembali.
+    WidgetsBinding.instance.addObserver(this);
+
     _gpsActive = widget.bus?.gpsActive ?? false;
 
     _positionSub = _gpsService.positionStream.listen((position) {
@@ -230,6 +234,16 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
         const Duration(seconds: 15), (_) => _loadAttendanceToday());
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _gpsActive) {
+      if (!_gpsService.isTracking) {
+        // GPS service mati saat layar off — restart tanpa ubah toggle UI
+        _resumeTracking();
+      }
+    }
+  }
+
   Future<void> _loadAttendanceToday() async {
     final bus = widget.bus;
     if (bus == null || !mounted || _isLoadingAttendance) return;
@@ -245,6 +259,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
 
   @override
   void dispose() {
+    // [FIX RECORDING] Hapus observer lifecycle saat widget dispose
+    WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     _attendancePollTimer?.cancel();
     _pulseController.dispose();

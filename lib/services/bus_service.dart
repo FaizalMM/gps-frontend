@@ -358,7 +358,11 @@ class BusService {
       final d = res.data!['data'] as Map<String, dynamic>?;
       if (d != null) {
         final pos = d['position'] as Map<String, dynamic>?;
-        final gpsActive = (d['gps_active'] as bool? ?? false) && pos != null;
+        // [FIX] Ikuti flag gps_active dari backend secara langsung.
+        // Sebelumnya: && pos != null → menyebabkan gpsActive = false
+        // di jeda awal setelah driver toggle ON (sebelum koordinat pertama masuk).
+        // Backend sudah difix: gps_active = true segera saat gps_status='on'.
+        final gpsActive = d['gps_active'] as bool? ?? false;
 
         final bus = BusModel.fromJson({
           'id': d['bus_id'],
@@ -371,18 +375,24 @@ class BusService {
                   'user': {'name': d['driver_name']}
                 }
               : null,
-          'current_position': gpsActive ? pos : null,
+          'current_position': pos, // kirim pos apa adanya, boleh null
           'routes': d['routes'] ?? [],
           'created_at': DateTime.now().toIso8601String(),
         });
 
         if (gpsActive && pos != null) {
+          // GPS aktif DAN sudah ada koordinat — update posisi
           bus.updateGps(
             latitude: (pos['latitude'] as num?)?.toDouble() ?? 0,
             longitude: (pos['longitude'] as num?)?.toDouble() ?? 0,
             speed: (pos['speed'] as num?)?.toDouble() ?? 0,
             gpsActive: true,
           );
+        } else if (gpsActive) {
+          // GPS aktif tapi koordinat belum masuk — tetap tandai aktif,
+          // biarkan posisi default (0,0) agar marker tidak muncul di peta
+          // tapi card status di Home berubah ke AKTIF.
+          bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: true);
         } else {
           bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: false);
         }

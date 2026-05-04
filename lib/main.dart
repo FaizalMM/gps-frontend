@@ -6,6 +6,9 @@ import 'services/auth_provider.dart';
 import 'screens/auth/splash_screen.dart';
 import 'utils/app_theme.dart';
 
+// Global navigator key agar bisa navigasi dari luar widget tree
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null); // ← TAMBAH INI
@@ -35,6 +38,8 @@ class MobitraApp extends StatelessWidget {
         title: 'Mobitra',
         debugShowCheckedModeBanner: false,
         theme: appTheme(),
+        // SplashScreen hanya ditampilkan sekali saat cold start.
+        navigatorKey: navigatorKey,
         home: const SplashScreen(),
       ),
     );
