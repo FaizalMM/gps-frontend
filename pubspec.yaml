@@ -36,6 +36,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
+    - assets/images/Logo1.png
   fonts:
     - family: Poppins
       fonts:

@@ -21,7 +21,7 @@ class MobitraAppBar extends StatelessWidget {
       child: Row(
         children: [
           Image.asset(
-            'assets/images/logo.png',
+            'assets/images/Logo1.png',
             width: 40,
             height: 40,
             fit: BoxFit.contain,

@@ -847,7 +847,7 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
   Widget _buildAttendanceBanner() {
     if (_attendanceStatus == null) {
       // Belum ada absensi hari ini — belum naik
-      return _StatusBanner(
+      return const _StatusBanner(
         color: AppColors.surface2,
         borderColor: AppColors.lightGrey,
         icon: Icons.qr_code_2_rounded,

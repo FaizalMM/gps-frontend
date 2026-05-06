@@ -1377,11 +1377,10 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
         ),
-        child: Row(children: [
-          const Icon(Icons.check_circle_rounded,
-              color: AppColors.primary, size: 20),
-          const SizedBox(width: 10),
-          const Expanded(
+        child: const Row(children: [
+          Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 20),
+          SizedBox(width: 10),
+          Expanded(
             child: Text('Laporan hari ini sudah dikirim',
                 style: TextStyle(
                     fontFamily: 'Poppins',

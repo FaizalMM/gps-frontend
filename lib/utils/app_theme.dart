@@ -1,39 +1,42 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // ── Brand ──────────────────────────────────────────────
-  static const Color primary = Color(0xFF7CBF2F); // hijau lime asli Mobitra
-  static const Color primaryDark =
-      Color(0xFF5A9A1A); // lebih gelap untuk gradient/hover
-  static const Color primaryLight =
-      Color(0xFFEAF5D0); // hijau muda lembut (bukan terlalu kuning)
+  // ── Brand — Forest Green palette (sesuai referensi desain) ──
+  static const Color primary = Color(0xFF1B5E37); // dark forest green
+  static const Color primaryMid = Color(0xFF2D7A4F); // medium green
+  static const Color primaryDark = Color(0xFF0F3D22); // deep green
+  static const Color primaryLight = Color(0xFFE8F5ED); // soft green tint
+  static const Color primaryAccentColor = Color(0xFFA7C957); // lime accent
 
-  // ── Surface / Background ───────────────────────────────
-  static const Color background =
-      Color(0xFFF5F6FA); // abu netral bersih (bukan kekuningan)
+  // ── Amber / Gold ─────────────────────────────────────────────
+  static const Color amber = Color(0xFFB07D00);
+  static const Color amberLight = Color(0xFFFFF3CD);
+
+  // ── Surface / Background ─────────────────────────────────────
+  static const Color background = Color(0xFFF0F4F2);
   static const Color white = Color(0xFFFFFFFF);
   static const Color cardBg = Color(0xFFFFFFFF);
-  static const Color surface2 = Color(0xFFF0F2F5); // input, chip bg
+  static const Color surface2 = Color(0xFFE4EDEA);
 
-  // ── Text ───────────────────────────────────────────────
+  // ── Text ─────────────────────────────────────────────────────
   static const Color black = Color(0xFF1A1A1A);
   static const Color textDark = Color(0xFF2D2D2D);
-  static const Color textGrey = Color(0xFF888888);
-  static const Color textLight = Color(0xFFAEAEB2);
+  static const Color textGrey = Color(0xFF6B7B73);
+  static const Color textLight = Color(0xFFABB8B0);
 
-  // ── Border / Divider ───────────────────────────────────
-  static const Color lightGrey = Color(0xFFEEEEEE);
-  static const Color divider = Color(0xFFF2F2F7);
+  // ── Border / Divider ─────────────────────────────────────────
+  static const Color lightGrey = Color(0xFFDDE6E0);
+  static const Color divider = Color(0xFFEBF0ED);
 
-  // ── Status ─────────────────────────────────────────────
-  static const Color red = Color(0xFFE53E3E);
-  static const Color orange = Color(0xFFFF8C00);
+  // ── Status ───────────────────────────────────────────────────
+  static const Color red = Color(0xFFD32F2F);
+  static const Color orange = Color(0xFFE67E00);
   static const Color pendingOrange = Color(0xFFF5A623);
-  static const Color blue = Color(0xFF2196F3);
-  static const Color purple = Color(0xFF9C27B0);
+  static const Color blue = Color(0xFF1565C0);
+  static const Color purple = Color(0xFF6A1B9A);
 
-  // ── Nav ────────────────────────────────────────────────
-  static const Color navBg = Color(0xFF2D2D2D);
+  // ── Nav ──────────────────────────────────────────────────────
+  static const Color navBg = Color(0xFF1B5E37);
 }
 
 class AppTextStyles {
