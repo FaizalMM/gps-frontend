@@ -1180,8 +1180,8 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(
           padding: const EdgeInsets.all(20),
-          decoration:
-              BoxDecoration(color: AppColors.surface2, shape: BoxShape.circle),
+          decoration: const BoxDecoration(
+              color: AppColors.surface2, shape: BoxShape.circle),
           child: Icon(Icons.gps_off_rounded,
               size: 48, color: AppColors.textGrey.withValues(alpha: 0.5)),
         ),
@@ -1406,117 +1406,693 @@ class _SiswaProfileTab extends StatefulWidget {
 }
 
 class _SiswaProfileTabState extends State<_SiswaProfileTab> {
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Keluar',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w700)),
+        content: const Text('Kamu yakin ingin keluar dari akun ini?',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<AuthProvider>().logout();
+              Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.red,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Keluar',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.background,
-      child: SafeArea(
+    final siswa = widget.siswa;
+    final detail = siswa.studentDetail;
+    final initial =
+        siswa.namaLengkap.isNotEmpty ? siswa.namaLengkap[0].toUpperCase() : '?';
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(20),
-                image: widget.siswa.photoUrl != null
-                    ? DecorationImage(
-                        image: NetworkImage(widget.siswa.photoUrl!),
-                        fit: BoxFit.cover)
-                    : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header hijau ────────────────────────────────
+              _buildHeader(siswa, detail, initial),
+
+              // ── NIS Badge melayang ──────────────────────────
+              if (detail != null && detail.nis.isNotEmpty)
+                _buildNisBadge(detail),
+
+              const SizedBox(height: 20),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── QR Code ───────────────────────────────
+                    _SProfQrCard(
+                      siswa: siswa,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => QrCodeScreen(siswa: siswa)),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ── Data Pribadi ────────────────────────────
+                    const _SProfLabel(label: 'Data Pribadi'),
+                    const SizedBox(height: 10),
+                    _SProfCard(children: [
+                      _SProfRow(
+                        icon: Icons.email_outlined,
+                        label: 'Email',
+                        value: siswa.email.isNotEmpty ? siswa.email : '-',
+                      ),
+                      const _SProfDivider(),
+                      _SProfRow(
+                        icon: Icons.phone_outlined,
+                        label: 'No. HP',
+                        value: siswa.noHp.isNotEmpty ? siswa.noHp : '-',
+                      ),
+                      const _SProfDivider(),
+                      _SProfRow(
+                        icon: Icons.location_on_outlined,
+                        label: 'Alamat',
+                        value: siswa.alamat.isNotEmpty ? siswa.alamat : '-',
+                        maxLines: 2,
+                      ),
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // ── Info Sekolah ───────────────────────────
+                    const _SProfLabel(label: 'Info Sekolah'),
+                    const SizedBox(height: 10),
+                    _SProfCard(children: [
+                      _SProfRow(
+                        icon: Icons.school_outlined,
+                        label: 'Sekolah',
+                        value: (detail != null && detail.sekolah.isNotEmpty)
+                            ? detail.sekolah
+                            : '-',
+                      ),
+                      if (detail != null && detail.nis.isNotEmpty) ...[
+                        const _SProfDivider(),
+                        _SProfRow(
+                          icon: Icons.badge_outlined,
+                          label: 'NIS',
+                          value: detail.nis,
+                        ),
+                      ],
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // ── Info Bus ───────────────────────────────
+                    const _SProfLabel(label: 'Bus & Rute'),
+                    const SizedBox(height: 10),
+                    _SProfCard(children: [
+                      _SProfRow(
+                        icon: Icons.directions_bus_outlined,
+                        label: 'Bus',
+                        value: (detail != null && detail.namaBus.isNotEmpty)
+                            ? detail.namaBus
+                            : 'Belum ada bus',
+                      ),
+                      const _SProfDivider(),
+                      _SProfRow(
+                        icon: Icons.route_outlined,
+                        label: 'Rute',
+                        value: (detail != null && detail.namaRute.isNotEmpty)
+                            ? detail.namaRute
+                            : '-',
+                      ),
+                      const _SProfDivider(),
+                      _SProfRow(
+                        icon: Icons.place_outlined,
+                        label: 'Halte Naik',
+                        value: (detail != null && detail.namaHalte.isNotEmpty)
+                            ? detail.namaHalte
+                            : '-',
+                      ),
+                      const _SProfDivider(),
+                      _SProfRowStatus(
+                          status:
+                              detail?.approvalStatus ?? ApprovalStatus.pending),
+                    ]),
+
+                    const SizedBox(height: 20),
+
+                    // ── Manajemen ──────────────────────────────
+                    const _SProfLabel(label: 'Pengaturan'),
+                    const SizedBox(height: 10),
+                    _SProfMenuCard(
+                      icon: Icons.edit_outlined,
+                      title: 'Edit Data Pribadi',
+                      subtitle: 'Ubah nama, nomor HP, dan alamat',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => EditProfileScreen(user: siswa)),
+                      ).then((_) {
+                        if (mounted) setState(() {});
+                      }),
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Keluar ─────────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _showLogoutDialog,
+                        icon: const Icon(Icons.logout_rounded,
+                            color: AppColors.red, size: 18),
+                        label: const Text('Keluar dari Akun',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.red)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                              color: AppColors.red, width: 1.2),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
-              child: widget.siswa.photoUrl == null
-                  ? Center(
-                      child: Text(widget.siswa.namaLengkap[0].toUpperCase(),
-                          style: const TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 32,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary)))
-                  : null,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Header ────────────────────────────────────────────────
+  Widget _buildHeader(UserModel siswa, StudentDetail? detail, String initial) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Column(children: [
+        // Avatar
+        Container(
+          width: 88,
+          height: 88,
+          decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3)),
+          child: ClipOval(
+            child: siswa.photoUrl != null
+                ? Image.network(siswa.photoUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        _SProfAvatar(initial: initial))
+                : _SProfAvatar(initial: initial),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Nama
+        Text(siswa.namaLengkap,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white)),
+        const SizedBox(height: 6),
+        // Chip role
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(20)),
+          child: const Text(
+            'Siswa',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 6),
+        // Status akun
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.4), width: 0.8)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.verified_outlined, size: 13, color: Colors.white),
+            const SizedBox(width: 4),
+            Text(
+              siswa.status == AccountStatus.active
+                  ? 'Akun Aktif'
+                  : 'Akun Non-aktif',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white),
             ),
-            const SizedBox(height: 12),
-            Text(widget.siswa.namaLengkap,
-                style: const TextStyle(
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  // ── NIS badge melayang ────────────────────────────────────
+  Widget _buildNisBadge(StudentDetail detail) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      transform: Matrix4.translationValues(0, -18, 0),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 12,
+                offset: const Offset(0, 4))
+          ]),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(children: [
+        Expanded(
+            child: _SProfStatItem(
+          icon: Icons.badge_outlined,
+          value: detail.nis.isNotEmpty ? detail.nis : '-',
+          label: 'NIS',
+          color: AppColors.primary,
+        )),
+        Container(width: 1, height: 40, color: AppColors.lightGrey),
+        Expanded(
+            child: _SProfStatItem(
+          icon: Icons.directions_bus_outlined,
+          value: detail.namaBus.isNotEmpty ? detail.namaBus : '-',
+          label: 'Bus',
+          color: AppColors.blue,
+        )),
+        Container(width: 1, height: 40, color: AppColors.lightGrey),
+        Expanded(
+            child: _SProfStatItem(
+          icon: Icons.place_outlined,
+          value: detail.namaHalte.isNotEmpty ? detail.namaHalte : '-',
+          label: 'Halte',
+          color: AppColors.pendingOrange,
+        )),
+      ]),
+    );
+  }
+}
+
+// ── Profile sub-widgets (prefix _SProf agar tidak bentrok) ────
+
+class _SProfAvatar extends StatelessWidget {
+  final String initial;
+  const _SProfAvatar({required this.initial});
+  @override
+  Widget build(BuildContext context) => Container(
+        color: AppColors.primaryLight,
+        child: Center(
+          child: Text(initial,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 36,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary)),
+        ),
+      );
+}
+
+class _SProfStatItem extends StatelessWidget {
+  final IconData icon;
+  final String value, label;
+  final Color color;
+  const _SProfStatItem(
+      {required this.icon,
+      required this.value,
+      required this.label,
+      required this.color});
+  @override
+  Widget build(BuildContext context) => Column(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(value,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color)),
+        Text(label,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                color: AppColors.textGrey)),
+      ]);
+}
+
+class _SProfLabel extends StatelessWidget {
+  final String label;
+  const _SProfLabel({required this.label});
+  @override
+  Widget build(BuildContext context) => Text(label,
+      style: const TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.black));
+}
+
+class _SProfCard extends StatelessWidget {
+  final List<Widget> children;
+  const _SProfCard({required this.children});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4))
+            ]),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(children: children),
+      );
+}
+
+class _SProfRow extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  final int maxLines;
+  const _SProfRow(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      this.maxLines = 1});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                borderRadius: BorderRadius.circular(9)),
+            child: Icon(icon, color: AppColors.primary, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textGrey,
+                      letterSpacing: 0.3)),
+              const SizedBox(height: 1),
+              Text(value,
+                  maxLines: maxLines,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.black)),
+            ]),
+          ),
+        ]),
+      );
+}
+
+class _SProfRowStatus extends StatelessWidget {
+  final ApprovalStatus status;
+  const _SProfRowStatus({required this.status});
+  @override
+  Widget build(BuildContext context) {
+    final isApproved = status == ApprovalStatus.approved;
+    final isPending = status == ApprovalStatus.pending;
+    final color = isApproved
+        ? AppColors.primary
+        : isPending
+            ? AppColors.pendingOrange
+            : AppColors.red;
+    final bg = isApproved
+        ? AppColors.primaryLight
+        : isPending
+            ? AppColors.orange.withValues(alpha: 0.1)
+            : AppColors.red.withValues(alpha: 0.08);
+    final label = isApproved
+        ? 'Disetujui'
+        : isPending
+            ? 'Menunggu Persetujuan'
+            : 'Ditolak';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(9)),
+          child: const Icon(Icons.verified_user_outlined,
+              color: AppColors.primary, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Status Pendaftaran',
+                style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.black)),
-            const SizedBox(height: 4),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textGrey,
+                    letterSpacing: 0.3)),
+            const SizedBox(height: 2),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(20)),
-              child: const Text('Siswa',
+                  color: bg, borderRadius: BorderRadius.circular(8)),
+              child: Text(label,
                   style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.primary)),
+                      color: color)),
             ),
-            const SizedBox(height: 24),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 10)
-                  ]),
-              child: Column(children: [
-                _InfoRow(
-                    icon: Icons.email_outlined,
-                    label: 'Email',
-                    value: widget.siswa.email),
-                const Divider(color: AppColors.lightGrey, height: 20),
-                _InfoRow(
-                    icon: Icons.phone_outlined,
-                    label: 'No. HP',
-                    value: widget.siswa.noHp.isEmpty ? '-' : widget.siswa.noHp),
-                const Divider(color: AppColors.lightGrey, height: 20),
-                _InfoRow(
-                    icon: Icons.location_on_outlined,
-                    label: 'Alamat',
-                    value: widget.siswa.alamat.isEmpty
-                        ? '-'
-                        : widget.siswa.alamat),
-              ]),
-            ),
-            const SizedBox(height: 14),
-            _ProfileMenu(
-                icon: Icons.edit_outlined,
-                label: 'Edit Profil',
-                onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) =>
-                                    EditProfileScreen(user: widget.siswa)))
-                        .then((_) {
-                      if (mounted) setState(() {});
-                    })),
-            _ProfileMenu(
-                icon: Icons.logout_rounded,
-                label: 'Keluar',
-                color: AppColors.red,
-                onTap: () {
-                  context.read<AuthProvider>().logout();
-                  Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (_) => false);
-                }),
-            const SizedBox(height: 20),
           ]),
         ),
-      ), // SafeArea
-    ); // ColoredBox
+      ]),
+    );
   }
 }
 
+class _SProfDivider extends StatelessWidget {
+  const _SProfDivider();
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(color: AppColors.lightGrey, height: 1);
+}
+
+class _SProfQrCard extends StatelessWidget {
+  final UserModel siswa;
+  final VoidCallback onTap;
+  const _SProfQrCard({required this.siswa, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = siswa.status == AccountStatus.active;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4))
+          ],
+        ),
+        child: Row(children: [
+          // Panel kiri — hijau dengan ikon QR
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.primary : AppColors.surface2,
+              borderRadius:
+                  const BorderRadius.horizontal(left: Radius.circular(16)),
+            ),
+            child: Icon(
+              Icons.qr_code_2_rounded,
+              size: 40,
+              color: isActive ? Colors.white : AppColors.textGrey,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Buka QR Code',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.black),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isActive
+                      ? 'Tunjukkan ke driver saat naik bus'
+                      : 'Akun belum aktif',
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 11,
+                      color: AppColors.textGrey),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color:
+                        isActive ? AppColors.primaryLight : AppColors.surface2,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    isActive ? 'Aktif · Berlaku hari ini' : 'Tidak aktif',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color:
+                            isActive ? AppColors.primary : AppColors.textGrey),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(right: 14),
+            child: Icon(Icons.chevron_right_rounded,
+                color: AppColors.textGrey, size: 20),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SProfMenuCard extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final VoidCallback onTap;
+  const _SProfMenuCard(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
+              ]),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.black)),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: AppColors.textGrey)),
+                ])),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textGrey, size: 20),
+          ]),
+        ),
+      );
+}
 // ══════════════════════════════════════════════════════════════
 // SHARED WIDGETS
 // ══════════════════════════════════════════════════════════════

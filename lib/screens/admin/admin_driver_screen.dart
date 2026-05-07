@@ -794,73 +794,129 @@ class _DriverCard extends StatelessWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Center(child: Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: AppColors.lightGrey,
-                  borderRadius: BorderRadius.circular(2)))),
+          Center(
+              child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: AppColors.lightGrey,
+                      borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 20),
           Row(children: [
-            Container(width: 52, height: 52,
+            Container(
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                   color: isActive ? AppColors.primaryLight : AppColors.surface2,
                   shape: BoxShape.circle),
-              child: Center(child: Text(
-                driver.namaLengkap.isNotEmpty ? driver.namaLengkap[0].toUpperCase() : '?',
-                style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700,
-                    fontSize: 22, color: isActive ? AppColors.primary : AppColors.textGrey),
+              child: Center(
+                  child: Text(
+                driver.namaLengkap.isNotEmpty
+                    ? driver.namaLengkap[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
+                    color: isActive ? AppColors.primary : AppColors.textGrey),
               )),
             ),
             const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(driver.namaLengkap, style: const TextStyle(fontFamily: 'Poppins',
-                  fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.black)),
-              Text(driver.email, style: const TextStyle(fontFamily: 'Poppins',
-                  fontSize: 12, color: AppColors.textGrey)),
-            ])),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(driver.namaLengkap,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.black)),
+                  Text(driver.email,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: AppColors.textGrey)),
+                ])),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                   color: isActive ? AppColors.primaryLight : AppColors.surface2,
                   borderRadius: BorderRadius.circular(8)),
               child: Text(isActive ? 'Aktif' : 'Nonaktif',
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w600,
-                      color: isActive ? AppColors.primary : AppColors.textGrey)),
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isActive ? AppColors.primary : AppColors.textGrey)),
             ),
           ]),
           const SizedBox(height: 20),
           const Divider(color: AppColors.lightGrey),
           const SizedBox(height: 12),
-          _DetailRow(icon: Icons.badge_rounded, label: 'NIK',
+          _DetailRow(
+              icon: Icons.badge_rounded,
+              label: 'NIK',
               value: driver.driverDetail?.nik ?? '-'),
           const SizedBox(height: 10),
-          _DetailRow(icon: Icons.phone_rounded, label: 'No. HP',
+          _DetailRow(
+              icon: Icons.phone_rounded,
+              label: 'No. HP',
               value: driver.noHp.isNotEmpty ? driver.noHp : 'Belum diisi'),
           const SizedBox(height: 10),
-          _DetailRow(icon: Icons.location_on_rounded, label: 'Alamat',
+          _DetailRow(
+              icon: Icons.location_on_rounded,
+              label: 'Alamat',
               value: driver.alamat.isNotEmpty ? driver.alamat : 'Belum diisi'),
           const SizedBox(height: 10),
-          _DetailRow(icon: Icons.directions_bus_rounded, label: 'Bus',
-              value: bus != null ? '${bus.nama} · ${bus.platNomor}' : 'Belum ditugaskan'),
+          _DetailRow(
+              icon: Icons.directions_bus_rounded,
+              label: 'Bus',
+              value: bus != null
+                  ? '${bus.nama} · ${bus.platNomor}'
+                  : 'Belum ditugaskan'),
           const SizedBox(height: 20),
           Row(children: [
-            Expanded(child: OutlinedButton.icon(
-              icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.red),
-              label: const Text('Hapus', style: TextStyle(fontFamily: 'Poppins',
-                  fontSize: 13, color: AppColors.red)),
-              onPressed: () { Navigator.pop(ctx); onDelete(); },
+            Expanded(
+                child: OutlinedButton.icon(
+              icon: const Icon(Icons.delete_outline_rounded,
+                  size: 16, color: AppColors.red),
+              label: const Text('Hapus',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      color: AppColors.red)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                onDelete();
+              },
               style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.red),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             )),
             const SizedBox(width: 10),
-            Expanded(child: ElevatedButton.icon(
-              icon: const Icon(Icons.edit_rounded, size: 16, color: Colors.white),
-              label: const Text('Edit Data', style: TextStyle(fontFamily: 'Poppins',
-                  fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
-              onPressed: () { Navigator.pop(ctx); onEdit(); },
+            Expanded(
+                child: ElevatedButton.icon(
+              icon:
+                  const Icon(Icons.edit_rounded, size: 16, color: Colors.white),
+              label: const Text('Edit Data',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white)),
+              onPressed: () {
+                Navigator.pop(ctx);
+                onEdit();
+              },
               style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary, elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: AppColors.primary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             )),
           ]),
@@ -872,16 +928,29 @@ class _DriverCard extends StatelessWidget {
 }
 
 class _DetailRow extends StatelessWidget {
-  final IconData icon; final String label; final String value;
-  const _DetailRow({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DetailRow(
+      {required this.icon, required this.label, required this.value});
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Icon(icon, size: 16, color: AppColors.textGrey),
-    const SizedBox(width: 10),
-    SizedBox(width: 60, child: Text(label, style: const TextStyle(fontFamily: 'Poppins',
-        fontSize: 12, color: AppColors.textGrey))),
-    Expanded(child: Text(value, style: const TextStyle(fontFamily: 'Poppins',
-        fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.black))),
-  ]);
+  Widget build(BuildContext context) =>
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 16, color: AppColors.textGrey),
+        const SizedBox(width: 10),
+        SizedBox(
+            width: 60,
+            child: Text(label,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    color: AppColors.textGrey))),
+        Expanded(
+            child: Text(value,
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.black))),
+      ]);
 }
