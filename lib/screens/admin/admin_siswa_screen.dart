@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import '../../models/models_api.dart';
 import '../../services/app_data_service.dart';
@@ -784,14 +785,14 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
                     color: sel
-                        ? (label == 'Belum Bus'
+                        ? (label == 'Belum ada Bus'
                             ? AppColors.orange
                             : AppColors.primary)
                         : AppColors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                         color: sel
-                            ? (label == 'Belum Bus'
+                            ? (label == 'Belum ada Bus'
                                 ? AppColors.orange
                                 : AppColors.primary)
                             : AppColors.lightGrey),
@@ -824,7 +825,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                 if (_filter == 'Nonaktif')
                   return u.status != AccountStatus.active &&
                       u.status != AccountStatus.pending;
-                if (_filter == 'Belum Bus') {
+                if (_filter == 'Belum ada Bus') {
                   // Siswa aktif tapi belum punya bus assignment
                   return u.status == AccountStatus.active &&
                       (u.studentDetail?.busId ?? 0) == 0;
@@ -838,14 +839,14 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                       Icon(
-                          _filter == 'Belum Bus'
+                          _filter == 'Belum ada Bus'
                               ? Icons.directions_bus_outlined
                               : Icons.school_outlined,
                           size: 56,
                           color: AppColors.primary.withValues(alpha: 0.3)),
                       const SizedBox(height: 12),
                       Text(
-                          _filter == 'Belum Bus'
+                          _filter == 'Belum ada Bus'
                               ? 'Semua siswa sudah punya bus 🎉'
                               : 'Tidak ada siswa ditemukan',
                           style: const TextStyle(
@@ -867,6 +868,56 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
           ),
         ),
       ]),
+    );
+  }
+}
+
+// Avatar siswa: tampilkan foto jika ada, fallback ke inisial
+class _SiswaAvatar extends StatelessWidget {
+  final UserModel siswa;
+  const _SiswaAvatar({required this.siswa});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = siswa.photoUrl != null && siswa.photoUrl!.isNotEmpty;
+    final initials =
+        siswa.namaLengkap.isNotEmpty ? siswa.namaLengkap[0].toUpperCase() : '?';
+
+    Widget fallback = Container(
+      color: AppColors.primaryLight,
+      child: Center(
+        child: Text(initials,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                fontSize: 18)),
+      ),
+    );
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primaryLight,
+        border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.2), width: 1.5),
+      ),
+      child: ClipOval(
+        child: hasPhoto
+            ? CachedNetworkImage(
+                imageUrl: siswa.photoUrl!,
+                fit: BoxFit.cover,
+                httpHeaders: const {
+                  'ngrok-skip-browser-warning': 'true',
+                  'User-Agent': 'Mobitra-App/1.0',
+                },
+                placeholder: (_, __) => fallback,
+                errorWidget: (_, __, ___) => fallback,
+              )
+            : fallback,
+      ),
     );
   }
 }
@@ -923,15 +974,7 @@ class _SiswaCard extends StatelessWidget {
           ]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.primaryLight,
-              child: Text(siswa.namaLengkap[0].toUpperCase(),
-                  style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                      fontSize: 18))),
+          _SiswaAvatar(siswa: siswa),
           const SizedBox(width: 12),
           Expanded(
               child: Column(
