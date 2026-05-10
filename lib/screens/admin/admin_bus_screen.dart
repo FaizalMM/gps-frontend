@@ -1247,7 +1247,9 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                                         if (rh.halte?.alamat
                                                                 .isNotEmpty ==
                                                             true)
-                                                          Text(rh.halte!.alamat,
+                                                          Text(
+                                                              rh.halte?.alamat ??
+                                                                  '',
                                                               maxLines: 1,
                                                               overflow:
                                                                   TextOverflow

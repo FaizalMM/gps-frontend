@@ -596,5 +596,4 @@ class AppDataService {
 
   void deleteHalteLocal(String halteId) =>
       _haltes.removeWhere((h) => h.idStr == halteId);
-  LaporanPerjalanan? getLaporanByDriver(String driverId) => null;
 }

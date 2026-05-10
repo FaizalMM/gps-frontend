@@ -564,7 +564,7 @@ class _BusOfflineCard extends StatelessWidget {
             decoration: BoxDecoration(
                 color: AppColors.surface2,
                 borderRadius: BorderRadius.circular(10)),
-            child: Column(children: const [
+            child: const Column(children: [
               Text('ETA',
                   style: TextStyle(
                       fontFamily: 'Poppins',
@@ -592,7 +592,7 @@ class _BusOfflineCard extends StatelessWidget {
             Container(
               width: 34,
               height: 34,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                   color: AppColors.primaryLight, shape: BoxShape.circle),
               child: Center(
                 child: Text(
@@ -648,8 +648,8 @@ class _WaitingBanner extends StatelessWidget {
         Container(
           width: 52,
           height: 52,
-          decoration:
-              BoxDecoration(color: AppColors.white, shape: BoxShape.circle),
+          decoration: const BoxDecoration(
+              color: AppColors.white, shape: BoxShape.circle),
           child: const Icon(Icons.gps_off_rounded,
               size: 26, color: AppColors.orange),
         ),
@@ -678,7 +678,7 @@ class _WaitingBanner extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
           ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: const [
+          child: const Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.info_outline_rounded,
                 size: 14, color: AppColors.primary),
             SizedBox(width: 8),

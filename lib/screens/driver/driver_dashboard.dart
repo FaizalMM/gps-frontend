@@ -11,7 +11,6 @@ import '../../services/routing_service.dart';
 import '../../services/bus_service.dart';
 import '../../services/domain_services.dart';
 import '../../services/api_client.dart';
-import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/bus_map_widget.dart';
@@ -344,6 +343,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
         });
         if (pos != null) await _initNavigation(pos);
       } else {
+        if (!mounted) return;
         setState(() {
           _gpsLoading = false;
           _gpsError =
@@ -352,6 +352,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
       }
     } else {
       _gpsService.stopTracking();
+      if (!mounted) return;
       setState(() {
         _gpsActive = false;
         _gpsLoading = false;
@@ -2373,6 +2374,7 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
   Future<void> _load() async {
     final bus = widget.bus;
     if (bus == null) {
+      if (!mounted) return;
       setState(() {
         _error = 'Bus belum ditugaskan ke akun driver ini.';
         _loading = false;
