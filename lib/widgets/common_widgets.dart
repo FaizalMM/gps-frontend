@@ -6,16 +6,12 @@ class MobitraAppBar extends StatelessWidget {
   final String? name;
   final VoidCallback? onNotification;
   final VoidCallback? onProfile;
-  // Jika > 0 tampilkan titik merah pada lonceng (khusus admin).
-  // Jika null, lonceng tidak ditampilkan sama sekali (driver/siswa).
-  final int? pendingCount;
 
   const MobitraAppBar({
     super.key,
     this.name,
     this.onNotification,
     this.onProfile,
-    this.pendingCount,
   });
 
   @override
@@ -25,7 +21,7 @@ class MobitraAppBar extends StatelessWidget {
       child: Row(
         children: [
           Image.asset(
-            'assets/images/Logo1.png',
+            'assets/images/logo.png',
             width: 40,
             height: 40,
             fit: BoxFit.contain,
@@ -41,44 +37,38 @@ class MobitraAppBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // Lonceng hanya muncul jika pendingCount != null (admin saja)
-          if (pendingCount != null) ...[
-            IconButton(
-              onPressed: onNotification ?? () {},
-              icon: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.notifications_outlined,
-                      color: AppColors.primary,
-                      size: 22,
+          IconButton(
+            onPressed: onNotification ?? () {},
+            icon: Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.notifications_outlined,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
+                ),
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.red,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  // Titik merah hanya muncul jika ada pending
-                  if (pendingCount! > 0)
-                    Positioned(
-                      right: 6,
-                      top: 6,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: AppColors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(width: 4),
-          ],
+          ),
+          const SizedBox(width: 4),
           InkWell(
             onTap: onProfile ?? () {},
             child: Container(

@@ -18,9 +18,16 @@ class AdminSiswaScreen extends StatefulWidget {
 
 class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
   String _search = '';
-  String _filter = 'Semua'; // Semua / Aktif / Nonaktif
+  String _filter = 'Semua';
 
-  // ── Geocoding & jarak (sama persis seperti di admin_pending_screen) ───────
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.dataService.loadStudents();
+    });
+  }
+
   Future<Map<String, double>?> _geocodeAlamat(String alamat) async {
     try {
       final query =
@@ -116,14 +123,12 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     }
   }
 
-  // ── Assign / Re-assign bus untuk siswa yang sudah approved ───────────────
   void _showAssignBusSheet(UserModel user) {
     final buses = widget.dataService.buses
         .where((b) => b.status == BusStatus.active)
         .toList();
     final allHaltes = widget.dataService.haltes;
 
-    // Cek bus yang sudah di-assign ke siswa ini (jika ada)
     final currentBusId = user.studentDetail?.busId ?? 0;
     final currentHalteId = user.studentDetail?.halteId ?? 0;
 
@@ -169,7 +174,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
               ? user.studentDetail!.alamat
               : user.alamat;
 
-          // Auto-geocode saat sheet buka
           if (!isGeocoding && siswaCoords == null && alamat.isNotEmpty) {
             isGeocoding = true;
             _geocodeAlamat(alamat).then((coords) {
@@ -209,7 +213,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Handle bar
                     Center(
                         child: Container(
                             width: 40,
@@ -218,8 +221,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 color: AppColors.lightGrey,
                                 borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 20),
-
-                    // Header
                     Row(children: [
                       Container(
                         width: 44,
@@ -264,8 +265,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                           ])),
                     ]),
                     const SizedBox(height: 12),
-
-                    // Kotak alamat + status geocoding
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -332,15 +331,12 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                           ]),
                     ),
                     const SizedBox(height: 20),
-
-                    // Pilih Bus
                     const Text('Pilih Bus / Rute',
                         style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 13,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 10),
-
                     if (buses.isEmpty)
                       Container(
                         padding: const EdgeInsets.all(14),
@@ -500,8 +496,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                         );
                       }),
                     const SizedBox(height: 16),
-
-                    // Pilih Halte
                     if (selectedBus != null) ...[
                       Row(children: [
                         const Expanded(
@@ -626,8 +620,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       }),
                       const SizedBox(height: 16),
                     ],
-
-                    // Tombol Simpan
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -718,7 +710,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             child: Container(color: AppColors.lightGrey, height: 0.5)),
       ),
       body: Column(children: [
-        // Info banner
         Container(
           color: AppColors.white,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -740,8 +731,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
           ),
         ),
         const SizedBox(height: 2),
-
-        // Search bar
         Container(
           color: AppColors.white,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -767,8 +756,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             ),
           ),
         ),
-
-        // Filter chips
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
           child: Row(
@@ -808,7 +795,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             );
           }).toList()),
         ),
-
         Expanded(
           child: StreamBuilder<List<UserModel>>(
             stream: widget.dataService.usersStream,
@@ -826,7 +812,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                   return u.status != AccountStatus.active &&
                       u.status != AccountStatus.pending;
                 if (_filter == 'Belum ada Bus') {
-                  // Siswa aktif tapi belum punya bus assignment
                   return u.status == AccountStatus.active &&
                       (u.studentDetail?.busId ?? 0) == 0;
                 }
@@ -872,7 +857,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
   }
 }
 
-// Avatar siswa: tampilkan foto jika ada, fallback ke inisial
 class _SiswaAvatar extends StatelessWidget {
   final UserModel siswa;
   const _SiswaAvatar({required this.siswa});
@@ -951,7 +935,6 @@ class _SiswaCard extends StatelessWidget {
             ? AppColors.orange.withValues(alpha: 0.1)
             : AppColors.lightGrey;
 
-    // Cek apakah siswa sudah punya bus
     final hasBus = (siswa.studentDetail?.busId ?? 0) > 0;
     final namaBus = siswa.studentDetail?.namaBus ?? '';
     final namaHalte = siswa.studentDetail?.namaHalte ?? '';
@@ -1012,7 +995,6 @@ class _SiswaCard extends StatelessWidget {
                             color: statusColor)),
                   ),
                   const SizedBox(width: 6),
-                  // Badge bus status
                   if (isActive)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1047,9 +1029,7 @@ class _SiswaCard extends StatelessWidget {
                 ]),
               ])),
           const SizedBox(width: 8),
-          // Tombol aksi
           Column(mainAxisSize: MainAxisSize.min, children: [
-            // Tombol assign/ganti bus — tampil untuk siswa aktif
             if (isActive) ...[
               _ActionBtn(
                 icon:
@@ -1088,8 +1068,6 @@ class _SiswaCard extends StatelessWidget {
                 tooltip: 'Hapus'),
           ]),
         ]),
-
-        // Info halte jika sudah ada bus
         if (hasBus && namaHalte.isNotEmpty) ...[
           const SizedBox(height: 8),
           Container(
@@ -1109,8 +1087,6 @@ class _SiswaCard extends StatelessWidget {
             ]),
           ),
         ],
-
-        // Warning jika aktif tapi belum ada bus
         if (isActive && !hasBus) ...[
           const SizedBox(height: 8),
           Container(
