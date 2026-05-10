@@ -11,6 +11,11 @@ import '../siswa/siswa_dashboard.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
+  // [FIX SPLASH LOGIN] Flag static di public class agar bisa diakses
+  // dari LoginScreen saat user login manual — set true setelah login sukses
+  // sehingga SplashScreen tidak tampil lagi saat Android resume activity.
+  static bool hasNavigated = false;
+
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -22,6 +27,9 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _busAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+
+  // [FIX SPLASH] Pakai flag dari SplashScreen (public) agar bisa di-set
+  // dari LoginScreen juga — mencegah splash muncul saat resume/login.
 
   @override
   void initState() {
@@ -48,33 +56,20 @@ class _SplashScreenState extends State<SplashScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut));
 
+    // [FIX SPLASH] Jika sudah pernah navigasi (resume dari background,
+    // atau user sudah login manual), langsung navigasi tanpa animasi splash.
+    if (SplashScreen.hasNavigated) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
+      return;
+    }
+
     _busController.forward();
     Future.delayed(const Duration(milliseconds: 400), () {
       _fadeController.forward();
     });
 
     Future.delayed(const Duration(milliseconds: 2000), () async {
-      if (!mounted) return;
-      final auth = context.read<AuthProvider>();
-      final autoLogin = await auth.tryAutoLogin();
-      if (!mounted) return;
-      Widget next;
-      if (autoLogin && auth.currentUser != null) {
-        switch (auth.currentUser!.role) {
-          case UserRole.admin:
-            next = const AdminDashboard();
-            break;
-          case UserRole.driver:
-            next = const DriverDashboard();
-            break;
-          default:
-            next = const SiswaDashboard();
-        }
-      } else {
-        next = const LoginScreen();
-      }
-      Navigator.of(context)
-          .pushReplacement(MaterialPageRoute(builder: (_) => next));
+      await _navigate();
     });
   }
 
@@ -83,6 +78,33 @@ class _SplashScreenState extends State<SplashScreen>
     _busController.dispose();
     _fadeController.dispose();
     super.dispose();
+  }
+
+  // [FIX BUG 3] Pisahkan logika navigasi ke method sendiri
+  Future<void> _navigate() async {
+    if (!mounted) return;
+    final auth = context.read<AuthProvider>();
+    final autoLogin = await auth.tryAutoLogin();
+    if (!mounted) return;
+    Widget next;
+    if (autoLogin && auth.currentUser != null) {
+      switch (auth.currentUser!.role) {
+        case UserRole.admin:
+          next = const AdminDashboard();
+          break;
+        case UserRole.driver:
+          next = const DriverDashboard();
+          break;
+        default:
+          next = const SiswaDashboard();
+      }
+    } else {
+      next = const LoginScreen();
+    }
+    // Tandai sudah navigasi agar resume berikutnya tidak tampil splash
+    SplashScreen.hasNavigated = true;
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => next));
   }
 
   @override

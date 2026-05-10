@@ -2,26 +2,18 @@ import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import '../models/models_api.dart';
 
+// ============================================================
+// StudentService
+// ============================================================
 class StudentService {
   final _api = ApiClient();
 
   Future<List<UserModel>> getStudents() async {
-    final List<UserModel> all = [];
-    int page = 1;
-    while (true) {
-      final res = await _api.get('/students?page=$page&per_page=1000');
-      if (!res.success || res.data == null) break;
-      final raw = res.data!['data'];
-      final list = raw is List ? raw : (raw?['data'] as List? ?? []);
-      final parsed = _parseStudentList(list);
-      all.addAll(parsed);
-
-      final pagination = res.data!['pagination'] as Map<String, dynamic>?;
-      final lastPage = pagination?['last_page'] as int? ?? 1;
-      if (page >= lastPage) break;
-      page++;
-    }
-    return all;
+    final res = await _api.get('/students');
+    if (!res.success || res.data == null) return [];
+    final raw = res.data!['data'];
+    final list = raw is List ? raw : (raw?['data'] as List? ?? []);
+    return _parseStudentList(list);
   }
 
   Future<({List<UserModel> students, int statusCode})>
@@ -38,8 +30,9 @@ class StudentService {
   List<UserModel> _parseStudentList(List list) {
     return list.map((e) {
       final json = e as Map<String, dynamic>;
-
+      // BE returns student with user nested, or user with student nested
       if (json['user'] != null) {
+        // student record → wrap as user
         final userJson = json['user'] as Map<String, dynamic>;
         return UserModel.fromJson({
           ...userJson,
@@ -50,11 +43,14 @@ class StudentService {
     }).toList();
   }
 
+  /// Approve siswa dan return students.id dari response backend.
+  /// Mengirim userId (users.id) ke endpoint, backend cari by user_id.
+  /// Return: students.id jika berhasil, null jika gagal.
   Future<int?> approveStudent(int userId) async {
     final res = await _api.post('/students/$userId/approve', {});
     if (!res.success) return null;
     final data = res.data?['data'] as Map<String, dynamic>?;
-
+    // Backend return student object → ambil students.id
     return data?['id'] as int?;
   }
 
@@ -85,6 +81,7 @@ class StudentService {
     return res.success;
   }
 
+  // Siswa: get profil sendiri
   Future<UserModel?> getMyProfile() async {
     final res = await _api.get('/student/profile');
     if (!res.success || res.data == null) return null;
@@ -93,6 +90,7 @@ class StudentService {
     return UserModel.fromJson(d as Map<String, dynamic>);
   }
 
+  // Siswa: generate QR code check-in
   Future<Map<String, dynamic>?> generateQrCode({
     required double latitude,
     required double longitude,
@@ -102,6 +100,7 @@ class StudentService {
       'longitude': longitude,
     });
     if (!res.success) {
+      // Kembalikan map khusus berisi pesan error agar UI bisa tampilkan detail
       return {
         '__error':
             res.message.isNotEmpty ? res.message : 'Gagal generate QR Code'
@@ -110,7 +109,10 @@ class StudentService {
     return res.data!['data'] as Map<String, dynamic>?;
   }
 
+  /// Ambil status absensi siswa hari ini (sudah naik / belum / sudah turun)
   Future<Map<String, dynamic>?> getMyAttendanceToday(int studentId) async {
+    // Pakai endpoint baru /student/attendance/today (tanpa ID di URL)
+    // agar tidak kena 403 karena /students/{id}/attendance/today hanya untuk admin
     final res = await _api.get('/student/attendance/today');
     if (!res.success || res.data == null) return null;
     final data = res.data!['data'];
@@ -118,6 +120,7 @@ class StudentService {
     return data as Map<String, dynamic>;
   }
 
+  // Siswa: get info bus yang di-assign
   Future<Map<String, dynamic>?> getMyBus() async {
     final res = await _api.get('/student/bus');
     if (!res.success || res.data == null) return null;
@@ -125,39 +128,31 @@ class StudentService {
   }
 }
 
+// ============================================================
+// DriverService
+// ============================================================
 class DriverService {
   final _api = ApiClient();
 
   Future<List<UserModel>> getDrivers() async {
-    final List<UserModel> all = [];
-    int page = 1;
-    while (true) {
-      final res = await _api.get('/drivers?page=$page&per_page=1000');
-      if (!res.success || res.data == null) break;
-      final raw = res.data!['data'];
-      final list = raw is List ? raw : (raw?['data'] as List? ?? []);
-      final parsed = list.map((e) {
-        final json = e as Map<String, dynamic>;
-        if (json['user'] != null) {
-          final userJson =
-              Map<String, dynamic>.from(json['user'] as Map<String, dynamic>);
-          final driverJson = Map<String, dynamic>.from(json);
-          return UserModel.fromJson({
-            ...userJson,
-            'role': 'driver',
-            'driver': driverJson,
-          });
-        }
-        return UserModel.fromJson({...json, 'role': 'driver'});
-      }).toList();
-      all.addAll(parsed);
-
-      final pagination = res.data!['pagination'] as Map<String, dynamic>?;
-      final lastPage = pagination?['last_page'] as int? ?? 1;
-      if (page >= lastPage) break;
-      page++;
-    }
-    return all;
+    final res = await _api.get('/drivers');
+    if (!res.success || res.data == null) return [];
+    final raw = res.data!['data'];
+    final list = raw is List ? raw : (raw?['data'] as List? ?? []);
+    return list.map((e) {
+      final json = e as Map<String, dynamic>;
+      if (json['user'] != null) {
+        final userJson =
+            Map<String, dynamic>.from(json['user'] as Map<String, dynamic>);
+        final driverJson = Map<String, dynamic>.from(json);
+        return UserModel.fromJson({
+          ...userJson,
+          'role': 'driver',
+          'driver': driverJson,
+        });
+      }
+      return UserModel.fromJson({...json, 'role': 'driver'});
+    }).toList();
   }
 
   Future<bool> createDriver({
@@ -190,6 +185,7 @@ class DriverService {
     return res.success;
   }
 
+  // Driver: profil sendiri
   Future<UserModel?> getMyProfile() async {
     final res = await _api.get('/driver/profile');
     if (!res.success || res.data == null) return null;
@@ -198,24 +194,26 @@ class DriverService {
     return UserModel.fromJson(d as Map<String, dynamic>);
   }
 
+  // Driver: toggle GPS on/off
   Future<bool> toggleGps(String status) async {
     final res = await _api.patch('/driver/gps', {'gps_status': status});
     return res.success;
   }
 
+  // Driver: kirim koordinat GPS dengan data akurasi lengkap
   Future<bool> sendGpsLocation({
     required double latitude,
     required double longitude,
     required double speed,
     double? accuracy,
     double? heading,
-    int? deviceTimestamp,
+    int? deviceTimestamp, // epoch ms dari device
     String? deviceId,
   }) async {
     final body = <String, dynamic>{
       'latitude': latitude,
       'longitude': longitude,
-      'speed': speed < 0 ? 0 : speed,
+      'speed': speed < 0 ? 0 : speed, // filter speed negatif
       'device_timestamp':
           deviceTimestamp ?? DateTime.now().millisecondsSinceEpoch,
     };
@@ -226,6 +224,8 @@ class DriverService {
     return res.success;
   }
 
+  // Driver: scan QR siswa (check-in)
+  // Mengembalikan ScanQrResult — bisa sukses, rute tidak sesuai, atau error lain
   Future<ScanQrResult> scanStudentQr(
     Map<String, dynamic> qrData, {
     required double latitude,
@@ -248,6 +248,7 @@ class DriverService {
           AttendanceModel.fromJson(d as Map<String, dynamic>));
     }
 
+    // Cek apakah error karena rute tidak sesuai (403 + error_type)
     final body = res.data;
     if (res.statusCode == 403 &&
         body != null &&
@@ -258,6 +259,7 @@ class DriverService {
     return ScanQrResult.error(res.message);
   }
 
+  // Driver: checkout siswa
   Future<bool> checkoutStudent({
     required String qrId,
     required double latitude,
@@ -271,16 +273,21 @@ class DriverService {
     return res.success;
   }
 
+  /// Ambil daftar siswa yang sudah naik bus hari ini
+  /// Endpoint: GET /driver/buses/{busId}/attendance/today (driver route)
   Future<List<Map<String, dynamic>>> getBusAttendanceToday(int busId) async {
     final res = await _api.get('/driver/buses/$busId/attendance/today');
     if (!res.success || res.data == null) return [];
-
+    // PERBAIKAN BUG: backend responseSuccess membungkus dalam {success, data: {bus_id, data:[...]}}
+    // res.data!['data'] = {bus_id, bus_code, date, data:[...]} bukan List langsung
+    // sehingga raw is! List → selalu return [] → penumpang tidak pernah tampil
     final wrapper = res.data!['data'];
     final raw = wrapper is Map ? wrapper['data'] : wrapper;
     if (raw is! List) return [];
     return List<Map<String, dynamic>>.from(raw);
   }
 
+  // Driver: laporan harian
   Future<Map<String, dynamic>?> getDailyReport(int busId) async {
     final res = await _api.get('/driver/buses/$busId/report');
     if (!res.success || res.data == null) return null;
@@ -288,9 +295,13 @@ class DriverService {
   }
 }
 
+// ============================================================
+// HalteService
+// ============================================================
 class HalteService {
   final _api = ApiClient();
 
+  /// Ambil semua halte (tanpa paginasi)
   Future<List<HalteModel>> getHaltes() async {
     final res = await _api.get('/haltes', params: {'all': 'true'});
     if (!res.success || res.data == null) return [];
@@ -301,6 +312,7 @@ class HalteService {
         .toList();
   }
 
+  /// Cari halte berdasarkan nama/alamat
   Future<List<HalteModel>> searchHaltes(String query) async {
     final res = await _api.get('/haltes', params: {'q': query, 'all': 'true'});
     if (!res.success || res.data == null) return [];
@@ -311,6 +323,8 @@ class HalteService {
         .toList();
   }
 
+  /// Buat halte baru dan kembalikan HalteModel-nya
+  /// Return HalteModel dengan ID asli dari BE, atau null jika gagal
   Future<HalteModel?> createHalte({
     required String namaHalte,
     required double latitude,
@@ -351,6 +365,9 @@ class HalteService {
   }
 }
 
+// ============================================================
+// AttendanceService
+// ============================================================
 class AttendanceService {
   final _api = ApiClient();
 
@@ -370,9 +387,21 @@ class AttendanceService {
   }
 }
 
+// ============================================================
+// RouteService — CRUD rute bus + manajemen halte dalam rute
+// Endpoint BE: GET/POST/PUT/DELETE /buses/{id}/routes (via BusService)
+//              POST   /routes/{id}/haltes
+//              PUT    /route-haltes/{id}
+//              DELETE /route-haltes/{id}
+//              GET    /routes/{id}/haltes
+// ============================================================
 class RouteService {
   final _api = ApiClient();
 
+  // ── Rute ───────────────────────────────────────────────────────
+
+  /// Ambil semua rute untuk listing (tanpa polyline — ringan)
+  /// Untuk polyline lengkap gunakan getRoute(id) atau getRouteByBus(busId)
   Future<List<RouteModel>> getRoutes() async {
     final res = await _api.get('/routes');
     if (!res.success || res.data == null) return [];
@@ -388,6 +417,7 @@ class RouteService {
     }
   }
 
+  /// Ambil satu rute lengkap (dengan halte & polyline)
   Future<RouteModel?> getRoute(int routeId) async {
     final res = await _api.get('/routes/$routeId');
     if (!res.success || res.data == null) return null;
@@ -396,6 +426,7 @@ class RouteService {
     return RouteModel.fromJson(d as Map<String, dynamic>);
   }
 
+  /// Ambil rute untuk sebuah bus (digunakan siswa & driver)
   Future<RouteModel?> getRouteByBus(int busId) async {
     final res = await _api.get('/buses/$busId/route');
     if (!res.success || res.data == null) return null;
@@ -404,6 +435,8 @@ class RouteService {
     return RouteModel.fromJson(d as Map<String, dynamic>);
   }
 
+  /// Buat rute baru beserta urutan halte (admin)
+  /// [orderedHalteIds] = list id halte berurutan dari awal ke akhir
   Future<RouteModel?> createRoute({
     required int busId,
     required String namaRute,
@@ -430,6 +463,7 @@ class RouteService {
     return RouteModel.fromJson(d as Map<String, dynamic>);
   }
 
+  /// Update nama rute
   Future<bool> updateRoute(int routeId, {String? namaRute, int? busId}) async {
     final body = <String, dynamic>{};
     if (namaRute != null) body['nama_rute'] = namaRute;
@@ -438,11 +472,15 @@ class RouteService {
     return res.success;
   }
 
+  /// Hapus rute
   Future<bool> deleteRoute(int routeId) async {
     final res = await _api.delete('/routes/$routeId');
     return res.success;
   }
 
+  // ── Halte dalam Rute ──────────────────────────────────────────
+
+  /// Ambil halte dalam rute tertentu (sudah urut)
   Future<List<RouteHalteModel>> getHaltesByRoute(int routeId) async {
     final res = await _api.get('/routes/$routeId/haltes');
     if (!res.success || res.data == null) return [];
@@ -454,6 +492,7 @@ class RouteService {
       ..sort((a, b) => a.urutan.compareTo(b.urutan)));
   }
 
+  /// Tambah halte ke rute
   Future<bool> addHalteToRoute({
     required int routeId,
     required int halteId,
@@ -466,17 +505,22 @@ class RouteService {
     return res.success;
   }
 
+  /// Update urutan halte dalam rute
   Future<bool> updateRouteHalte(int routeHalteId, int urutan) async {
     final res =
         await _api.put('/route-haltes/$routeHalteId', {'urutan': urutan});
     return res.success;
   }
 
+  /// Hapus halte dari rute
   Future<bool> removeHalteFromRoute(int routeHalteId) async {
     final res = await _api.delete('/route-haltes/$routeHalteId');
     return res.success;
   }
 
+  // ── Polyline ──────────────────────────────────────────────────
+
+  /// Sync dari RouteBuilderScreen — simpan polyline + halte sekaligus
   Future<RouteModel?> syncRoute({
     required int routeId,
     required List<Map<String, double>> polyline,

@@ -147,7 +147,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 52,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -325,7 +325,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 52,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -1062,7 +1062,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                             const SizedBox(height: 20),
                             SizedBox(
                               width: double.infinity,
-                              height: 48,
+                              height: 52,
                               child: ElevatedButton.icon(
                                 icon: const Icon(Icons.add_road_rounded,
                                     size: 18),
@@ -1768,7 +1768,7 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
+                    height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,

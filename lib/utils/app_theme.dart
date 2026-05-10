@@ -125,7 +125,7 @@ ThemeData appTheme() {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
         elevation: 0,
         textStyle: AppTextStyles.button,
       ),

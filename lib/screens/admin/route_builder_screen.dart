@@ -250,7 +250,7 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
                 const SizedBox(height: 18),
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 52,
                   child: ElevatedButton.icon(
                     icon: const Icon(Icons.add_location_alt_rounded, size: 18),
                     label: const Text('Simpan & Tambah ke Rute',
@@ -777,7 +777,7 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
             child: SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 52,
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.check_circle_rounded, size: 20),
                 label: Text(

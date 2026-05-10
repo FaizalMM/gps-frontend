@@ -509,7 +509,7 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
                   // Tombol konfirmasi
                   SizedBox(
                     width: double.infinity,
-                    height: 50,
+                    height: 52,
                     child: ElevatedButton.icon(
                       onPressed: () => Navigator.pop(
                           context,

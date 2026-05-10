@@ -8,14 +8,23 @@ import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
+// ── Buka WhatsApp ────────────────────────────────────────────
+// Pastikan pubspec.yaml sudah ada: url_launcher: ^6.3.0
+// dan AndroidManifest.xml sudah ada <queries> untuk https
+// Contoh penggunaan setelah tambah url_launcher:
+//   import 'package:url_launcher/url_launcher.dart';
+//   launchUrl(uri, mode: LaunchMode.externalApplication);
 Future<void> _bukaWhatsApp(String noHp) async {
   String n = noHp.replaceAll(RegExp(r'[\s\-+]'), '');
   if (n.startsWith('0')) n = '62${n.substring(1)}';
   if (!n.startsWith('62')) n = '62$n';
-
+  // ignore: deprecated_member_use
+  // await launch('https://wa.me/$n');
+  // Sementara salin ke clipboard jika url_launcher belum ada
   await Clipboard.setData(ClipboardData(text: noHp));
 }
 
+// ══════════════════════════════════════════════════════════════
 class AdminDriverScreen extends StatefulWidget {
   final AppDataService dataService;
   const AdminDriverScreen({super.key, required this.dataService});
@@ -25,16 +34,8 @@ class AdminDriverScreen extends StatefulWidget {
 
 class _AdminDriverScreenState extends State<AdminDriverScreen> {
   final _searchCtrl = TextEditingController();
-  String _filterMode = 'semua';
+  String _filterMode = 'semua'; // semua | online | offline
   String _sortBy = 'name';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.dataService.loadDrivers();
-    });
-  }
 
   @override
   void dispose() {
@@ -42,11 +43,13 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     super.dispose();
   }
 
+  // ── Apakah driver sedang online (GPS aktif) ──────────────────
   bool _isOnline(UserModel d) {
     final bus = widget.dataService.getDriverBus(d.idStr);
     return bus?.gpsActive == true;
   }
 
+  // ── Filter & sort ─────────────────────────────────────────────
   List<UserModel> _filtered(List<UserModel> all) {
     var list = all.where((u) => u.role == UserRole.driver).toList();
 
@@ -73,6 +76,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     return list;
   }
 
+  // ── Snackbar ──────────────────────────────────────────────────
   void _snack(String msg, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -83,6 +87,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     ));
   }
 
+  // ── Hubungi driver via WA ─────────────────────────────────────
   void _hubungi(UserModel driver) {
     if (driver.noHp.isEmpty) {
       _snack('No. HP ${driver.namaLengkap} belum diisi', AppColors.red);
@@ -153,6 +158,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
+  // ── Dialog Tambah ─────────────────────────────────────────────
   void _showAdd() {
     final namaC = TextEditingController();
     final emailC = TextEditingController();
@@ -274,6 +280,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
+  // ── Dialog Edit ───────────────────────────────────────────────
   void _showEdit(UserModel driver) {
     final namaC = TextEditingController(text: driver.namaLengkap);
     final hpC = TextEditingController(text: driver.noHp);
@@ -372,6 +379,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
+  // ── Konfirmasi Hapus ──────────────────────────────────────────
   void _hapus(UserModel driver) {
     showDialog(
       context: context,
@@ -408,6 +416,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
+  // ── Sort sheet ────────────────────────────────────────────────
   void _showSort() {
     showModalBottomSheet(
       context: context,
@@ -429,6 +438,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
+  // ── BUILD ─────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -462,12 +472,16 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
 
           return Column(
             children: [
+              // ── LIST + header search/chips/sort ikut scroll ─
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.only(bottom: 90),
                   physics: const AlwaysScrollableScrollPhysics(),
+                  // index 0 = header (search+chips+sort), index 1..n = kartu driver
+                  // kalau kosong: 1 header + 1 pesan kosong = 2
                   itemCount: list.isEmpty ? 2 : list.length + 1,
                   itemBuilder: (_, i) {
+                    // Item 0: search + chips + sort
                     if (i == 0) {
                       return Container(
                         color: Colors.white,
@@ -475,6 +489,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Search bar
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                               child: Container(
@@ -516,6 +531,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
+                            // Filter chips
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 16),
@@ -550,6 +566,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                                 height: 0.5,
                                 thickness: 0.5,
                                 color: AppColors.lightGrey),
+                            // Sort bar
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                               child: Row(children: [
@@ -587,6 +604,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       );
                     }
 
+                    // Item 1 saat kosong: pesan kontekstual
                     if (list.isEmpty && i == 1) {
                       final isOnlineFilter = _filterMode == 'online';
                       return SizedBox(
@@ -630,6 +648,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       );
                     }
 
+                    // Item 1..n: kartu driver
                     final driverIndex = i - 1;
                     if (driverIndex < 0 || driverIndex >= list.length)
                       return const SizedBox.shrink();
@@ -663,6 +682,9 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// DRIVER CARD — tanpa rating, status GPS-based
+// ══════════════════════════════════════════════════════════════
 class _DriverCard extends StatelessWidget {
   final UserModel driver;
   final dynamic bus;
@@ -696,6 +718,7 @@ class _DriverCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ── BARIS ATAS ────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -706,6 +729,7 @@ class _DriverCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Nama
                         Text(driver.namaLengkap,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -715,6 +739,7 @@ class _DriverCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.black)),
                         const SizedBox(height: 2),
+                        // Bus
                         Row(children: [
                           Icon(Icons.directions_bus_rounded,
                               size: 11,
@@ -742,6 +767,7 @@ class _DriverCard extends StatelessWidget {
                           ),
                         ]),
                         const SizedBox(height: 2),
+                        // Foto indicator
                         Row(children: [
                           Icon(
                             hasPhoto
@@ -766,6 +792,7 @@ class _DriverCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  // Badge Online/Offline berdasarkan GPS
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -788,11 +815,14 @@ class _DriverCard extends StatelessWidget {
                   ),
                 ],
               ),
+
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: Divider(
                     height: 0.5, thickness: 0.5, color: AppColors.lightGrey),
               ),
+
+              // ── BARIS BAWAH: No HP + aksi ─────────────────
               Row(children: [
                 const Icon(Icons.phone_rounded,
                     size: 12, color: AppColors.textLight),
@@ -966,6 +996,10 @@ class _DriverCard extends StatelessWidget {
     );
   }
 }
+
+// ══════════════════════════════════════════════════════════════
+// WIDGET HELPERS
+// ══════════════════════════════════════════════════════════════
 
 class _Avatar extends StatelessWidget {
   final UserModel driver;

@@ -142,6 +142,7 @@ class _HomeTabState extends State<_HomeTab> {
           children: [
             // ── Header ──────────────────────────────────────
             MobitraAppBar(
+              pendingCount: widget.dataService.pendingUsers.length,
               onNotification: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -896,122 +897,471 @@ class _ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<_ProfileTab> {
+  void _showLogoutDialog(AuthProvider auth) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Keluar',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w700)),
+        content: const Text('Kamu yakin ingin keluar dari akun ini?',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              auth.logout();
+              Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (_) => false);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.red,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Keluar',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final user = auth.currentUser;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(22),
-              image: user?.photoUrl != null
-                  ? DecorationImage(
-                      image: NetworkImage(user!.photoUrl!), fit: BoxFit.cover)
-                  : null,
-            ),
-            child: user?.photoUrl == null
-                ? Center(
-                    child: Text(
-                        user?.namaLengkap.substring(0, 1).toUpperCase() ?? 'A',
-                        style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 34,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary)))
+    final ds = widget.dataService;
+
+    final initial = (user?.namaLengkap.isNotEmpty == true)
+        ? user!.namaLengkap[0].toUpperCase()
+        : 'A';
+
+    // stats dari dataService
+    final totalBus = ds.buses.length;
+    final totalSiswa = ds.siswaList.length;
+    final totalDriver = ds.drivers.length;
+    final totalPending = ds.pendingUsers.length;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header gelap / navy ──────────────────────────
+              _buildAdminHeader(user, initial),
+
+              // ── Stats cards ──────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _AProfLabel(label: 'Ringkasan Sistem'),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                          child: _AStatCard(
+                        value: '$totalBus',
+                        label: 'Bus',
+                        icon: Icons.directions_bus_rounded,
+                        color: AppColors.primary,
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _AStatCard(
+                        value: '$totalDriver',
+                        label: 'Driver',
+                        icon: Icons.badge_rounded,
+                        color: AppColors.blue,
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _AStatCard(
+                        value: '$totalSiswa',
+                        label: 'Siswa',
+                        icon: Icons.school_rounded,
+                        color: AppColors.purple,
+                      )),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _AStatCard(
+                        value: '$totalPending',
+                        label: 'Pending',
+                        icon: Icons.pending_actions_rounded,
+                        color: AppColors.pendingOrange,
+                      )),
+                    ]),
+
+                    const SizedBox(height: 24),
+
+                    // ── Data Pribadi ──────────────────────────
+                    const _AProfLabel(label: 'Data Pribadi'),
+                    const SizedBox(height: 10),
+                    _AProfCard(children: [
+                      _AProfRow(
+                        icon: Icons.email_outlined,
+                        label: 'Email',
+                        value:
+                            user?.email.isNotEmpty == true ? user!.email : '-',
+                      ),
+                      const _AProfDivider(),
+                      _AProfRow(
+                        icon: Icons.phone_outlined,
+                        label: 'No. HP',
+                        value: user?.noHp.isNotEmpty == true ? user!.noHp : '-',
+                      ),
+                      const _AProfDivider(),
+                      _AProfRow(
+                        icon: Icons.location_on_outlined,
+                        label: 'Alamat',
+                        value: user?.alamat.isNotEmpty == true
+                            ? user!.alamat
+                            : '-',
+                        maxLines: 2,
+                      ),
+                    ]),
+
+                    const SizedBox(height: 24),
+
+                    // ── Akun ──────────────────────────────────
+                    const _AProfLabel(label: 'Akun'),
+                    const SizedBox(height: 10),
+                    _AProfMenuCard(
+                      icon: Icons.edit_outlined,
+                      title: 'Edit Profil',
+                      subtitle: 'Ubah nama, nomor HP, dan alamat',
+                      onTap: () {
+                        if (user != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => EditProfileScreen(user: user)),
+                          ).then((_) {
+                            if (mounted) setState(() {});
+                          });
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showLogoutDialog(auth),
+                        icon: const Icon(Icons.logout_rounded,
+                            color: AppColors.red, size: 18),
+                        label: const Text('Keluar dari Akun',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.red)),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(
+                              color: AppColors.red, width: 1.2),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Header admin — kartu gelap dengan pola grid ──────────
+  Widget _buildAdminHeader(UserModel? user, String initial) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 32),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A2B1A),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+      ),
+      child: Column(children: [
+        // Avatar kotak rounded — berbeda dari driver/siswa yang bulat
+        Container(
+          width: 86,
+          height: 86,
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.primary, width: 2.5),
+            image: user?.photoUrl != null
+                ? DecorationImage(
+                    image: NetworkImage(user!.photoUrl!), fit: BoxFit.cover)
                 : null,
           ),
-          const SizedBox(height: 12),
-          Text(user?.namaLengkap ?? 'Admin',
-              style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.black)),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(20)),
-            child: const Text('Administrator',
+          child: user?.photoUrl == null
+              ? Center(
+                  child: Text(initial,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 34,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary)),
+                )
+              : null,
+        ),
+        const SizedBox(height: 14),
+        Text(user?.namaLengkap ?? 'Admin',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.white)),
+        const SizedBox(height: 6),
+        // Badge admin — berbeda bentuk dari driver/siswa
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.primary, width: 1.5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.shield_rounded, size: 12, color: AppColors.primary),
+            SizedBox(width: 5),
+            Text('Administrator',
                 style: TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary)),
-          ),
-          const SizedBox(height: 24),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3))
-                ]),
-            child: Column(children: [
-              _InfoRow(
-                  icon: Icons.email_outlined,
-                  label: 'Email',
-                  value: user?.email ?? '-'),
-              const Divider(color: AppColors.lightGrey, height: 20),
-              _InfoRow(
-                  icon: Icons.phone_outlined,
-                  label: 'No. HP',
-                  value:
-                      user?.noHp.isEmpty == true ? '-' : (user?.noHp ?? '-')),
-              const Divider(color: AppColors.lightGrey, height: 20),
-              _InfoRow(
-                  icon: Icons.location_on_outlined,
-                  label: 'Alamat',
-                  value: user?.alamat.isEmpty == true
-                      ? '-'
-                      : (user?.alamat ?? '-')),
-            ]),
-          ),
-          const SizedBox(height: 14),
-          _ProfileMenu(
-              icon: Icons.edit_outlined,
-              label: 'Edit Profil',
-              onTap: () {
-                if (user != null) {
-                  Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => EditProfileScreen(user: user)))
-                      .then((_) {
-                    if (mounted) setState(() {});
-                  });
-                }
-              }),
-          _ProfileMenu(
-              icon: Icons.logout_rounded,
-              label: 'Keluar',
-              color: AppColors.red,
-              onTap: () {
-                auth.logout();
-                Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (_) => false);
-              }),
-          const SizedBox(height: 20),
-        ]),
-      ),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    letterSpacing: 0.5)),
+          ]),
+        ),
+        const SizedBox(height: 6),
+        // Status
+        Text(
+          user?.status == AccountStatus.active
+              ? 'Akun Aktif'
+              : 'Akun Non-aktif',
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.55)),
+        ),
+      ]),
     );
   }
 }
 
+// ── Admin profile sub-widgets (prefix _AProf) ─────────────────
+
+class _AStatCard extends StatelessWidget {
+  final String value, label;
+  final IconData icon;
+  final Color color;
+  const _AStatCard(
+      {required this.value,
+      required this.label,
+      required this.icon,
+      required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3))
+        ],
+      ),
+      child: Column(children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(height: 6),
+        Text(value,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: color)),
+        Text(label,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                color: AppColors.textGrey)),
+      ]),
+    );
+  }
+}
+
+class _AProfLabel extends StatelessWidget {
+  final String label;
+  const _AProfLabel({required this.label});
+  @override
+  Widget build(BuildContext context) => Text(label,
+      style: const TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          color: AppColors.black));
+}
+
+class _AProfCard extends StatelessWidget {
+  final List<Widget> children;
+  const _AProfCard({required this.children});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4))
+            ]),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(children: children),
+      );
+}
+
+class _AProfRow extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  final int maxLines;
+  const _AProfRow(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      this.maxLines = 1});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: const Color(0xFF1A2B1A).withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(9)),
+            child: Icon(icon, color: const Color(0xFF1A2B1A), size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textGrey,
+                        letterSpacing: 0.3)),
+                const SizedBox(height: 1),
+                Text(value,
+                    maxLines: maxLines,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.black)),
+              ])),
+        ]),
+      );
+}
+
+class _AProfDivider extends StatelessWidget {
+  const _AProfDivider();
+  @override
+  Widget build(BuildContext context) =>
+      const Divider(color: AppColors.lightGrey, height: 1);
+}
+
+class _AProfMenuCard extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final VoidCallback onTap;
+  const _AProfMenuCard(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
+              ]),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                  color: const Color(0xFF1A2B1A).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12)),
+              child: Icon(icon, color: const Color(0xFF1A2B1A), size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.black)),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: AppColors.textGrey)),
+                ])),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textGrey, size: 20),
+          ]),
+        ),
+      );
+}
 // ════════════════════════════════════════════════════════════
 // SHARED WIDGETS
 // ════════════════════════════════════════════════════════════
