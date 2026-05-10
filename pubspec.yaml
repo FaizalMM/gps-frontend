@@ -21,6 +21,7 @@ dependencies:
   permission_handler: ^11.3.1
   qr_flutter: ^4.1.0
   cached_network_image: ^3.4.1
+  url_launcher: ^6.3.0
 
   http: ^1.2.2
   flutter_secure_storage: ^9.2.2
@@ -35,7 +36,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/logo.png
     - assets/images/Logo1.png
   fonts:
     - family: Poppins

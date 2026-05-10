@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart'; // ✅ TAMBAHAN: import url_launcher
 import '../../models/models_api.dart';
 import '../../services/app_data_service.dart';
 import '../../services/domain_services.dart';
@@ -9,19 +10,18 @@ import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
 // ── Buka WhatsApp ────────────────────────────────────────────
-// Pastikan pubspec.yaml sudah ada: url_launcher: ^6.3.0
-// dan AndroidManifest.xml sudah ada <queries> untuk https
-// Contoh penggunaan setelah tambah url_launcher:
-//   import 'package:url_launcher/url_launcher.dart';
-//   launchUrl(uri, mode: LaunchMode.externalApplication);
+// ✅ DIPERBAIKI: Menggunakan url_launcher untuk membuka WhatsApp langsung
 Future<void> _bukaWhatsApp(String noHp) async {
   String n = noHp.replaceAll(RegExp(r'[\s\-+]'), '');
   if (n.startsWith('0')) n = '62${n.substring(1)}';
   if (!n.startsWith('62')) n = '62$n';
-  // ignore: deprecated_member_use
-  // await launch('https://wa.me/$n');
-  // Sementara salin ke clipboard jika url_launcher belum ada
-  await Clipboard.setData(ClipboardData(text: noHp));
+  final uri = Uri.parse('https://wa.me/$n');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else {
+    // Fallback: salin ke clipboard jika WhatsApp tidak terinstall
+    await Clipboard.setData(ClipboardData(text: noHp));
+  }
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -117,8 +117,10 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       color: Colors.white)),
               onPressed: () async {
                 Navigator.pop(ctx);
-                await _bukaWhatsApp(driver.noHp);
-                _snack('Membuka WhatsApp...', const Color(0xFF25D366));
+                await _bukaWhatsApp(
+                    driver.noHp); // ✅ Sekarang membuka WA langsung
+                if (mounted)
+                  _snack('Membuka WhatsApp...', const Color(0xFF25D366));
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366),
@@ -477,8 +479,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                 child: ListView.builder(
                   padding: const EdgeInsets.only(bottom: 90),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  // index 0 = header (search+chips+sort), index 1..n = kartu driver
-                  // kalau kosong: 1 header + 1 pesan kosong = 2
                   itemCount: list.isEmpty ? 2 : list.length + 1,
                   itemBuilder: (_, i) {
                     // Item 0: search + chips + sort
