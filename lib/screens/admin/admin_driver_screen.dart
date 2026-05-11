@@ -117,8 +117,9 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                 Navigator.pop(ctx);
                 await _bukaWhatsApp(
                     driver.noHp); //  Sekarang membuka WA langsung
-                if (mounted)
+                if (mounted) {
                   _snack('Membuka WhatsApp...', const Color(0xFF25D366));
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366),
@@ -141,9 +142,16 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       color: AppColors.primary,
                       fontWeight: FontWeight.w500)),
               onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final nav = Navigator.of(ctx);
                 await Clipboard.setData(ClipboardData(text: driver.noHp));
-                Navigator.pop(ctx);
-                _snack('Nomor disalin: ${driver.noHp}', AppColors.primary);
+                nav.pop();
+                messenger.showSnackBar(SnackBar(
+                  content: Text('Nomor disalin: ${driver.noHp}',
+                      style: const TextStyle(fontFamily: 'Poppins')),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                ));
               },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primary),
@@ -248,6 +256,8 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                   icon: Icons.person_add_rounded,
                   onPressed: () {
                     if (key.currentState!.validate()) {
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(ctx);
                       DriverService()
                           .createDriver(
                         nama: namaC.text.trim(),
@@ -259,15 +269,20 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       )
                           .then((ok) async {
                         if (ok) await widget.dataService.loadDrivers();
-                        Navigator.pop(ctx);
                         if (!mounted) return;
+                        nav.pop();
                         setState(() {});
-                        _snack(
-                          ok
-                              ? 'Akun driver berhasil dibuat'
-                              : 'Gagal membuat akun',
-                          ok ? AppColors.primary : AppColors.red,
-                        );
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(
+                            ok
+                                ? 'Akun driver berhasil dibuat'
+                                : 'Gagal membuat akun',
+                            style: const TextStyle(fontFamily: 'Poppins'),
+                          ),
+                          backgroundColor:
+                              ok ? AppColors.primary : AppColors.red,
+                          behavior: SnackBarBehavior.floating,
+                        ));
                       });
                     }
                   },
@@ -356,17 +371,24 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                         if (nikC.text.trim().isNotEmpty)
                           'nik': nikC.text.trim(),
                       };
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(ctx);
                       DriverService()
                           .updateDriver(driver.id, data)
                           .then((ok) async {
                         if (ok) await widget.dataService.loadDrivers();
-                        Navigator.pop(ctx);
                         if (!mounted) return;
+                        nav.pop();
                         setState(() {});
-                        _snack(
-                          ok ? 'Data driver diperbarui' : 'Gagal memperbarui',
-                          ok ? AppColors.primary : AppColors.red,
-                        );
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(
+                            ok ? 'Data driver diperbarui' : 'Gagal memperbarui',
+                            style: const TextStyle(fontFamily: 'Poppins'),
+                          ),
+                          backgroundColor:
+                              ok ? AppColors.primary : AppColors.red,
+                          behavior: SnackBarBehavior.floating,
+                        ));
                       });
                     }
                   },
@@ -645,8 +667,9 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
 
                     // Item 1..n: kartu driver
                     final driverIndex = i - 1;
-                    if (driverIndex < 0 || driverIndex >= list.length)
+                    if (driverIndex < 0 || driverIndex >= list.length) {
                       return const SizedBox.shrink();
+                    }
                     final d = list[driverIndex];
                     final bus = widget.dataService.getDriverBus(d.idStr);
                     return Padding(
@@ -1185,34 +1208,24 @@ class _Chip extends StatelessWidget {
   final String label;
   final int count;
   final bool active;
-  final bool disabled;
   final VoidCallback? onTap;
   const _Chip(
       {required this.label,
       required this.count,
       required this.active,
-      this.disabled = false,
       this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        onTap: disabled ? null : onTap,
+        onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: active
-                ? AppColors.primary
-                : disabled
-                    ? const Color(0xFFF2F4F2)
-                    : Colors.white,
+            color: active ? AppColors.primary : Colors.white,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: active
-                  ? AppColors.primary
-                  : disabled
-                      ? const Color(0xFFDDE6E0)
-                      : AppColors.lightGrey,
+              color: active ? AppColors.primary : AppColors.lightGrey,
               width: active ? 1.5 : 1,
             ),
           ),
@@ -1222,11 +1235,7 @@ class _Chip extends StatelessWidget {
               fontFamily: 'Poppins',
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: active
-                  ? Colors.white
-                  : disabled
-                      ? AppColors.textLight
-                      : AppColors.textGrey,
+              color: active ? Colors.white : AppColors.textGrey,
             ),
           ),
         ),

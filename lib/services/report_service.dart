@@ -188,9 +188,10 @@ class ReportService {
       }).timeout(const Duration(seconds: 30));
 
       if (response.statusCode != 200) {
-        if (kDebugMode)
+        if (kDebugMode) {
           debugPrint(
               '[ReportService] HTTP ${response.statusCode}: ${response.body}');
+        }
         return null;
       }
 
@@ -274,14 +275,16 @@ class ReportService {
           await file.writeAsBytes(bytes, flush: true);
           // Verifikasi file benar-benar ada dan tidak kosong
           if (await file.exists() && await file.length() > 0) {
-            if (kDebugMode)
+            if (kDebugMode) {
               debugPrint('[ReportService] OK: $folderPath/$filename');
+            }
             return file.path;
           }
         }
       } catch (e) {
-        if (kDebugMode)
+        if (kDebugMode) {
           debugPrint('[ReportService] Gagal tulis ke $folderPath: $e');
+        }
         continue;
       }
     }
@@ -293,14 +296,16 @@ class ReportService {
         final file = File('${extDir.path}/$filename');
         await file.writeAsBytes(bytes, flush: true);
         if (await file.exists() && await file.length() > 0) {
-          if (kDebugMode)
+          if (kDebugMode) {
             debugPrint('[ReportService] External storage: ${extDir.path}');
+          }
           return file.path;
         }
       }
     } catch (e) {
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint('[ReportService] getExternalStorageDirectory error: $e');
+      }
     }
 
     // Fallback 2: internal app (tetap bisa dibuka via OpenFilex)
@@ -311,8 +316,9 @@ class ReportService {
     final dir = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(bytes, flush: true);
-    if (kDebugMode)
+    if (kDebugMode) {
       debugPrint('[ReportService] Internal fallback: ${file.path}');
+    }
     return file.path;
   }
 

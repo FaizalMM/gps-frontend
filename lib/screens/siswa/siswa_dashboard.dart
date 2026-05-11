@@ -151,8 +151,9 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
   Future<void> _getLocation() async {
     try {
       final perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied)
+      if (perm == LocationPermission.denied) {
         await Geolocator.requestPermission();
+      }
       final pos = await Geolocator.getCurrentPosition();
       if (mounted) setState(() => _userLocation = pos);
     } catch (_) {}
@@ -366,7 +367,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
                 final buses = (s.data ?? widget.dataService.buses)
                     .where((b) => b.gpsActive)
                     .toList();
-                if (buses.isEmpty)
+                if (buses.isEmpty) {
                   return const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     child: Center(
@@ -375,6 +376,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
                                 fontFamily: 'Poppins',
                                 color: AppColors.textGrey))),
                   );
+                }
                 return Column(
                   children: buses
                       .map((bus) => Padding(

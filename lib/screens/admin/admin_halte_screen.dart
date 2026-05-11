@@ -134,6 +134,8 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                           ));
                           return;
                         }
+                        final messenger = ScaffoldMessenger.of(context);
+                        final nav = Navigator.of(ctx);
                         widget.dataService
                             .createHalte(
                           namaHalte: namaCtrl.text.trim(),
@@ -142,10 +144,10 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                           alamat: alamatCtrl.text.trim(),
                         )
                             .then((ok) {
-                          Navigator.pop(ctx);
                           if (!mounted) return;
+                          nav.pop();
                           if (ok) _refresh();
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          messenger.showSnackBar(SnackBar(
                             content: Text(ok
                                 ? 'Halte berhasil ditambahkan!'
                                 : 'Gagal menambah halte'),
@@ -287,6 +289,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                     icon: Icons.save_rounded,
                     onPressed: () async {
                       if (!formKey.currentState!.validate()) return;
+                      final messenger = ScaffoldMessenger.of(context);
                       Navigator.pop(ctx);
                       // Bug 1 Fix: panggil API, bukan hanya update lokal
                       final ok = await widget.dataService.updateHalte(
@@ -298,7 +301,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                       );
                       if (!mounted) return;
                       if (ok) _refresh();
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      messenger.showSnackBar(SnackBar(
                           content: Text(ok
                               ? 'Halte berhasil diperbarui'
                               : 'Gagal memperbarui halte'),

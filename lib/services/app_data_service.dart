@@ -244,10 +244,6 @@ class AppDataService {
       final idx = _buses.indexWhere((b) => b.id == bus.id);
       if (idx >= 0) {
         final existing = _buses[idx];
-        final changed = existing.gpsActive != bus.gpsActive ||
-            existing.latitude != bus.latitude ||
-            existing.longitude != bus.longitude ||
-            existing.speed != bus.speed;
         {
           existing.updateGps(
             latitude: bus.latitude != 0 ? bus.latitude : existing.latitude,

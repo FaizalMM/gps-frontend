@@ -321,7 +321,9 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) return;
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
       final pos = await Geolocator.getCurrentPosition(
           locationSettings:
               const LocationSettings(accuracy: LocationAccuracy.high));

@@ -909,8 +909,9 @@ class _BusMarker extends StatelessWidget {
   /// Label singkat untuk marker: ambil angka dari nama bus, fallback huruf pertama
   String get _label {
     final digits = bus.nama.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isNotEmpty)
+    if (digits.isNotEmpty) {
       return digits.length > 2 ? digits.substring(0, 2) : digits;
+    }
     return bus.nama.isNotEmpty ? bus.nama[0].toUpperCase() : '?';
   }
 

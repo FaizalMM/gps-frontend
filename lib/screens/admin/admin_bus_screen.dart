@@ -153,6 +153,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                         ),
                         onPressed: () async {
                           if (!formKey.currentState!.validate()) return;
+                          final messenger = ScaffoldMessenger.of(context);
                           String statusStr =
                               selectedStatus == BusStatus.maintenance
                                   ? 'maintenance'
@@ -184,7 +185,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           Navigator.pop(ctx);
                           if (!mounted) return;
                           setState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          messenger.showSnackBar(SnackBar(
                             content: Text(
                                 ok
                                     ? 'Bus berhasil ditambahkan!'
@@ -330,6 +331,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                         ),
                         onPressed: () async {
                           if (!formKey.currentState!.validate()) return;
+                          final messenger = ScaffoldMessenger.of(context);
                           String statusStr = selStatus == BusStatus.maintenance
                               ? 'maintenance'
                               : selStatus == BusStatus.inactive
@@ -363,7 +365,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           Navigator.pop(ctx);
                           if (!mounted) return;
                           setState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          messenger.showSnackBar(SnackBar(
                             content: Text(
                                 ok
                                     ? 'Bus berhasil diperbarui'
@@ -484,16 +486,19 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
               allBuses.where((b) => b.status == BusStatus.maintenance).length;
 
           List<BusModel> filtered = allBuses;
-          if (_filter == _BusFilter.active)
+          if (_filter == _BusFilter.active) {
             filtered =
                 allBuses.where((b) => b.status == BusStatus.active).toList();
-          if (_filter == _BusFilter.maintenance)
+          }
+          if (_filter == _BusFilter.maintenance) {
             filtered = allBuses
                 .where((b) => b.status == BusStatus.maintenance)
                 .toList();
-          if (_filter == _BusFilter.inactive)
+          }
+          if (_filter == _BusFilter.inactive) {
             filtered =
                 allBuses.where((b) => b.status == BusStatus.inactive).toList();
+          }
           if (_searchQuery.isNotEmpty) {
             filtered = filtered
                 .where((b) =>
@@ -598,14 +603,13 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           onEdit: () => _showEditBusDialog(bus),
                           onDelete: () => _deleteBus(bus),
                           onAturRute: () async {
+                            final nav = Navigator.of(context);
                             await widget.dataService.loadHaltes();
                             if (!mounted) return;
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) => BusRuteScreen(
-                                        bus: bus,
-                                        dataService: widget.dataService)));
+                            nav.push(MaterialPageRoute(
+                                builder: (_) => BusRuteScreen(
+                                    bus: bus,
+                                    dataService: widget.dataService)));
                           },
                           onManageSiswa: () => Navigator.push(
                               context,
@@ -1625,11 +1629,12 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final list = await BusService().getBusStudents(widget.bus.id);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _siswa = list;
         _loading = false;
       });
+    }
   }
 
   void _showAssignDialog() {
@@ -1749,15 +1754,17 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
                               behavior: SnackBarBehavior.floating));
                           return;
                         }
+                        final messenger = ScaffoldMessenger.of(context);
+                        final nav = Navigator.of(ctx);
                         final studentId =
                             selSiswa!.studentDetail?.id ?? selSiswa!.id;
                         final halteId = selHalte?.id ??
                             (haltes.isNotEmpty ? haltes.first.id : 0);
                         final ok = await BusService().assignStudentToBus(
                             widget.bus.id, studentId, halteId);
-                        Navigator.pop(ctx);
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        nav.pop();
+                        messenger.showSnackBar(SnackBar(
                           content: Text(
                               ok
                                   ? '${selSiswa!.namaLengkap} berhasil ditambahkan'
