@@ -13,8 +13,6 @@ import 'route_builder_screen.dart';
 
 enum _BusFilter { all, active, maintenance, inactive }
 
-// AdminBusScreen
-
 class AdminBusScreen extends StatefulWidget {
   final AppDataService dataService;
   const AdminBusScreen({super.key, required this.dataService});
@@ -184,7 +182,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           }
                           if (!ctx.mounted) return;
                           Navigator.pop(ctx);
-                          if (!context.mounted) return;
+                          if (!mounted) return;
                           setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(
@@ -214,7 +212,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     );
   }
 
-  // ── Dialog edit bus ──
   void _showEditBusDialog(BusModel bus) {
     final namaCtrl = TextEditingController(text: bus.nama);
     final platCtrl = TextEditingController(text: bus.platNomor);
@@ -364,7 +361,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           }
                           if (!ctx.mounted) return;
                           Navigator.pop(ctx);
-                          if (!context.mounted) return;
+                          if (!mounted) return;
                           setState(() {});
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(
@@ -394,7 +391,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     );
   }
 
-  // ── Hapus bus ────────
   void _deleteBus(BusModel bus) {
     showDialog(
       context: context,
@@ -512,7 +508,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
           }
 
           return Column(children: [
-            // Search bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Container(
@@ -544,7 +539,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                 ),
               ),
             ),
-            // Filter chips
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: SingleChildScrollView(
@@ -578,7 +572,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            // List bus
             Expanded(
               child: filtered.isEmpty
                   ? Center(
@@ -606,7 +599,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           onDelete: () => _deleteBus(bus),
                           onAturRute: () async {
                             await widget.dataService.loadHaltes();
-                            if (!context.mounted) return;
+                            if (!mounted) return;
                             Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -630,8 +623,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     );
   }
 }
-
-// Bus Card
 
 class _BusCard extends StatelessWidget {
   final BusModel bus;
@@ -678,9 +669,7 @@ class _BusCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(children: [
-          // ── Baris atas: ikon + info + menu ──────────────
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Ikon bus
             Container(
               width: 54,
               height: 54,
@@ -692,7 +681,6 @@ class _BusCard extends StatelessWidget {
                   color: statusColor, size: 30),
             ),
             const SizedBox(width: 12),
-            // Info
             Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,7 +748,6 @@ class _BusCard extends StatelessWidget {
                     )),
                   ]),
                 ])),
-            // Menu
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded,
                   color: AppColors.textGrey, size: 20),
@@ -793,11 +780,9 @@ class _BusCard extends StatelessWidget {
               ],
             ),
           ]),
-
           const SizedBox(height: 12),
           const Divider(height: 1, color: AppColors.lightGrey),
           const SizedBox(height: 10),
-
           Row(children: [
             // Atur Rute (tombol utama)
             Expanded(
@@ -827,7 +812,6 @@ class _BusCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Siswa
             Expanded(
               flex: 2,
               child: GestureDetector(
@@ -1080,7 +1064,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
 
                       // ── Sudah ada rute
                       else ...[
-                        // Peta jalur rute
                         _PetaRute(
                           route: _route!,
                           expanded: _petaExpanded,
@@ -1088,10 +1071,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                               setState(() => _petaExpanded = !_petaExpanded),
                           onAturJalur: () => _bukaEditor(_route!),
                         ),
-
                         const SizedBox(height: 14),
-
-                        // Info halte
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white,
@@ -1106,7 +1086,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Header
                                 Padding(
                                   padding:
                                       const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -1137,7 +1116,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                   ]),
                                 ),
 
-                                // List halte
                                 if (_route!.haltes.isEmpty)
                                   const Padding(
                                     padding: EdgeInsets.all(16),
@@ -1163,7 +1141,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                           .asMap()
                                           .entries
                                           .map((e) {
-                                        final idx = e.key;
                                         final rh = e.value;
                                         final isFirst = rh.urutan == 1;
                                         final isLast =
@@ -1179,7 +1156,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.stretch,
                                               children: [
-                                                // Garis + dot
                                                 SizedBox(
                                                     width: 32,
                                                     child: Column(children: [
@@ -1219,7 +1195,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                                                         .lightGrey))),
                                                     ])),
                                                 const SizedBox(width: 10),
-                                                // Info
                                                 Expanded(
                                                     child: Padding(
                                                   padding: const EdgeInsets
@@ -1319,7 +1294,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                       ],
 
                       const SizedBox(height: 16),
-                      // Panduan singkat
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -1432,7 +1406,6 @@ class _PetaRuteState extends State<_PetaRute> {
         ],
       ),
       child: Column(children: [
-        // Header peta
         Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
           child: Row(children: [
@@ -1447,7 +1420,6 @@ class _PetaRuteState extends State<_PetaRute> {
                       fontSize: 14,
                       fontWeight: FontWeight.w700)),
             ),
-            // Status badge
             if (!hasPolyline)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1496,7 +1468,6 @@ class _PetaRuteState extends State<_PetaRute> {
             ),
           ]),
         ),
-        // Peta
         AnimatedContainer(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeInOut,
@@ -1630,8 +1601,6 @@ class _PetaRuteState extends State<_PetaRute> {
     );
   }
 }
-
-// BusSiswaScreen
 
 class BusSiswaScreen extends StatefulWidget {
   final BusModel bus;
@@ -1964,8 +1933,6 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
     );
   }
 }
-
-// Helper widgets
 
 class _Chip extends StatelessWidget {
   final String label;

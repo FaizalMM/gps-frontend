@@ -693,7 +693,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                 : Switch(
                                     value: _gpsActive,
                                     onChanged: bus.isActive ? _toggleGps : null,
-                                    activeColor: AppColors.primary),
+                                    activeThumbColor: AppColors.primary),
                           ],
                         ),
                       ),
@@ -1143,7 +1143,6 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle bar
               Center(
                 child: Container(
                   width: 40,
@@ -1170,7 +1169,6 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
                     color: AppColors.textGrey),
               ),
               const SizedBox(height: 20),
-              // Info ringkas
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -1209,7 +1207,6 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
                 ]),
               ),
               const SizedBox(height: 16),
-              // Input catatan
               const Text('Catatan (opsional)',
                   style: TextStyle(
                       fontFamily: 'Poppins',
@@ -1238,7 +1235,6 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
                 ),
               ),
               const SizedBox(height: 20),
-              // Tombol submit
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -1297,7 +1293,7 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
         setState(() => _isSubmitting = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(response.message ?? 'Gagal mengirim laporan.'),
+            content: Text(response.message),
             backgroundColor: Colors.red,
           ));
         }
@@ -1461,7 +1457,6 @@ class _DriverBottomNav extends StatelessWidget {
           children: [
             // Baris kiri & kanan
             Row(children: [
-              // Dashboard
               Expanded(
                   child: _NavItem(
                 icon: Icons.home_outlined,
@@ -1472,7 +1467,6 @@ class _DriverBottomNav extends StatelessWidget {
               )),
               // Spacer tengah untuk tombol QR
               const Expanded(child: SizedBox()),
-              // Profil
               Expanded(
                   child: _NavItem(
                 icon: Icons.person_outline_rounded,
@@ -2368,7 +2362,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
           color: AppColors.background,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       child: Column(children: [
-        // Handle + header
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
           child: Column(children: [
@@ -2428,8 +2421,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
           ]),
         ),
         const Divider(height: 1, color: AppColors.lightGrey),
-
-        // Content
         Expanded(
           child: _loading
               ? const SkeletonFullPage()
@@ -2484,8 +2475,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
                                 ? s.namaLengkap[0].toUpperCase()
                                 : '?';
                             // Ambil info halte dari studentDetail jika tersedia
-                            final halteId =
-                                s.studentDetail?.halteId?.toString();
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
@@ -2500,7 +2489,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
                                         offset: const Offset(0, 2))
                                   ]),
                               child: Row(children: [
-                                // Avatar inisial
                                 Container(
                                     width: 44,
                                     height: 44,
@@ -2515,7 +2503,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
                                                 color: AppColors.primary,
                                                 fontSize: 18)))),
                                 const SizedBox(width: 12),
-                                // Info siswa
                                 Expanded(
                                     child: Column(
                                         crossAxisAlignment:
@@ -2546,7 +2533,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
                                                           AppColors.textGrey))),
                                         ]),
                                     ])),
-                                // Status badge
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 4),
@@ -2597,7 +2583,6 @@ class _CheckoutButtonState extends State<_CheckoutButton> {
   bool _loading = false;
 
   Future<void> _doCheckout() async {
-    // Konfirmasi dulu
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

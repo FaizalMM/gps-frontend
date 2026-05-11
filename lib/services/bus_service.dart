@@ -148,8 +148,6 @@ class BusService {
             ? (wrapper['data'] ?? wrapper['items'] ?? [])
             : [];
     debugPrint('[BusService] raw count: ${(raw as List).length}');
-    if (raw is! List) return [];
-
     final List<UserModel> result = [];
     for (final e in raw) {
       try {
@@ -304,8 +302,6 @@ class BusService {
     }
     return (buses: _parseDashboardList(res.data!), statusCode: res.statusCode);
   }
-
-  // ── GPS tracking (admin lihat semua bus) ──────────────────
 
   Future<List<BusModel>> getGpsDashboard() async {
     final res = await _api.get('/gps-tracks/dashboard');

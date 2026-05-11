@@ -162,6 +162,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (mounted) {
       // Refresh currentUser di AuthProvider agar foto muncul di semua screen
       await context.read<AuthProvider>().tryAutoLogin();
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: const Text('Profil berhasil diperbarui'),
@@ -207,7 +208,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: Form(
           key: _formKey,
           child: Column(children: [
-            // Avatar
             GestureDetector(
               onTap: _showPickerOptions,
               child: Stack(children: [
@@ -272,7 +272,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       color: AppColors.primary)),
             ),
             const SizedBox(height: 32),
-
             AppTextField(
                 label: 'Nama Lengkap',
                 controller: _namaCtrl,

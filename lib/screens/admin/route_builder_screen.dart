@@ -317,8 +317,9 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
   Future<void> _goToMyLocation() async {
     try {
       var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied)
+      if (perm == LocationPermission.denied) {
         perm = await Geolocator.requestPermission();
+      }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) return;
       final pos = await Geolocator.getCurrentPosition(

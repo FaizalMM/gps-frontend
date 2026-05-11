@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
@@ -108,8 +107,9 @@ class ReportService {
       'tanggal': tanggal,
     });
     if (!resp.success || resp.data == null) {
-      if (kDebugMode)
-        debugPrint('[ReportService] fetchDriverReport error: ${resp.message}');
+      if (kDebugMode) {
+        debugPrint('[ReportService] fetchDriverReport error: \${resp.message}');
+      }
       return null;
     }
     try {

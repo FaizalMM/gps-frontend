@@ -14,7 +14,6 @@ class AppDataService {
   final _busService = BusService();
   final _halteService = HalteService();
 
-  // ── Stream controllers untuk reaktif UI ──────────────────
   final _studentsCtrl = StreamController<List<UserModel>>.broadcast();
   final _busesCtrl = StreamController<List<BusModel>>.broadcast();
   final _haltesCtrl = StreamController<List<HalteModel>>.broadcast();
@@ -241,7 +240,7 @@ class AppDataService {
 
       if (bus == null) return;
 
-      // Juga update _buses cache dan emit ke busesStream (untuk komponen lain)
+      // Juga update _buses cache dan emit ke busesStream
       final idx = _buses.indexWhere((b) => b.id == bus.id);
       if (idx >= 0) {
         final existing = _buses[idx];
@@ -249,7 +248,7 @@ class AppDataService {
             existing.latitude != bus.latitude ||
             existing.longitude != bus.longitude ||
             existing.speed != bus.speed;
-        if (changed) {
+        {
           existing.updateGps(
             latitude: bus.latitude != 0 ? bus.latitude : existing.latitude,
             longitude: bus.longitude != 0 ? bus.longitude : existing.longitude,
@@ -262,9 +261,7 @@ class AppDataService {
         _buses.add(bus);
         _busesCtrl.add(_buses);
       }
-    } catch (_) {
-      // Abaikan error jaringan
-    }
+    } catch (_) {}
   }
 
   Future<void> _pollGps() async {
@@ -289,8 +286,6 @@ class AppDataService {
       final gpsBuses = result.buses;
       if (!_gpsPollingActive) return;
 
-      bool changed = false;
-
       for (final gpsBus in gpsBuses) {
         final idx = _buses.indexWhere((b) => b.id == gpsBus.id);
         if (idx >= 0) {
@@ -311,16 +306,13 @@ class AppDataService {
               speed: gpsBus.gpsActive ? gpsBus.speed : 0,
               gpsActive: gpsBus.gpsActive,
             );
-            changed = true;
           }
           if (nameChanged) {
             e.driverName = gpsBus.driverName;
-            changed = true;
           }
         } else {
           // Bus ada di dashboard tapi belum di cache — tambahkan
           _buses.add(gpsBus);
-          changed = true;
         }
       }
 
@@ -335,7 +327,6 @@ class AppDataService {
             speed: 0,
             gpsActive: false,
           );
-          changed = true;
         }
       }
 

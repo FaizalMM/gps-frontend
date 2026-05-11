@@ -94,7 +94,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     BusModel? selectedBus;
     HalteModel? selectedHalte;
 
-    // State geocoding
     bool isGeocoding = false;
     Map<String, double>? siswaCoords; // koordinat hasil geocode alamat siswa
     Map<int, double> jarakKeHalte = {}; // halteId → jarak meter
@@ -175,7 +174,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Handle bar
                     Center(
                         child: Container(
                             width: 40,
@@ -225,7 +223,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                     ]),
                     const SizedBox(height: 12),
 
-                    // ── Kotak alamat + status geocoding ──
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -265,7 +262,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                                         height: 1.4),
                                   ),
                                   const SizedBox(height: 4),
-                                  // Status geocoding
                                   if (isGeocoding)
                                     const Row(children: [
                                       SizedBox(
@@ -670,7 +666,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         }
                         Navigator.pop(ctx);
 
-                        // Approve siswa
                         final studentDbId =
                             await widget.dataService.approveAndGetStudentId(
                           user.idStr,
@@ -679,7 +674,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
 
                         if (!mounted) return;
 
-                        // Approve gagal
                         if (studentDbId == null) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: const Text(
@@ -849,119 +843,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     );
   }
 
-  void _showCreateSiswaDialog() {
-    final namaCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final noHpCtrl = TextEditingController();
-    final alamatCtrl = TextEditingController();
-    final passCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        decoration: const BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-              key: formKey,
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                        child: Container(
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                                color: AppColors.lightGrey,
-                                borderRadius: BorderRadius.circular(2)))),
-                    const SizedBox(height: 20),
-                    const Text('Tambah Akun Siswa',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 20),
-                    AppTextField(
-                        label: 'Nama Lengkap',
-                        controller: namaCtrl,
-                        validator: (v) =>
-                            v!.isEmpty ? 'Nama tidak boleh kosong' : null),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                        label: 'Email',
-                        controller: emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) {
-                          if (v!.isEmpty) return 'Email wajib diisi';
-                          if (!v.contains('@'))
-                            return 'Format email tidak valid';
-                          return null;
-                        }),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                        label: 'No. HP',
-                        controller: noHpCtrl,
-                        keyboardType: TextInputType.phone),
-                    const SizedBox(height: 14),
-                    AppTextField(label: 'Alamat', controller: alamatCtrl),
-                    const SizedBox(height: 14),
-                    AppTextField(
-                        label: 'Password',
-                        controller: passCtrl,
-                        obscureText: true,
-                        validator: (v) {
-                          if (v!.isEmpty) return 'Password wajib diisi';
-                          if (v.length < 6) return 'Min 6 karakter';
-                          return null;
-                        }),
-                    const SizedBox(height: 24),
-                    PrimaryButton(
-                        text: 'Buat Akun Siswa',
-                        icon: Icons.person_add_rounded,
-                        onPressed: () {
-                          if (formKey.currentState!.validate()) {
-                            if (widget.dataService
-                                .emailExists(emailCtrl.text.trim())) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                                  content: const Text('Email sudah terdaftar'),
-                                  backgroundColor: AppColors.red,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(10))));
-                              return;
-                            }
-                            widget.dataService.registerSiswa(
-                                namaLengkap: namaCtrl.text.trim(),
-                                email: emailCtrl.text.trim(),
-                                noHp: noHpCtrl.text.trim(),
-                                alamat: alamatCtrl.text.trim(),
-                                password: passCtrl.text);
-                            Navigator.pop(ctx);
-                            setState(() {});
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                content:
-                                    const Text('Akun siswa berhasil dibuat'),
-                                backgroundColor: AppColors.primary,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10))));
-                          }
-                        }),
-                    const SizedBox(height: 8),
-                  ])),
-        ),
-      ),
-    );
-  }
-
   void _showEditStudentDialog(UserModel student) {
     final namaCtrl = TextEditingController(text: student.namaLengkap);
     final noHpCtrl = TextEditingController(text: student.noHp);
@@ -1048,7 +929,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
           width: 280,
           decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            // Header kartu
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -1084,7 +964,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         color: Colors.white70)),
               ]),
             ),
-            // QR placeholder
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(children: [
@@ -1135,7 +1014,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
             .toList();
         final totalPending = pendingStudents.length;
 
-        List<UserModel> _search(List<UserModel> list) {
+        List<UserModel> search(List<UserModel> list) {
           if (_searchQuery.isEmpty) return list;
           return list
               .where((u) => u.namaLengkap
@@ -1188,7 +1067,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                 child: Container(color: AppColors.lightGrey, height: 0.5)),
           ),
           body: Column(children: [
-            // Search
             Container(
               color: AppColors.white,
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -1214,8 +1092,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                 ),
               ),
             ),
-
-            // Tabs
             Container(
               color: AppColors.white,
               child: TabBar(
@@ -1253,7 +1129,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                 ],
               ),
             ),
-
             Expanded(
               child: RefreshIndicator(
                 color: AppColors.primary,
@@ -1262,14 +1137,14 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                   controller: _tabController,
                   children: [
                     _StudentList(
-                        students: _search(allStudents),
+                        students: search(allStudents),
                         onApprove: _approveUser,
                         onReject: _rejectUser,
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
                         onIdCard: _showIdCard),
                     _StudentList(
-                        students: _search(pendingStudents),
+                        students: search(pendingStudents),
                         isPending: true,
                         onApprove: _approveUser,
                         onReject: _rejectUser,
@@ -1277,7 +1152,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onEdit: _showEditStudentDialog,
                         onIdCard: _showIdCard),
                     _StudentList(
-                        students: _search(suspended),
+                        students: search(suspended),
                         onApprove: _approveUser,
                         onReject: _rejectUser,
                         onDelete: _deleteUser,
@@ -1558,7 +1433,6 @@ class _StudentCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // ID Card button
               GestureDetector(
                 onTap: onIdCard,
                 child: Container(
@@ -1582,7 +1456,6 @@ class _StudentCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // More menu
               GestureDetector(
                 onTap: () {
                   showModalBottomSheet(

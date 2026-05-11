@@ -20,7 +20,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
   String _search = '';
   String _filter = 'Semua'; // Semua / Aktif / Nonaktif
 
-  // ── Geocoding & jarak (sama persis seperti di admin_pending_screen) ───────
   Future<Map<String, double>?> _geocodeAlamat(String alamat) async {
     try {
       final query =
@@ -104,6 +103,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     if (!mounted) return;
     if (ok) {
       await widget.dataService.loadStudents();
+      if (!mounted) return;
       setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(isActive
@@ -208,7 +208,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Handle bar
                     Center(
                         child: Container(
                             width: 40,
@@ -218,7 +217,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 20),
 
-                    // Header
                     Row(children: [
                       Container(
                         width: 44,
@@ -332,7 +330,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Pilih Bus
                     const Text('Pilih Bus / Rute',
                         style: TextStyle(
                             fontFamily: 'Poppins',
@@ -381,8 +378,9 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                             selectedHalte = null;
                             if (siswaCoords != null) {
                               final hBus = haltesForBus(b);
-                              if (hBus.isNotEmpty)
+                              if (hBus.isNotEmpty) {
                                 selectedHalte = sortedHaltes(hBus).first;
+                              }
                             }
                           }),
                           child: Container(
@@ -500,7 +498,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       }),
                     const SizedBox(height: 16),
 
-                    // Pilih Halte
                     if (selectedBus != null) ...[
                       Row(children: [
                         const Expanded(
@@ -626,7 +623,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // Tombol Simpan
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -717,7 +713,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             child: Container(color: AppColors.lightGrey, height: 0.5)),
       ),
       body: Column(children: [
-        // Info banner
         Container(
           color: AppColors.white,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -739,8 +734,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
           ),
         ),
         const SizedBox(height: 2),
-
-        // Search bar
         Container(
           color: AppColors.white,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -766,8 +759,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             ),
           ),
         ),
-
-        // Filter chips
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
           child: Row(
@@ -807,7 +798,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             );
           }).toList()),
         ),
-
         Expanded(
           child: StreamBuilder<List<UserModel>>(
             stream: widget.dataService.usersStream,
@@ -821,9 +811,10 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       u.email.toLowerCase().contains(_search.toLowerCase()))
                   .where((u) {
                 if (_filter == 'Aktif') return u.status == AccountStatus.active;
-                if (_filter == 'Nonaktif')
+                if (_filter == 'Nonaktif') {
                   return u.status != AccountStatus.active &&
                       u.status != AccountStatus.pending;
+                }
                 if (_filter == 'Belum ada Bus') {
                   // Siswa aktif tapi belum punya bus assignment
                   return u.status == AccountStatus.active &&
@@ -832,7 +823,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                 return true;
               }).toList();
 
-              if (list.isEmpty)
+              if (list.isEmpty) {
                 return Center(
                     child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -853,16 +844,17 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                               fontSize: 15,
                               color: AppColors.textGrey)),
                     ]));
-
-              return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
-                itemCount: list.length,
-                itemBuilder: (_, i) => _SiswaCard(
-                    siswa: list[i],
-                    onDelete: () => _deleteUser(list[i]),
-                    onToggle: () => _toggleStatus(list[i]),
-                    onAssignBus: () => _showAssignBusSheet(list[i])),
-              );
+              } else {
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) => _SiswaCard(
+                      siswa: list[i],
+                      onDelete: () => _deleteUser(list[i]),
+                      onToggle: () => _toggleStatus(list[i]),
+                      onAssignBus: () => _showAssignBusSheet(list[i])),
+                );
+              }
             },
           ),
         ),
@@ -1011,7 +1003,6 @@ class _SiswaCard extends StatelessWidget {
                             color: statusColor)),
                   ),
                   const SizedBox(width: 6),
-                  // Badge bus status
                   if (isActive)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -1046,7 +1037,6 @@ class _SiswaCard extends StatelessWidget {
                 ]),
               ])),
           const SizedBox(width: 8),
-          // Tombol aksi
           Column(mainAxisSize: MainAxisSize.min, children: [
             // Tombol assign/ganti bus — tampil untuk siswa aktif
             if (isActive) ...[

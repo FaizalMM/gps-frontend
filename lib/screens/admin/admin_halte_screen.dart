@@ -104,7 +104,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                             builder: (_) => HalteLocationPicker(
                                 initialLat: pickedLat, initialLng: pickedLng)),
                       );
-                      if (result != null)
+                      if (result != null) {
                         setModal(() {
                           pickedLat = result.latitude;
                           pickedLng = result.longitude;
@@ -114,6 +114,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                             alamatCtrl.text = result.namaAlamat!;
                           }
                         });
+                      }
                     },
                   ),
                   const SizedBox(height: 24),
@@ -142,7 +143,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                         )
                             .then((ok) {
                           Navigator.pop(ctx);
-                          if (!context.mounted) return;
+                          if (!mounted) return;
                           if (ok) _refresh();
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                             content: Text(ok
@@ -267,7 +268,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                             builder: (_) => HalteLocationPicker(
                                 initialLat: pickedLat, initialLng: pickedLng)),
                       );
-                      if (result != null)
+                      if (result != null) {
                         setModal(() {
                           pickedLat = result.latitude;
                           pickedLng = result.longitude;
@@ -277,6 +278,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                             alamatCtrl.text = result.namaAlamat!;
                           }
                         });
+                      }
                     },
                   ),
                   const SizedBox(height: 24),
@@ -294,7 +296,7 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                         latitude: pickedLat,
                         longitude: pickedLng,
                       );
-                      if (!context.mounted) return;
+                      if (!mounted) return;
                       if (ok) _refresh();
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text(ok
@@ -379,7 +381,6 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
         onRefresh: _refresh,
         child: Column(
           children: [
-            // Search bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Container(
@@ -411,8 +412,6 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                 ),
               ),
             ),
-
-            // Stats row
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
               child: Row(children: [
@@ -427,8 +426,6 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                 ),
               ]),
             ),
-
-            // Header list
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(children: [
@@ -443,8 +440,6 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                         color: AppColors.black)),
               ]),
             ),
-
-            // Halte list
             Expanded(
               child: _loading
                   ? const SkeletonList(itemCount: 5)
@@ -563,7 +558,6 @@ class _HalteCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Map preview
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: SizedBox(
@@ -605,8 +599,6 @@ class _HalteCard extends StatelessWidget {
               ),
             ),
           ),
-
-          // Info
           Padding(
             padding: const EdgeInsets.all(14),
             child: Column(

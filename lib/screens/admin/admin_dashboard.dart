@@ -108,7 +108,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 }
 
-// HOME TAB
 class _HomeTab extends StatefulWidget {
   final AppDataService dataService;
   const _HomeTab({required this.dataService});
@@ -135,7 +134,6 @@ class _HomeTabState extends State<_HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ──────────────────────────────────────
             MobitraAppBar(
               pendingCount: widget.dataService.pendingUsers.length,
               onNotification: () => Navigator.push(
@@ -224,7 +222,6 @@ class _HomeTabState extends State<_HomeTab> {
             ),
             const SizedBox(height: 24),
 
-            // ── Live Tracking ────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -445,7 +442,6 @@ class _HomeTabState extends State<_HomeTab> {
               },
             ),
             const SizedBox(height: 24),
-            // Kelola
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text('Kelola',
@@ -561,7 +557,6 @@ class _HomeTabState extends State<_HomeTab> {
             ),
             const SizedBox(height: 12),
 
-            // Persetujuan card
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: GestureDetector(
@@ -676,211 +671,6 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
-// MONITOR TAB
-
-class _MonitorTab extends StatelessWidget {
-  final AppDataService dataService;
-  const _MonitorTab({required this.dataService});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: Row(children: [
-            const Expanded(
-                child: Text('Monitor GPS',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.black))),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(20)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(
-                    width: 7,
-                    height: 7,
-                    decoration: const BoxDecoration(
-                        color: AppColors.primary, shape: BoxShape.circle)),
-                const SizedBox(width: 5),
-                const Text('Live',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary)),
-              ]),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: StreamBuilder<List<BusModel>>(
-            stream: dataService.busesStream,
-            builder: (_, s) {
-              final buses = s.data ?? dataService.buses;
-              final active = buses.where((b) => b.gpsActive).toList();
-              if (active.isEmpty) {
-                return Container(
-                  height: 240,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface2,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.location_off_outlined,
-                            size: 36, color: AppColors.textGrey),
-                        SizedBox(height: 8),
-                        Text('Belum ada bus yang beroperasi',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textGrey)),
-                        SizedBox(height: 4),
-                        Text(
-                            'GPS akan muncul saat driver mengaktifkan tracking',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                color: AppColors.textGrey)),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              return BusMapWidget(
-                  buses: active,
-                  height: 240,
-                  showAllBuses: true,
-                  interactive: true);
-            },
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
-          child: Text('Status Bus',
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.black)),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: StreamBuilder<List<BusModel>>(
-            stream: dataService.busesStream,
-            builder: (_, s) {
-              final buses = s.data ?? dataService.buses;
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: buses.length,
-                itemBuilder: (_, i) {
-                  final b = buses[i];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2))
-                      ],
-                    ),
-                    child: Row(children: [
-                      Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                              color: b.gpsActive
-                                  ? AppColors.primaryLight
-                                  : AppColors.surface2,
-                              borderRadius: BorderRadius.circular(10)),
-                          child: Icon(Icons.directions_bus_rounded,
-                              color: b.gpsActive
-                                  ? AppColors.primary
-                                  : AppColors.textGrey,
-                              size: 22)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(b.nama,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.black)),
-                            Text(
-                                b.driverName.isEmpty
-                                    ? 'Tidak ada driver'
-                                    : b.driverName,
-                                style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 12,
-                                    color: AppColors.textGrey)),
-                          ])),
-                      Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                  color: b.gpsActive
-                                      ? AppColors.primaryLight
-                                      : AppColors.surface2,
-                                  borderRadius: BorderRadius.circular(6)),
-                              child: Text(b.gpsActive ? 'GPS ON' : 'GPS OFF',
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: b.gpsActive
-                                          ? AppColors.primary
-                                          : AppColors.textGrey)),
-                            ),
-                            if (b.gpsActive) ...[
-                              const SizedBox(height: 3),
-                              Text('${b.speed.toStringAsFixed(0)} km/h',
-                                  style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.black))
-                            ],
-                          ]),
-                    ]),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-// PROFILE TAB
-
 class _ProfileTab extends StatefulWidget {
   final AppDataService dataService;
   const _ProfileTab({required this.dataService});
@@ -944,7 +734,6 @@ class _ProfileTabState extends State<_ProfileTab> {
         ? user!.namaLengkap[0].toUpperCase()
         : 'A';
 
-    // stats dari dataService
     final totalBus = ds.buses.length;
     final totalSiswa = ds.siswaList.length;
     final totalDriver = ds.drivers.length;
@@ -958,8 +747,6 @@ class _ProfileTabState extends State<_ProfileTab> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildAdminHeader(user, initial),
-
-              // Stats cards
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Column(
@@ -1000,10 +787,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                         color: AppColors.pendingOrange,
                       )),
                     ]),
-
                     const SizedBox(height: 24),
-
-                    // ── Data Pribadi ──────────────────────────
                     const _AProfLabel(label: 'Data Pribadi'),
                     const SizedBox(height: 10),
                     _AProfCard(children: [
@@ -1029,10 +813,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                         maxLines: 2,
                       ),
                     ]),
-
                     const SizedBox(height: 24),
-
-                    // ── Akun ──────────────────────────────────
                     const _AProfLabel(label: 'Akun'),
                     const SizedBox(height: 10),
                     _AProfMenuCard(
@@ -1051,9 +832,7 @@ class _ProfileTabState extends State<_ProfileTab> {
                         }
                       },
                     ),
-
                     const SizedBox(height: 28),
-
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -1149,7 +928,6 @@ class _ProfileTabState extends State<_ProfileTab> {
           ]),
         ),
         const SizedBox(height: 6),
-        // Status
         Text(
           user?.status == AccountStatus.active
               ? 'Akun Aktif'
@@ -1355,8 +1133,6 @@ class _AProfMenuCard extends StatelessWidget {
       );
 }
 
-// SHARED WIDGETS
-
 class _StatCard extends StatelessWidget {
   final String value, label, sub;
   final Color color;
@@ -1561,81 +1337,6 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label, value;
-  const _InfoRow(
-      {required this.icon, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      Icon(icon, color: AppColors.primary, size: 18),
-      const SizedBox(width: 12),
-      Expanded(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                color: AppColors.textGrey)),
-        Text(value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.black)),
-      ])),
-    ]);
-  }
-}
-
-class _ProfileMenu extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ProfileMenu(
-      {required this.icon,
-      required this.label,
-      required this.onTap,
-      this.color = AppColors.black});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)
-          ]),
-      child: ListTile(
-        onTap: onTap,
-        leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 18)),
-        title: Text(label,
-            style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: color)),
-        trailing: Icon(Icons.chevron_right_rounded,
-            color: color.withValues(alpha: 0.4), size: 20),
-      ),
-    );
-  }
-}
-
 // ── Toast notifikasi siswa baru pending
 // Muncul di atas semua UI (via Overlay), auto-hilang setelah 4 detik.
 class _NewPendingToast extends StatefulWidget {
@@ -1702,7 +1403,6 @@ class _NewPendingToastState extends State<_NewPendingToast>
                 ],
               ),
               child: Row(children: [
-                // Ikon dengan badge
                 Stack(clipBehavior: Clip.none, children: [
                   Container(
                     width: 40,

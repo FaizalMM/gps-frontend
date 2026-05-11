@@ -17,8 +17,6 @@ import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
 import 'qr_code_screen.dart';
 
-// ROOT WIDGET
-
 class SiswaDashboard extends StatefulWidget {
   const SiswaDashboard({super.key});
   @override
@@ -83,8 +81,6 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
     );
   }
 }
-
-// HOME TAB
 
 class _SiswaHomeTab extends StatefulWidget {
   final UserModel siswa;
@@ -193,7 +189,6 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
         child: SingleChildScrollView(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // ── Header ──────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
               child: Row(
@@ -220,7 +215,6 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      // Notif bell
                       GestureDetector(
                         onTap: () => _showNotifSheet(context),
                         child: Container(
@@ -240,7 +234,6 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // GPS Status badge
                       _GpsBadge(aktif: gpsAktif),
                     ],
                   ),
@@ -249,7 +242,6 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             ),
             const SizedBox(height: 18),
 
-            // Bus status card
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _loadingBusInfo
@@ -333,7 +325,6 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             ),
             const SizedBox(height: 20),
 
-            // Bus Beroperasi
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(children: [
@@ -448,8 +439,6 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
   }
 }
 
-// GPS STATUS BADGE
-
 class _GpsBadge extends StatelessWidget {
   final bool aktif;
   const _GpsBadge({required this.aktif});
@@ -515,7 +504,6 @@ class _BusOfflineCard extends StatelessWidget {
         ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Bus header
         Row(children: [
           Container(
             width: 46,
@@ -554,7 +542,6 @@ class _BusOfflineCard extends StatelessWidget {
                           color: AppColors.textGrey)),
                 ]),
               ])),
-          // ETA placeholder
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
@@ -578,13 +565,11 @@ class _BusOfflineCard extends StatelessWidget {
             ]),
           ),
         ]),
-
         if (driverName != null) ...[
           const SizedBox(height: 12),
           const Divider(height: 1, color: AppColors.lightGrey),
           const SizedBox(height: 12),
           Row(children: [
-            // Avatar driver
             Container(
               width: 34,
               height: 34,
@@ -689,8 +674,6 @@ class _WaitingBanner extends StatelessWidget {
     );
   }
 }
-
-// STATUS BANNER
 
 class _StatusBanner extends StatelessWidget {
   final IconData icon;
@@ -1038,8 +1021,6 @@ class _NoBusAssignedCard extends StatelessWidget {
   }
 }
 
-// BUS LIST TILE
-
 class _BusListTile extends StatelessWidget {
   final BusModel bus;
   final String eta;
@@ -1108,8 +1089,6 @@ class _BusListTile extends StatelessWidget {
     );
   }
 }
-
-// TRACKING TAB
 
 class _SiswaTrackingTab extends StatefulWidget {
   final AppDataService dataService;
@@ -1264,8 +1243,6 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
 
   @override
   Widget build(BuildContext context) {
-    final buses = _myBus != null ? [_myBus!] : <BusModel>[];
-
     return ColoredBox(
       color: AppColors.background,
       child: SafeArea(
@@ -1335,13 +1312,10 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
               ),
             ]),
           ),
-
           if (_loadingAttendance)
             const SkeletonAttendanceBanner()
           else
             _buildAttendanceBanner(),
-
-          // Filter chips
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Row(children: [
@@ -1413,7 +1387,6 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
               ],
             ]),
           ),
-
           Expanded(
             child: Stack(
               children: [
@@ -1996,8 +1969,6 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
       ]));
 }
 
-// TRACKING STATUS BANNER
-
 class _TrackingStatusBanner extends StatelessWidget {
   final Color color;
   final Color borderColor;
@@ -2065,8 +2036,6 @@ class _TrackingStatusBanner extends StatelessWidget {
   }
 }
 
-// ON BUS OVERLAY
-
 class _OnBusOverlay extends StatelessWidget {
   final String busName;
   final double speed;
@@ -2133,8 +2102,6 @@ class _OnBusOverlay extends StatelessWidget {
   }
 }
 
-// INFO TILE
-
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -2171,8 +2138,6 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
-
-// PROFILE TAB
 
 class _SiswaProfileTab extends StatefulWidget {
   final UserModel siswa;
@@ -2496,7 +2461,6 @@ class _SiswaProfileTabState extends State<_SiswaProfileTab> {
   }
 }
 
-//  Profile sub-widgets
 class _SProfAvatar extends StatelessWidget {
   final String initial;
   const _SProfAvatar({required this.initial});
@@ -2912,8 +2876,6 @@ class _NotifTile extends StatelessWidget {
     );
   }
 }
-
-// HALTE ROUTE SHEET
 
 class _HalteRouteSheet extends StatefulWidget {
   final AppDataService dataService;
