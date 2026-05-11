@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
-// ══════════════════════════════════════════════════════════════
-// SHIMMER CORE ENGINE
-// Pure Flutter shimmer — tidak perlu package tambahan.
-// Menggunakan LinearGradient yang dianimasikan dengan AnimationController.
-// ══════════════════════════════════════════════════════════════
-
 class ShimmerEffect extends StatefulWidget {
   final Widget child;
   final Color baseColor;
@@ -85,7 +79,7 @@ class _SlidingGradientTransform extends GradientTransform {
   }
 }
 
-// ── Helper: kotak skeleton ─────────────────────────────────────
+// ── Helper: kotak skeleton
 class _SkeletonBox extends StatelessWidget {
   final double width;
   final double height;
@@ -112,7 +106,6 @@ class _SkeletonBox extends StatelessWidget {
   }
 }
 
-// ── Helper: lingkaran skeleton ────────────────────────────────
 class _SkeletonCircle extends StatelessWidget {
   final double size;
   final Color color;
@@ -134,11 +127,6 @@ class _SkeletonCircle extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: BUS CARD (Siswa Dashboard — Home Tab)
-// Menggantikan _LoadingBusCard
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonBusCard extends StatelessWidget {
   const SkeletonBusCard({super.key});
@@ -214,10 +202,6 @@ class SkeletonBusCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: LIST ITEM (Admin: Siswa / Driver / Bus / Halte)
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonListItem extends StatelessWidget {
   final bool showAvatar;
   final bool showTrailing;
@@ -278,10 +262,6 @@ class SkeletonListItem extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: LIST (beberapa item sekaligus)
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonList extends StatelessWidget {
   final int itemCount;
   final bool showAvatar;
@@ -302,10 +282,6 @@ class SkeletonList extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: STAT CARD (Admin Dashboard — stat cards)
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonStatCard extends StatelessWidget {
   const SkeletonStatCard({super.key});
@@ -346,10 +322,6 @@ class SkeletonStatCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: GRID STAT CARDS (2x2)
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonStatGrid extends StatelessWidget {
   final int count;
 
@@ -368,10 +340,6 @@ class SkeletonStatGrid extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: MAP AREA
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonMapArea extends StatelessWidget {
   final double height;
@@ -468,10 +436,6 @@ class SkeletonMapArea extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: INFO CARD (Bus info / driver info horizontal)
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonInfoCard extends StatelessWidget {
   const SkeletonInfoCard({super.key});
 
@@ -512,10 +476,6 @@ class SkeletonInfoCard extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: PROFILE SECTION (header profil)
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonProfileHeader extends StatelessWidget {
   const SkeletonProfileHeader({super.key});
@@ -558,10 +518,6 @@ class SkeletonProfileHeader extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: ATTENDANCE BANNER (banner status absensi)
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonAttendanceBanner extends StatelessWidget {
   const SkeletonAttendanceBanner({super.key});
 
@@ -595,10 +551,6 @@ class SkeletonAttendanceBanner extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: DASHBOARD HOME (gabungan untuk home admin/driver/siswa)
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonDashboardHome extends StatelessWidget {
   final bool showStatGrid;
@@ -687,10 +639,6 @@ class SkeletonDashboardHome extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: DETAIL ROW (untuk detail item: Bus Detail, Route, dll)
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonDetailRow extends StatelessWidget {
   const SkeletonDetailRow({super.key});
 
@@ -710,10 +658,6 @@ class SkeletonDetailRow extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: BUS BOTTOM CARD (tracking tab — info card bawah)
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonBottomCard extends StatelessWidget {
   const SkeletonBottomCard({super.key});
@@ -786,10 +730,6 @@ class SkeletonBottomCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// SKELETON: CHART / ANALYTICS
-// ══════════════════════════════════════════════════════════════
-
 class SkeletonChart extends StatelessWidget {
   final double height;
 
@@ -854,11 +794,6 @@ class SkeletonChart extends StatelessWidget {
     );
   }
 }
-
-// ══════════════════════════════════════════════════════════════
-// SKELETON: SPLASH / FULL SCREEN LOADER
-// Dipakai saat halaman pertama kali load sebelum ada data apapun
-// ══════════════════════════════════════════════════════════════
 
 class SkeletonFullPage extends StatelessWidget {
   const SkeletonFullPage({super.key});

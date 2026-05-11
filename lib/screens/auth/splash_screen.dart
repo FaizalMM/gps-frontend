@@ -11,9 +11,6 @@ import '../siswa/siswa_dashboard.dart';
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
-  // [FIX SPLASH LOGIN] Flag static di public class agar bisa diakses
-  // dari LoginScreen saat user login manual — set true setelah login sukses
-  // sehingga SplashScreen tidak tampil lagi saat Android resume activity.
   static bool hasNavigated = false;
 
   @override
@@ -24,9 +21,6 @@ class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
   late AnimationController _busController;
   late Animation<double> _busAnimation;
-
-  // [FIX SPLASH] Pakai flag dari SplashScreen (public) agar bisa di-set
-  // dari LoginScreen juga — mencegah splash muncul saat resume/login.
 
   @override
   void initState() {
@@ -41,8 +35,6 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.elasticOut,
     );
 
-    // [FIX SPLASH] Jika sudah pernah navigasi (resume dari background,
-    // atau user sudah login manual), langsung navigasi tanpa animasi splash.
     if (SplashScreen.hasNavigated) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _navigate());
       return;
@@ -61,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  // [FIX BUG 3] Pisahkan logika navigasi ke method sendiri
   Future<void> _navigate() async {
     if (!mounted) return;
     final auth = context.read<AuthProvider>();

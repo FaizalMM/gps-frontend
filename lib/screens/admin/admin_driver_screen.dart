@@ -9,8 +9,8 @@ import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
-// ── Buka WhatsApp ────────────────────────────────────────────
-// ✅ DIPERBAIKI: Menggunakan url_launcher untuk membuka WhatsApp langsung
+// ── Buka WhatsApp
+
 Future<void> _bukaWhatsApp(String noHp) async {
   String n = noHp.replaceAll(RegExp(r'[\s\-+]'), '');
   if (n.startsWith('0')) n = '62${n.substring(1)}';
@@ -24,7 +24,6 @@ Future<void> _bukaWhatsApp(String noHp) async {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 class AdminDriverScreen extends StatefulWidget {
   final AppDataService dataService;
   const AdminDriverScreen({super.key, required this.dataService});
@@ -43,13 +42,12 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     super.dispose();
   }
 
-  // ── Apakah driver sedang online (GPS aktif) ──────────────────
   bool _isOnline(UserModel d) {
     final bus = widget.dataService.getDriverBus(d.idStr);
     return bus?.gpsActive == true;
   }
 
-  // ── Filter & sort ─────────────────────────────────────────────
+  // ── Filter & sort
   List<UserModel> _filtered(List<UserModel> all) {
     var list = all.where((u) => u.role == UserRole.driver).toList();
 
@@ -76,7 +74,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     return list;
   }
 
-  // ── Snackbar ──────────────────────────────────────────────────
+  // ── Snackbar
   void _snack(String msg, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -87,7 +85,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     ));
   }
 
-  // ── Hubungi driver via WA ─────────────────────────────────────
+  // ── Hubungi driver via WA
   void _hubungi(UserModel driver) {
     if (driver.noHp.isEmpty) {
       _snack('No. HP ${driver.namaLengkap} belum diisi', AppColors.red);
@@ -118,7 +116,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
               onPressed: () async {
                 Navigator.pop(ctx);
                 await _bukaWhatsApp(
-                    driver.noHp); // ✅ Sekarang membuka WA langsung
+                    driver.noHp); //  Sekarang membuka WA langsung
                 if (mounted)
                   _snack('Membuka WhatsApp...', const Color(0xFF25D366));
               },
@@ -160,7 +158,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Dialog Tambah ─────────────────────────────────────────────
+  // ── Dialog Tambah
   void _showAdd() {
     final namaC = TextEditingController();
     final emailC = TextEditingController();
@@ -282,7 +280,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Dialog Edit ───────────────────────────────────────────────
+  // ── Dialog Edit
   void _showEdit(UserModel driver) {
     final namaC = TextEditingController(text: driver.namaLengkap);
     final hpC = TextEditingController(text: driver.noHp);
@@ -381,7 +379,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Konfirmasi Hapus ──────────────────────────────────────────
   void _hapus(UserModel driver) {
     showDialog(
       context: context,
@@ -418,7 +415,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Sort sheet ────────────────────────────────────────────────
+  // ── Sort sheet
   void _showSort() {
     showModalBottomSheet(
       context: context,
@@ -440,7 +437,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── BUILD ─────────────────────────────────────────────────────
+  // ── BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -474,14 +471,12 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
 
           return Column(
             children: [
-              // ── LIST + header search/chips/sort ikut scroll ─
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.only(bottom: 90),
                   physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: list.isEmpty ? 2 : list.length + 1,
                   itemBuilder: (_, i) {
-                    // Item 0: search + chips + sort
                     if (i == 0) {
                       return Container(
                         color: Colors.white,
@@ -682,9 +677,8 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// DRIVER CARD — tanpa rating, status GPS-based
-// ══════════════════════════════════════════════════════════════
+// DRIVER CARD
+
 class _DriverCard extends StatelessWidget {
   final UserModel driver;
   final dynamic bus;
@@ -718,7 +712,7 @@ class _DriverCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── BARIS ATAS ────────────────────────────────
+              // ── BARIS ATAS
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -997,9 +991,7 @@ class _DriverCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // WIDGET HELPERS
-// ══════════════════════════════════════════════════════════════
 
 class _Avatar extends StatelessWidget {
   final UserModel driver;

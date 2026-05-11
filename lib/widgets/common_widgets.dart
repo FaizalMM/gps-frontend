@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
-// Mobitra App Bar
 class MobitraAppBar extends StatelessWidget {
   final String? name;
   final VoidCallback? onNotification;
   final VoidCallback? onProfile;
-  // Jika > 0 tampilkan titik merah pada lonceng (khusus admin).
-  // Jika null, lonceng tidak ditampilkan sama sekali (driver/siswa).
+
   final int? pendingCount;
 
   const MobitraAppBar({

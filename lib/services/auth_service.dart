@@ -4,8 +4,6 @@ import '../models/models_api.dart';
 class AuthService {
   final _api = ApiClient();
 
-  // Cache bus aktif driver — diisi saat login, dikosongkan saat logout.
-  // Diakses oleh DriverDashboard agar tidak perlu request tambahan.
   BusModel? _cachedDriverBus;
   BusModel? get cachedDriverBus => _cachedDriverBus;
 
@@ -38,11 +36,8 @@ class AuthService {
 
     await _api.saveToken(token);
 
-    // Parse user langsung dari response login — tidak perlu extra call /auth/me
     final user = UserModel.fromJson(userJson);
 
-    // Jika driver, cache data bus aktif dari response login
-    // sehingga DriverDashboard bisa langsung pakai tanpa request tambahan
     final busJson = data['bus'] as Map<String, dynamic>?;
     _cachedDriverBus = busJson != null ? BusModel.fromJson(busJson) : null;
 
@@ -136,8 +131,6 @@ class AuthService {
     return res.success;
   }
 }
-
-// ── Result types ──────────────────────────────────────────────
 
 class AuthResult {
   final AuthResultType type;

@@ -2,9 +2,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-// ─────────────────────────────────────────────────────────────
-// Model hasil pencarian lokasi (Nominatim)
-// ─────────────────────────────────────────────────────────────
 class LocationSearchResult {
   final String displayName;
   final String shortName;
@@ -21,9 +18,6 @@ class LocationSearchResult {
   LatLng get latLng => LatLng(latitude, longitude);
 }
 
-// ─────────────────────────────────────────────────────────────
-// Model hasil routing (OSRM)
-// ─────────────────────────────────────────────────────────────
 class OsrmRouteResult {
   final List<LatLng> points;
   final double distanceMeters;
@@ -49,11 +43,6 @@ class OsrmRouteResult {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// RouteSearchService
-// Geocoding: Nominatim (openstreetmap) — gratis, tanpa API key
-// Routing:   OSRM public server       — gratis, tanpa API key
-// ─────────────────────────────────────────────────────────────
 class RouteSearchService {
   static const _nominatim = 'https://nominatim.openstreetmap.org';
   static const _osrm = 'https://router.project-osrm.org';
@@ -67,7 +56,6 @@ class RouteSearchService {
     'Accept-Language': 'id,en',
   };
 
-  // ── Cari lokasi berdasarkan query teks ─────────────────────
   Future<List<LocationSearchResult>> searchLocation(String query) async {
     if (query.trim().isEmpty) return [];
     try {
@@ -117,7 +105,6 @@ class RouteSearchService {
     }
   }
 
-  // ── Reverse geocode: koordinat → nama tempat ───────────────
   Future<String?> reverseGeocode(double lat, double lng) async {
     try {
       final uri = Uri.parse('$_nominatim/reverse').replace(
@@ -148,8 +135,6 @@ class RouteSearchService {
     }
   }
 
-  // ── Routing via OSRM (jalur mengikuti jalan) ───────────────
-  // [waypoints] = titik awal, halte-halte, titik akhir
   Future<OsrmRouteResult?> getRoute(List<LatLng> waypoints) async {
     if (waypoints.length < 2) return null;
     try {

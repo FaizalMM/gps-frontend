@@ -258,7 +258,6 @@ class _PendingScreenState extends State<PendingScreen>
   }
 }
 
-// ─── Dialog Approved ──────────────────────────────────────────
 class _ApprovedDialog extends StatelessWidget {
   final VoidCallback onLogin;
   const _ApprovedDialog({required this.onLogin});
@@ -279,7 +278,8 @@ class _ApprovedDialog extends StatelessWidget {
               decoration: const BoxDecoration(
                   color: Color(0xFFE8F5E9), shape: BoxShape.circle),
               child: const Center(
-                  child: Text('🎉', style: TextStyle(fontSize: 40))),
+                  child: Icon(Icons.celebration_rounded,
+                      size: 40, color: AppColors.primary)),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -326,7 +326,6 @@ class _ApprovedDialog extends StatelessWidget {
   }
 }
 
-// ─── Dialog Rejected ──────────────────────────────────────────
 class _RejectedDialog extends StatelessWidget {
   final String reason;
   final VoidCallback onBack;
@@ -348,7 +347,8 @@ class _RejectedDialog extends StatelessWidget {
               decoration: const BoxDecoration(
                   color: Color(0xFFFFEBEE), shape: BoxShape.circle),
               child: const Center(
-                  child: Text('😔', style: TextStyle(fontSize: 40))),
+                  child: Icon(Icons.sentiment_dissatisfied_rounded,
+                      size: 40, color: AppColors.textGrey)),
             ),
             const SizedBox(height: 20),
             const Text(
@@ -424,7 +424,6 @@ class _RejectedDialog extends StatelessWidget {
   }
 }
 
-// ─── Widget pembantu ──────────────────────────────────────────
 class _StatusStep extends StatelessWidget {
   final IconData icon;
   final String label;

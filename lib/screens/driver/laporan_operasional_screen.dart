@@ -130,7 +130,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     }
   }
 
-  /// Dialog sukses yang jelas — tampilkan nama file, lokasi, dan tombol aksi
   void _showFileDialog(String path, String tipe) {
     final fileName = path.split('/').last;
     final isDownloads = path.contains('/Download');
@@ -679,7 +678,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
                     color: AppColors.textGrey),
               ),
               const SizedBox(height: 20),
-              // ── Filter Mode Chip ──────────────────────────
               Row(children: [
                 _FilterChip(
                   label: 'Harian',
@@ -708,8 +706,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
                 ),
               ]),
               const SizedBox(height: 16),
-
-              // ── Konten berdasarkan mode ───────────────────
               if (_filterMode == _FilterMode.mingguan) ...[
                 // Navigasi minggu
                 Row(children: [
@@ -853,8 +849,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     );
   }
 }
-
-// ── Widgets ─────────────────────────────────────────────────
 
 class _LoadingCard extends StatelessWidget {
   const _LoadingCard();
@@ -1139,10 +1133,9 @@ class _ExportButton extends StatelessWidget {
       );
 }
 
-// ── Enum filter mode ──────────────────────────────────────────
 enum _FilterMode { harian, mingguan }
 
-// ── Model data harian untuk chart mingguan ────────────────────
+// ── Model data harian untuk chart mingguan
 class _DayReport {
   final DateTime tanggal;
   final int totalPenumpang;
@@ -1154,7 +1147,6 @@ class _DayReport {
   });
 }
 
-// ── Filter chip ───────────────────────────────────────────────
 class _FilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -1193,7 +1185,7 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-// ── Weekly chart ──────────────────────────────────────────────
+// Weekly chart
 class _WeeklyChart extends StatelessWidget {
   final List<_DayReport> reports;
   const _WeeklyChart({required this.reports});

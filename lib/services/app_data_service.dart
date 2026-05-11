@@ -1,7 +1,3 @@
-// app_data_service.dart — COMPATIBILITY SHIM
-// [PERBAIKAN] Ditambahkan GPS polling setiap 3 detik agar admin
-// melihat posisi bus terbaru secara otomatis tanpa refresh manual.
-
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/models_api.dart';
@@ -27,7 +23,7 @@ class AppDataService {
   Stream<List<BusModel>> get busesStream => _busesCtrl.stream;
   Stream<List<HalteModel>> get haltesStream => _haltesCtrl.stream;
 
-  // ── In-memory cache ───────────────────────────────────────
+  // ── In-memory cache
   List<UserModel> _users = [];
   List<BusModel> _buses = [];
   List<HalteModel> _haltes = [];
@@ -43,15 +39,11 @@ class AppDataService {
   List<UserModel> get pendingUsers =>
       _users.where((u) => u.status == AccountStatus.pending).toList();
 
-  // ── GPS Polling (admin) — auto-refresh setiap 3 detik ────
   Timer? _gpsPollingTimer;
   bool _gpsPollingActive = false;
 
-  /// Callback yang dipanggil saat server mengembalikan 401.
-  /// Set ini dari AdminDashboard untuk handle logout otomatis.
   VoidCallback? onUnauthorized;
 
-  // ── Pending Students Polling — auto-refresh setiap 15 detik ─
   Timer? _pendingPollingTimer;
   bool _pendingPollingActive = false;
   int _lastKnownPendingCount = -1; // -1 = belum diinisialisasi
@@ -83,8 +75,6 @@ class AppDataService {
     try {
       final result = await _studentService.getPendingStudents();
 
-      // [FIX] Hentikan polling jika server menolak token (401 Unauthorized)
-      // Ini mencegah log 401 berulang-ulang saat belum/tidak terautentikasi
       if (result.statusCode == 401) {
         stopPendingPolling();
         onUnauthorized?.call();
@@ -103,7 +93,6 @@ class AppDataService {
         return;
       }
 
-      // Ada siswa baru masuk sejak polling terakhir
       if (newCount > _lastKnownPendingCount) {
         final jumlahBaru = newCount - _lastKnownPendingCount;
         _lastKnownPendingCount = newCount;
@@ -159,11 +148,6 @@ class AppDataService {
     onUnauthorized = null;
   }
 
-  // ── Polling khusus SISWA ─────────────────────────────────
-  // PERBAIKAN BUG: startGpsPolling() memanggil /gps-tracks/dashboard
-  // yang admin-only (403 Forbidden). Siswa harus pakai endpoint sendiri:
-  // /student/bus/tracking via BusService.getMyBusTrackingFull().
-
   Timer? _studentPollingTimer;
   bool _studentPollingActive = false;
   void Function(
@@ -214,11 +198,6 @@ class AppDataService {
       // Abaikan error jaringan — polling coba lagi di interval berikutnya
     }
   }
-
-  // ── [FIX BUG 1] Home polling khusus siswa ────────────────
-  // Home tab siswa menggunakan busesStream untuk cek gpsActive bus.
-  // busesStream hanya diupdate oleh _pollGps() (admin-only/403).
-  // Fix: polling khusus home tab yang update _busesCtrl dari endpoint siswa.
 
   Timer? _homePollingTimer;
   bool _homePollingActive = false;
@@ -312,15 +291,11 @@ class AppDataService {
 
       bool changed = false;
 
-      // Semua bus dari dashboard (termasuk yang GPS-nya off)
-      // dipakai untuk update status di _buses cache
       for (final gpsBus in gpsBuses) {
         final idx = _buses.indexWhere((b) => b.id == gpsBus.id);
         if (idx >= 0) {
           final e = _buses[idx];
 
-          // gpsActive dari polling adalah sumber kebenaran utama.
-          // Selalu update jika status berubah — termasuk dari on→off
           final activeChanged = e.gpsActive != gpsBus.gpsActive;
           final latChanged = e.latitude != gpsBus.latitude;
           final lngChanged = e.longitude != gpsBus.longitude;
@@ -329,9 +304,6 @@ class AppDataService {
               gpsBus.driverName.isNotEmpty && e.driverName != gpsBus.driverName;
 
           if (activeChanged || latChanged || lngChanged || spdChanged) {
-            // Jangan update posisi ke 0,0 — artinya belum ada GPS hari ini
-            // Biarkan posisi terakhir yang valid tetap ditampilkan
-            // hingga koordinat nyata masuk
             final hasRealCoords = gpsBus.latitude != 0 && gpsBus.longitude != 0;
             e.updateGps(
               latitude: hasRealCoords ? gpsBus.latitude : e.latitude,
@@ -373,7 +345,7 @@ class AppDataService {
     } catch (_) {}
   }
 
-  // ── Load data dari API ────────────────────────────────────
+  // ── Load data dari API
 
   Future<void> loadAll() async {
     await Future.wait([
@@ -384,9 +356,6 @@ class AppDataService {
     ]);
   }
 
-  // [FIX] loadStudents: getStudents() mengembalikan List<UserModel> langsung,
-  // sedangkan getPendingStudents() mengembalikan record {students, statusCode}.
-  // Jangan panggil .students pada List — itu akan crash.
   Future<void> loadStudents() async {
     final approved = await _studentService.getStudents();
     final pendingResult = await _studentService.getPendingStudents();
@@ -417,7 +386,7 @@ class AppDataService {
     _haltesCtrl.add(_haltes);
   }
 
-  // ── Student actions ───────────────────────────────────────
+  // ── Student actions
 
   Future<void> updateUserStatus(String userId, AccountStatus status,
       {int? studentDetailId}) async {
@@ -464,7 +433,7 @@ class AppDataService {
     await loadStudents();
   }
 
-  // ── Bus actions ───────────────────────────────────────────
+  // ── Bus actions
 
   Future<bool> createBus({
     required String kodeBus,
@@ -502,8 +471,6 @@ class AppDataService {
     if (ok) await loadBuses();
     return ok;
   }
-
-  // ── Halte actions ─────────────────────────────────────────
 
   Future<bool> createHalte({
     required String namaHalte,
@@ -544,8 +511,6 @@ class AppDataService {
     return ok;
   }
 
-  // ── GPS (driver) ──────────────────────────────────────────
-
   Future<List<BusModel>> getGpsDashboard() => _busService.getGpsDashboard();
 
   void updateBusLocation({
@@ -563,8 +528,6 @@ class AppDataService {
     bus.updateGps(latitude: latitude, longitude: longitude, speed: speed);
     _busesCtrl.add(_buses);
   }
-
-  // ── Helpers ───────────────────────────────────────────────
 
   bool emailExists(String email) =>
       _users.any((u) => u.email.toLowerCase() == email.toLowerCase());

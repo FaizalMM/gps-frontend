@@ -7,12 +7,12 @@ import '../../services/app_data_service.dart';
 import '../../services/report_service.dart';
 import '../../utils/app_theme.dart';
 
-// ── Helper format tanggal ────────────────────────────────────
+// ── Helper format tanggal ──
 String _fmtDate(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 String _todayStr() => _fmtDate(DateTime.now());
 
-// ── Model lokal ──────────────────────────────────────────────
+// ── Model lokal ────────────
 class _ActivitySummary {
   final int loginHari, loginGagal, akunSuspend;
   final List<Map<String, dynamic>> topUsers, byType;
@@ -38,9 +38,8 @@ class _ReportSummary {
       required this.rows});
 }
 
-// ═══════════════════════════════════════════════════════════════
 // MAIN SCREEN
-// ═══════════════════════════════════════════════════════════════
+
 class AdminAnalitikScreen extends StatefulWidget {
   final AppDataService dataService;
   const AdminAnalitikScreen({super.key, required this.dataService});
@@ -59,7 +58,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
   _ReportSummary? _report;
   String? _error;
 
-  // ── Filter ───────────────────────────────────────────────────
+  // ── Filter
   _FilterMode _filterMode = _FilterMode.harian;
   DateTime _selectedDate = DateTime.now();
   List<_AdminDayReport> _weekReports = [];
@@ -297,7 +296,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
 
     return SafeArea(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Header ──────────────────────────────────────────
+        // ── Header ────────
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
           child: Row(children: [
@@ -400,7 +399,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
         ),
         const SizedBox(height: 12),
 
-        // ── Tabs ────────────────────────────────────────────
+        // ── Tabs ──────────
         Container(
           color: AppColors.background,
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -465,9 +464,8 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
 // TAB 1: RINGKASAN
-// ═══════════════════════════════════════════════════════════════
+
 class _RingkasanTab extends StatelessWidget {
   final List<BusModel> buses;
   final List<UserModel> siswa, drivers, admins;
@@ -540,7 +538,7 @@ class _RingkasanTab extends StatelessWidget {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Stat cards utama (data real) ─────────────────────
+        // ── Stat cards utama (data real)
         Row(children: [
           Expanded(
               child: _StatTile(
@@ -578,7 +576,7 @@ class _RingkasanTab extends StatelessWidget {
         ]),
         const SizedBox(height: 20),
 
-        // ── Mode mingguan ─────────────────────────────────────
+        // ── Mode mingguan ───
         if (filterMode == _FilterMode.mingguan) ...[
           // Navigasi minggu
           Row(children: [
@@ -630,7 +628,7 @@ class _RingkasanTab extends StatelessWidget {
           const SizedBox(height: 20),
         ],
 
-        // ── Absensi hari ini ──────────────────────────────────
+        // ── Absensi hari ini
         if (filterMode == _FilterMode.harian) ...[
           const _SectionHeader(title: 'Absensi Hari Ini'),
           const SizedBox(height: 10),
@@ -640,7 +638,7 @@ class _RingkasanTab extends StatelessWidget {
           const SizedBox(height: 20),
         ], // end if harian
 
-        // ── Laporan driver ────────────────────────────────────
+        // ── Laporan driver ──
         if (filterMode == _FilterMode.harian) ...[
           const _SectionHeader(title: 'Laporan Driver Hari Ini'),
           const SizedBox(height: 10),
@@ -650,7 +648,7 @@ class _RingkasanTab extends StatelessWidget {
           const SizedBox(height: 20),
         ], // end if harian laporan
 
-        // ── Aktivitas sistem ──────────────────────────────────
+        // ── Aktivitas sistem
         const _SectionHeader(title: 'Aktivitas Sistem (24 Jam)'),
         const SizedBox(height: 10),
         activity == null
@@ -669,9 +667,8 @@ class _RingkasanTab extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TAB 2: ARMADA
-// ═══════════════════════════════════════════════════════════════
+// ARMADA BUS
+
 class _ArmadaTab extends StatelessWidget {
   final List<BusModel> buses;
   final _ReportSummary? report;
@@ -728,7 +725,7 @@ class _ArmadaTab extends StatelessWidget {
         ]),
         const SizedBox(height: 20),
 
-        // ── Laporan per bus ───────────────────────────────────
+        // ── Laporan per bus ─
         if (report != null && report!.rows.isNotEmpty) ...[
           const _SectionHeader(title: 'Laporan Per Bus Hari Ini'),
           const SizedBox(height: 10),
@@ -813,9 +810,8 @@ class _ArmadaTab extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TAB 3: PENGGUNA
-// ═══════════════════════════════════════════════════════════════
+// User
+
 class _PenggunaTab extends StatelessWidget {
   final List<UserModel> drivers, siswa, admins;
   final AppDataService dataService;
@@ -840,7 +836,7 @@ class _PenggunaTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       children: [
-        // ── Stat pengguna ─────────────────────────────────────
+        // ── Stat pengguna ───
         Row(children: [
           Expanded(
               child: _StatTile(
@@ -878,7 +874,7 @@ class _PenggunaTab extends StatelessWidget {
         ]),
         const SizedBox(height: 20),
 
-        // ── Login info ────────────────────────────────────────
+        // ── Login info ──────
         if (activity != null) ...[
           const _SectionHeader(title: 'Aktivitas Login (24 Jam)'),
           const SizedBox(height: 10),
@@ -906,7 +902,7 @@ class _PenggunaTab extends StatelessWidget {
           ],
         ],
 
-        // ── Daftar driver ─────────────────────────────────────
+        // ── Daftar driver ───
         const _SectionHeader(title: 'Daftar Driver'),
         const SizedBox(height: 10),
         ...drivers.map((d) {
@@ -985,7 +981,7 @@ class _PenggunaTab extends StatelessWidget {
         if (drivers.isEmpty) const _EmptyState(msg: 'Belum ada data driver'),
         const SizedBox(height: 20),
 
-        // ── Siswa pending ─────────────────────────────────────
+        // ── Siswa pending ───
         if (pendingSiswa > 0) ...[
           _SectionHeader(title: 'Menunggu Persetujuan ($pendingSiswa)'),
           const SizedBox(height: 10),
@@ -1023,9 +1019,8 @@ class _PenggunaTab extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
 // CARD WIDGETS
-// ═══════════════════════════════════════════════════════════════
+
 class _AbsensiCard extends StatelessWidget {
   final _AttendanceSummary attendance;
   const _AbsensiCard({required this.attendance});
@@ -1093,9 +1088,8 @@ class _AbsensiCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Tombol Download PDF — compact, untuk header
-// ═══════════════════════════════════════════════════════════════
+// Download PDF
+
 class _DownloadPdfButton extends StatefulWidget {
   final bool loading;
   final String tanggal;
@@ -1742,9 +1736,8 @@ class _BusStatusRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
 // SHARED SMALL WIDGETS
-// ═══════════════════════════════════════════════════════════════
+
 class _StatTile extends StatelessWidget {
   final String label, value, sub;
   final IconData icon;
@@ -2000,7 +1993,7 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-// ── Enum & Model ──────────────────────────────────────────────
+// ── Enum & Model ────────────
 enum _FilterMode { harian, mingguan }
 
 class _AdminDayReport {
@@ -2016,7 +2009,7 @@ class _AdminDayReport {
   });
 }
 
-// ── Filter chip ───────────────────────────────────────────────
+// ── Filter chip ─────────────
 class _AdminFilterChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -2053,7 +2046,7 @@ class _AdminFilterChip extends StatelessWidget {
   }
 }
 
-// ── Weekly Chart Admin ────────────────────────────────────────
+// ── Weekly Chart Admin ──────
 class _AdminWeeklyChart extends StatelessWidget {
   final List<_AdminDayReport> reports;
   const _AdminWeeklyChart({required this.reports});

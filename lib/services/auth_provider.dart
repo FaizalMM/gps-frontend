@@ -81,9 +81,6 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    // Matikan GPS tracking dulu sebelum logout — ini penting agar gps_status
-    // di server di-set 'off'. Tanpa ini, bus driver lama tetap terlihat aktif
-    // di admin selama 5 menit (sampai auto-reset backend berjalan).
     if (_currentUser?.role == UserRole.driver) {
       await GpsService().stopTracking();
     }

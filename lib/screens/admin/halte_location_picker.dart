@@ -13,14 +13,6 @@ class PickedLocation {
   const PickedLocation(this.latitude, this.longitude, {this.namaAlamat});
 }
 
-/// Full-screen map picker untuk menentukan koordinat halte secara akurat.
-/// Fitur:
-/// 1. Cari alamat/tempat (Nominatim)
-/// 2. Tap peta untuk pilih titik
-/// 3. Tombol GPS → langsung ke posisi saat ini
-/// 4. Reverse geocode → tampilkan nama jalan setelah pilih titik
-/// 5. Zoom tinggi default (18) agar presisi
-/// 6. Crosshair di tengah peta (alternatif tap)
 class HalteLocationPicker extends StatefulWidget {
   final double? initialLat;
   final double? initialLng;
@@ -68,7 +60,7 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
 
   LatLng get _center => _picked ?? _defaultCenter;
 
-  // ── Pilih titik dari tap peta ────────────────────────────
+  // ── Pilih titik dari tap peta
   Future<void> _onTap(TapPosition _, LatLng point) async {
     setState(() {
       _picked = point;
@@ -88,7 +80,7 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
     await _reverseGeocode(center);
   }
 
-  // ── Reverse geocode: koordinat → nama jalan ──────────────
+  // ── Reverse geocode: koordinat → nama jalan
   Future<void> _reverseGeocode(LatLng point) async {
     setState(() => _loadingAddr = true);
     final nama = await _svc.reverseGeocode(point.latitude, point.longitude);
@@ -99,7 +91,7 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
     });
   }
 
-  // ── GPS: pergi ke posisi saat ini ────────────────────────
+  // ── GPS: pergi ke posisi saat ini
   Future<void> _goToMyLocation() async {
     setState(() => _loadingGps = true);
     try {
@@ -137,7 +129,7 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
     }
   }
 
-  // ── Cari alamat (debounce 600ms) ─────────────────────────
+  // ── Cari alamat (debounce 600ms)
   void _onSearchChanged(String q) {
     _debounce?.cancel();
     if (q.trim().length < 3) {
@@ -155,7 +147,7 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
     });
   }
 
-  // ── Pilih hasil pencarian ─────────────────────────────────
+  // ── Pilih hasil pencarian
   Future<void> _selectSearchResult(LocationSearchResult r) async {
     final loc = LatLng(r.latitude, r.longitude);
     setState(() {
@@ -180,7 +172,6 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(children: [
-        // ── PETA ─────────────────────────────────────────────
         FlutterMap(
           mapController: _mapCtrl,
           options: MapOptions(
@@ -213,16 +204,12 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
               ]),
           ],
         ),
-
-        // ── CROSSHAIR tengah peta ─────────────────────────────
         const Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             SizedBox(height: 0),
             Icon(Icons.add, size: 24, color: Colors.black54),
           ]),
         ),
-
-        // ── HEADER: tombol kembali + search bar ───────────────
         Positioned(
           top: 0,
           left: 0,
@@ -375,8 +362,6 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
             ),
           ),
         ),
-
-        // ── Tombol crosshair (pakai tengah peta) ─────────────
         Positioned(
           right: 16,
           bottom: _picked != null ? 220 : 100,
@@ -400,8 +385,6 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
             ),
           ]),
         ),
-
-        // ── Panel bawah: info koordinat + konfirmasi ──────────
         if (_picked != null && !_showSearch)
           Positioned(
             bottom: 0,
@@ -537,8 +520,6 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
               ),
             ),
           ),
-
-        // ── Instruksi awal kalau belum pilih titik ────────────
         if (_picked == null && !_showSearch)
           Positioned(
             bottom: 24,
@@ -595,8 +576,6 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
               ),
             ),
           ),
-
-        // ── Tutup search saat tap di luar ─────────────────────
         if (_showSearch)
           Positioned.fill(
             child: GestureDetector(
@@ -612,8 +591,6 @@ class _HalteLocationPickerState extends State<HalteLocationPicker> {
     );
   }
 }
-
-// ── Widget helpers ────────────────────────────────────────────
 
 class _PinMarker extends StatelessWidget {
   @override

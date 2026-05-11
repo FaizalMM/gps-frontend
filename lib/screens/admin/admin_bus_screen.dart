@@ -9,14 +9,12 @@ import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/skeleton_widgets.dart';
-// import '../../services/route_search_service.dart';
 import 'route_builder_screen.dart';
 
 enum _BusFilter { all, active, maintenance, inactive }
 
-// ═══════════════════════════════════════════════════════════
 // AdminBusScreen
-// ═══════════════════════════════════════════════════════════
+
 class AdminBusScreen extends StatefulWidget {
   final AppDataService dataService;
   const AdminBusScreen({super.key, required this.dataService});
@@ -29,7 +27,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
   _BusFilter _filter = _BusFilter.all;
   String _searchQuery = '';
 
-  // ── Dialog tambah bus ──────────────────────────────────
+  // ── Dialog tambah bus
   void _showAddBusDialog() {
     final namaCtrl = TextEditingController();
     final platCtrl = TextEditingController();
@@ -216,7 +214,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     );
   }
 
-  // ── Dialog edit bus ────────────────────────────────────
+  // ── Dialog edit bus ──
   void _showEditBusDialog(BusModel bus) {
     final namaCtrl = TextEditingController(text: bus.nama);
     final platCtrl = TextEditingController(text: bus.platNomor);
@@ -396,7 +394,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     );
   }
 
-  // ── Hapus bus ──────────────────────────────────────────
+  // ── Hapus bus ────────
   void _deleteBus(BusModel bus) {
     showDialog(
       context: context,
@@ -633,9 +631,8 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// Bus Card — tampilan ringkas, rapi, tidak over
-// ═══════════════════════════════════════════════════════════
+// Bus Card
+
 class _BusCard extends StatelessWidget {
   final BusModel bus;
   final VoidCallback onEdit;
@@ -801,7 +798,6 @@ class _BusCard extends StatelessWidget {
           const Divider(height: 1, color: AppColors.lightGrey),
           const SizedBox(height: 10),
 
-          // ── Baris bawah: tombol aksi ──────────────────
           Row(children: [
             // Atur Rute (tombol utama)
             Expanded(
@@ -867,9 +863,8 @@ class _BusCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
 // BusRuteScreen — Atur rute bus + lihat peta jalur
-// ═══════════════════════════════════════════════════════════
+
 class BusRuteScreen extends StatefulWidget {
   final BusModel bus;
   final AppDataService dataService;
@@ -894,7 +889,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
 
   Future<void> _loadRoute() async {
     setState(() => _loading = true);
-    // getRouteByBus → GET /buses/{id}/route → return rute lengkap dengan polyline
+    // getRouteByBus → GET /buses/{id}/route
     final route = await _routeService.getRouteByBus(widget.bus.id);
     if (!mounted) return;
     setState(() {
@@ -1029,7 +1024,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Belum ada rute ─────────────────────────────
+                      // ── Belum ada rute
                       if (_route == null) ...[
                         Container(
                           width: double.infinity,
@@ -1083,7 +1078,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                         ),
                       ]
 
-                      // ── Sudah ada rute ─────────────────────────────
+                      // ── Sudah ada rute
                       else ...[
                         // Peta jalur rute
                         _PetaRute(
@@ -1366,7 +1361,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
   }
 }
 
-// ── Widget peta preview jalur rute ─────────────────────────
+// ── Widget peta preview jalur rute
 class _PetaRute extends StatefulWidget {
   final RouteModel route;
   final bool expanded;
@@ -1636,9 +1631,8 @@ class _PetaRuteState extends State<_PetaRute> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// BusSiswaScreen — kelola siswa di bus ini
-// ═══════════════════════════════════════════════════════════
+// BusSiswaScreen
+
 class BusSiswaScreen extends StatefulWidget {
   final BusModel bus;
   final AppDataService dataService;
@@ -1971,9 +1965,8 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
 // Helper widgets
-// ═══════════════════════════════════════════════════════════
+
 class _Chip extends StatelessWidget {
   final String label;
   final bool active;

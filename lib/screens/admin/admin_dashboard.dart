@@ -40,9 +40,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _ProfileTab(dataService: _dataService),
     ];
 
-    // [FIX] Mulai GPS polling HANYA setelah token dipastikan tersedia.
-    // Jika token belum ada (misal app baru buka), polling ditunda 500ms
-    // sampai login selesai — mencegah 401 berulang saat belum terautentikasi.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       if (!auth.isLoggedIn) return; // belum login, jangan mulai polling
@@ -111,9 +108,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 }
 
-// ════════════════════════════════════════════════════════════
 // HOME TAB
-// ════════════════════════════════════════════════════════════
 class _HomeTab extends StatefulWidget {
   final AppDataService dataService;
   const _HomeTab({required this.dataService});
@@ -127,10 +122,10 @@ class _HomeTabState extends State<_HomeTab> {
 
   String get _greeting {
     final h = DateTime.now().hour;
-    if (h < 11) return 'Selamat pagi 👋';
-    if (h < 15) return 'Selamat siang 👋';
-    if (h < 18) return 'Selamat sore 👋';
-    return 'Selamat malam 👋';
+    if (h < 11) return 'Selamat pagi';
+    if (h < 15) return 'Selamat siang';
+    if (h < 18) return 'Selamat sore';
+    return 'Selamat malam';
   }
 
   @override
@@ -172,7 +167,7 @@ class _HomeTabState extends State<_HomeTab> {
             ),
             const SizedBox(height: 20),
 
-            // ── Stats ────────────────────────────────────────
+            // ── Stats
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: StreamBuilder<List<BusModel>>(
@@ -316,7 +311,7 @@ class _HomeTabState extends State<_HomeTab> {
                   );
                 }
 
-                // Peta + list bus terpisah (tidak overlay)
+                // Peta + list bus terpisah
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
@@ -450,7 +445,7 @@ class _HomeTabState extends State<_HomeTab> {
               },
             ),
             const SizedBox(height: 24),
-            // ── Kelola ───────────────────────────────────────
+            // Kelola
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
               child: Text('Kelola',
@@ -681,9 +676,8 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
-// ════════════════════════════════════════════════════════════
 // MONITOR TAB
-// ════════════════════════════════════════════════════════════
+
 class _MonitorTab extends StatelessWidget {
   final AppDataService dataService;
   const _MonitorTab({required this.dataService});
@@ -885,9 +879,8 @@ class _MonitorTab extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════════════
 // PROFILE TAB
-// ════════════════════════════════════════════════════════════
+
 class _ProfileTab extends StatefulWidget {
   final AppDataService dataService;
   const _ProfileTab({required this.dataService});
@@ -964,10 +957,9 @@ class _ProfileTabState extends State<_ProfileTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header gelap / navy ──────────────────────────
               _buildAdminHeader(user, initial),
 
-              // ── Stats cards ──────────────────────────────────
+              // Stats cards
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                 child: Column(
@@ -1094,7 +1086,7 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
-  // ── Header admin — kartu gelap dengan pola grid ──────────
+  // ── Header admin
   Widget _buildAdminHeader(UserModel? user, String initial) {
     return Container(
       width: double.infinity,
@@ -1172,7 +1164,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   }
 }
 
-// ── Admin profile sub-widgets (prefix _AProf) ─────────────────
+// ── Admin profile sub-widgets
 
 class _AStatCard extends StatelessWidget {
   final String value, label;
@@ -1362,9 +1354,8 @@ class _AProfMenuCard extends StatelessWidget {
         ),
       );
 }
-// ════════════════════════════════════════════════════════════
+
 // SHARED WIDGETS
-// ════════════════════════════════════════════════════════════
 
 class _StatCard extends StatelessWidget {
   final String value, label, sub;
@@ -1439,8 +1430,6 @@ class _QuickCard extends StatelessWidget {
   final String Function(List<HalteModel>)? halteCount;
   final bool busStream;
   final bool halteStream;
-  // Nilai awal dari cache lokal sebelum stream pertama emit
-  // Ini mencegah angka "0" saat data sudah ada tapi stream belum emit
   final int initialCount;
 
   const _QuickCard({
@@ -1647,7 +1636,7 @@ class _ProfileMenu extends StatelessWidget {
   }
 }
 
-// ── Toast notifikasi siswa baru pending ───────────────────────
+// ── Toast notifikasi siswa baru pending
 // Muncul di atas semua UI (via Overlay), auto-hilang setelah 4 detik.
 class _NewPendingToast extends StatefulWidget {
   final int count;
@@ -1753,7 +1742,7 @@ class _NewPendingToastState extends State<_NewPendingToast>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Text(
-                        'Pendaftaran Baru! 🔔',
+                        'Pendaftaran Baru!',
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 13,

@@ -27,7 +27,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
-    // Refresh data saat layar dibuka — pastikan data paling baru tampil
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
     });
@@ -46,8 +46,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     super.dispose();
   }
 
-  // ── Actions ──────────────────────────────────────────────
-  // ── Geocoding: alamat teks → koordinat via Nominatim (gratis, no API key) ──
   Future<Map<String, double>?> _geocodeAlamat(String alamat) async {
     try {
       final query =
@@ -68,7 +66,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     }
   }
 
-  // ── Hitung jarak dua titik koordinat (Haversine, meter) ──────────────────
+  // ── Hitung jarak dua titik koordinat (Haversine, meter)
   double _hitungJarak(double lat1, double lng1, double lat2, double lng2) {
     const r = 6371000.0;
     final dLat = (lat2 - lat1) * pi / 180;
@@ -81,7 +79,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     return r * 2 * atan2(sqrt(a), sqrt(1 - a));
   }
 
-  // ── Format jarak ke teks (m / km) ────────────────────────────────────────
+  // ── Format jarak ke teks (m / km)
   String _formatJarak(double meter) {
     if (meter < 1000) return '${meter.round()} m';
     return '${(meter / 1000).toStringAsFixed(1)} km';
@@ -187,7 +185,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                                 borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 20),
 
-                    // ── Header siswa ──────────────────────
+                    // ── Header siswa
                     Row(children: [
                       Container(
                         width: 44,
@@ -312,7 +310,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                     ),
                     const SizedBox(height: 20),
 
-                    // ── Pilih Bus ─────────────────────────
+                    // ── Pilih Bus
                     const Text('Pilih Bus / Rute',
                         style: TextStyle(
                             fontFamily: 'Poppins',
@@ -475,7 +473,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                     }),
                     const SizedBox(height: 16),
 
-                    // ── Pilih Halte ───────────────────────
+                    // ── Pilih Halte
                     if (selectedBus != null) ...[
                       Row(children: [
                         const Expanded(
@@ -602,7 +600,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                       const SizedBox(height: 16),
                     ],
 
-                    // ── Ringkasan ─────────────────────────
+                    // ── Ringkasan
                     if (selectedBus != null && selectedHalte != null) ...[
                       Container(
                         width: double.infinity,
@@ -658,7 +656,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                       const SizedBox(height: 16),
                     ],
 
-                    // ── Tombol Setujui ────────────────────
                     PrimaryButton(
                       text: 'Setujui & Assign Bus',
                       icon: Icons.check_circle_rounded,
@@ -673,7 +670,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         }
                         Navigator.pop(ctx);
 
-                        // Step 1: Approve siswa — cek hasilnya, jangan diabaikan
+                        // Approve siswa
                         final studentDbId =
                             await widget.dataService.approveAndGetStudentId(
                           user.idStr,
@@ -682,11 +679,11 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
 
                         if (!mounted) return;
 
-                        // Approve gagal — hentikan proses, jangan assign bus
+                        // Approve gagal
                         if (studentDbId == null) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                            content: Text(
-                                '❌ Gagal menyetujui akun ${user.namaLengkap}. Periksa koneksi dan coba lagi.'),
+                            content: const Text(
+                                'Gagal menyetujui akun \${user.namaLengkap}. Periksa koneksi dan coba lagi.'),
                             backgroundColor: AppColors.red,
                             behavior: SnackBarBehavior.floating,
                             duration: const Duration(seconds: 4),
@@ -696,22 +693,22 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                           return;
                         }
 
-                        // Step 2: Assign ke bus — approve sudah dipastikan berhasil
+                        // Assign ke bus — approve sudah dipastikan berhasil
                         final assigned = await BusService().assignStudentToBus(
                           selectedBus!.id,
                           studentDbId,
                           selectedHalte!.id,
                         );
 
-                        // Step 3: Refresh data siswa SETELAH semua proses selesai
+                        // Refresh data siswa SETELAH semua proses selesai
                         await widget.dataService.loadStudents();
 
                         if (!mounted) return;
                         setState(() {});
                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text(assigned
-                              ? '✅ ${user.namaLengkap} disetujui & ditugaskan ke ${selectedBus!.nama}'
-                              : '⚠️ ${user.namaLengkap} disetujui, tapi gagal assign bus. Coba assign manual dari menu Siswa.'),
+                              ? '${user.namaLengkap} disetujui & ditugaskan ke ${selectedBus!.nama}'
+                              : '${user.namaLengkap} disetujui, tapi gagal assign bus. Coba assign manual dari menu Siswa.'),
                           backgroundColor:
                               assigned ? AppColors.primary : AppColors.orange,
                           behavior: SnackBarBehavior.floating,
@@ -765,7 +762,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                                       .showSnackBar(SnackBar(
                                     content: Text(studentId != null
                                         ? '${user.namaLengkap} disetujui (belum ada bus — assign manual dari menu Siswa)'
-                                        : '❌ Gagal menyetujui ${user.namaLengkap}'),
+                                        : 'Gagal menyetujui ${user.namaLengkap}'),
                                     backgroundColor: studentId != null
                                         ? AppColors.orange
                                         : AppColors.red,
@@ -1121,7 +1118,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────
+  // ── Build
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<UserModel>>(
@@ -1297,7 +1294,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
   }
 }
 
-// ── Tab badge ───────────────────────────────────────────────
+// ── Tab badge
 class _TabBadge extends StatelessWidget {
   final int count;
   final Color color;
@@ -1320,7 +1317,7 @@ class _TabBadge extends StatelessWidget {
   }
 }
 
-// ── Student list ────────────────────────────────────────────
+// ── Student list
 class _StudentList extends StatelessWidget {
   final List<UserModel> students;
   final bool isPending;
@@ -1398,7 +1395,6 @@ class _StudentList extends StatelessWidget {
   }
 }
 
-// ── Student card — gaya referensi screenshot ────────────────
 class _StudentCard extends StatelessWidget {
   final UserModel student;
   final VoidCallback onApprove;

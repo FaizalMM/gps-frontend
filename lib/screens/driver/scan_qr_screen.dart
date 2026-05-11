@@ -267,7 +267,6 @@ class _ScanQrScreenState extends State<ScanQrScreen>
   }
 }
 
-// ── Result Sheet ────────────────────────────────────────────
 class _ResultSheet extends StatelessWidget {
   final ScanQrResult result;
   final VoidCallback onNext;
@@ -286,7 +285,6 @@ class _ResultSheet extends StatelessWidget {
   }
 }
 
-// ── Sheet: Sukses ────────────────────────────────────────────
 class _SuccessSheet extends StatefulWidget {
   final AttendanceModel attendance;
   final VoidCallback onNext;
@@ -450,7 +448,7 @@ class _SuccessSheetState extends State<_SuccessSheet> {
           ),
         ),
         const SizedBox(height: 10),
-        // Tombol sekunder: Scan siswa berikutnya
+
         SizedBox(
           width: double.infinity,
           height: 46,
@@ -476,7 +474,6 @@ class _SuccessSheetState extends State<_SuccessSheet> {
   }
 }
 
-// ── Sheet: Rute Tidak Sesuai ─────────────────────────────────
 class _RouteMismatchSheet extends StatelessWidget {
   final RouteMismatchInfo mismatch;
   final VoidCallback onNext;
@@ -522,7 +519,7 @@ class _RouteMismatchSheet extends StatelessWidget {
           decoration: BoxDecoration(
               color: AppColors.orange.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20)),
-          child: const Text('⚠️  RUTE TIDAK SESUAI',
+          child: const Text('RUTE TIDAK SESUAI',
               style: TextStyle(
                   fontFamily: 'Poppins',
                   fontSize: 12,
@@ -669,7 +666,6 @@ class _RouteMismatchSheet extends StatelessWidget {
   }
 }
 
-// ── Sheet: Error Umum ────────────────────────────────────────
 class _ErrorSheet extends StatelessWidget {
   final String message;
   final VoidCallback onNext;
@@ -758,7 +754,6 @@ class _ErrorSheet extends StatelessWidget {
   }
 }
 
-// ── Info column ──────────────────────────────────────────────
 class _InfoCol extends StatelessWidget {
   final String label, value;
   final Color color;
@@ -792,7 +787,6 @@ class _InfoCol extends StatelessWidget {
   }
 }
 
-// ── Corner widget ────────────────────────────────────────────
 class _Corner extends StatelessWidget {
   final bool top, left;
   final double s, t;
@@ -821,7 +815,6 @@ class _Corner extends StatelessWidget {
   }
 }
 
-// ── Scan overlay ─────────────────────────────────────────────
 class _ScanOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {

@@ -8,11 +8,9 @@ class RoutingService {
   factory RoutingService() => _instance;
   RoutingService._internal();
 
-  // OSRM public routing API — gratis, tidak butuh API key
   static const String _osrmBase =
       'http://router.project-osrm.org/route/v1/driving';
 
-  // Jarak (meter) untuk dianggap "sudah melewati" halte
   static const double _haltePassThreshold = 80.0;
 
   final _distance = const Distance();
@@ -24,10 +22,6 @@ class RoutingService {
   // Minimum jeda antar request OSRM ke halte yang sama (detik)
   static const int _requestThrottleSeconds = 5;
 
-  /// Ambil polyline navigasi dari posisi driver ke halte target.
-  /// - Hasil di-cache per halte tujuan agar rute tidak hilang saat request gagal
-  /// - Throttle request agar tidak spam OSRM setiap detik GPS update
-  /// - Jika OSRM gagal/timeout: kembalikan cache terakhir (rute tetap tampil)
   Future<List<LatLng>> getNavigationRoute({
     required LatLng from,
     required LatLng to,
@@ -93,8 +87,6 @@ class RoutingService {
     _lastRequestTime.remove(key);
   }
 
-  /// Cari halte tujuan berikutnya berdasarkan posisi driver.
-  /// Returns index halte yang belum dilewati.
   int getNextHalteIndex({
     required LatLng driverPos,
     required List<RouteHalteModel> haltes,

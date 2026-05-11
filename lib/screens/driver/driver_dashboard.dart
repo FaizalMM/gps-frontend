@@ -32,7 +32,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
   final AppDataService _dataService = AppDataService();
   BusModel? _driverBus;
 
-  // [FIX 1] Lacak apakah sedang refresh bus dari API — untuk tampilkan loading
   bool _isRefreshingBus = false;
 
   @override
@@ -47,8 +46,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     }
   }
 
-  // [FIX 2] Gunakan refreshDriverBus() dari AuthProvider agar notifyListeners()
-  // ikut dipanggil dan semua widget listener terupdate secara konsisten
   Future<void> _refreshBusFromApi() async {
     if (!mounted) return;
     setState(() => _isRefreshingBus = true);
@@ -70,7 +67,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
     final currentUser = context.read<AuthProvider>().currentUser!;
     final BusModel? bus = _driverBus;
 
-    // [FIX 3] isLoadingBus sekarang dinamis — bukan selalu false
     final bool isLoadingBus = _isRefreshingBus && bus == null;
 
     return PopScope(
@@ -118,8 +114,6 @@ class _DriverDashboardState extends State<DriverDashboard> {
   }
 }
 
-// ── _DriverHomeTab ────────────────────────────────────────────
-
 class _DriverHomeTab extends StatefulWidget {
   final UserModel driver;
   final BusModel? bus;
@@ -159,8 +153,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   @override
   void initState() {
     super.initState();
-    // [FIX RECORDING] Daftarkan observer lifecycle agar GPS bisa
-    // di-resume otomatis saat layar HP dinyalakan kembali.
+
     WidgetsBinding.instance.addObserver(this);
 
     _gpsActive = widget.bus?.gpsActive ?? false;
@@ -225,7 +218,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
 
   @override
   void dispose() {
-    // [FIX RECORDING] Hapus observer lifecycle saat widget dispose
     WidgetsBinding.instance.removeObserver(this);
     _positionSub?.cancel();
     _attendancePollTimer?.cancel();
@@ -844,7 +836,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                             fontWeight: FontWeight.w700,
                             color: AppColors.black)),
                     const SizedBox(height: 12),
-                    // ── Baris 1: Laporan & Daftar Siswa ──────────
+
                     Row(children: [
                       Expanded(
                         child: _ActionCard(
@@ -880,14 +872,14 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                       ),
                     ]),
                     const SizedBox(height: 12),
-                    // ── Selesai Bertugas ──────────────────────────
+
                     _SelesaiBertugasButton(
                       bus: widget.bus,
                       attendanceCount: _attendanceToday.length,
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Penumpang Hari Ini ─────────────────────────
+                    // ── Penumpang Hari Ini
                     Row(children: [
                       const Expanded(
                           child: Text('Penumpang Hari Ini',
@@ -1096,7 +1088,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   }
 }
 
-// ── _SelesaiBertugasButton ────────────────────────────────────
 class _SelesaiBertugasButton extends StatefulWidget {
   final dynamic bus;
   final int attendanceCount;
@@ -1381,8 +1372,6 @@ class _SelesaiBertugasButtonState extends State<_SelesaiBertugasButton> {
   }
 }
 
-// ── _ActionCard — menu item baru (3 kolom) ──────────────────
-
 class _ActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1435,10 +1424,8 @@ class _ActionCard extends StatelessWidget {
   }
 }
 
-// ── _DriverBottomNav — 3 item: Dashboard | QR (menonjol) | Profil ──
-
 class _DriverBottomNav extends StatelessWidget {
-  final int currentIndex; // 0 = Dashboard, 1 = Profil
+  final int currentIndex;
   final VoidCallback onDashboard;
   final VoidCallback onScan;
   final VoidCallback onProfile;
@@ -1582,8 +1569,6 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ── Banner halte berikutnya ───────────────────────────────────
-
 class _NextHalteBanner extends StatelessWidget {
   final HalteModel halte;
   final int halteIndex;
@@ -1719,7 +1704,7 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-// ── Profile Tab (Redesign) ────────────────────────────────────
+// ── Profile Tab
 
 class _DriverProfileTab extends StatefulWidget {
   final UserModel driver;
@@ -1792,20 +1777,14 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header hijau ──────────────────────────────────
               _buildHeader(driver, bus, initial),
-
-              // ── Stats bar melayang ────────────────────────────
               if (bus != null) _buildStatsBar(bus),
-
               const SizedBox(height: 20),
-
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Data Pribadi ──────────────────────────
                     const _ProfSectionLabel(label: 'Data Pribadi'),
                     const SizedBox(height: 10),
                     _ProfInfoCard(children: [
@@ -1837,10 +1816,7 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
                         maxLines: 2,
                       ),
                     ]),
-
                     const SizedBox(height: 20),
-
-                    // ── Bus Ditugaskan ──────────────────────────
                     const _ProfSectionLabel(label: 'Bus Ditugaskan'),
                     const SizedBox(height: 10),
                     if (bus != null)
@@ -1874,10 +1850,7 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
                           value: 'Belum ada bus yang ditugaskan',
                         ),
                       ]),
-
                     const SizedBox(height: 20),
-
-                    // ── Manajemen ────────────────────────────────
                     const _ProfSectionLabel(label: 'Manajemen'),
                     const SizedBox(height: 10),
                     _ProfMenuCard(
@@ -1912,10 +1885,7 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
                         );
                       },
                     ),
-
                     const SizedBox(height: 28),
-
-                    // ── Tombol Keluar ─────────────────────────────
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -1950,7 +1920,6 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
     );
   }
 
-  // ── Header widget (inline agar bisa akses local vars) ──────
   Widget _buildHeader(UserModel driver, BusModel? bus, String initial) {
     return Container(
       width: double.infinity,
@@ -2067,8 +2036,6 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
     );
   }
 }
-
-// ── Profile redesign sub-widgets (prefix _Prof agar unik) ────
 
 class _AvatarInitial extends StatelessWidget {
   final String initial;
@@ -2348,10 +2315,6 @@ class _RuteItem extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// _SiswaListSheet — list siswa yang terdaftar di bus driver ini
-// Data diambil dari API /buses/{id}/students bukan dari stream global
-// ══════════════════════════════════════════════════════════════
 class _SiswaListSheet extends StatefulWidget {
   final BusModel? bus;
   final ScrollController scrollCtrl;
@@ -2382,8 +2345,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
       return;
     }
     try {
-      // PERBAIKAN: /buses/{id}/students adalah admin-only (403 untuk driver).
-      // Gunakan endpoint driver: /driver/buses/{id}/students (myBusStudents)
       final list = await BusService().getDriverBusStudents(bus.id);
       if (!mounted) return;
       setState(() {
@@ -2617,10 +2578,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// _CheckoutButton — tombol turunkan siswa dari list penumpang hari ini
-// Dipanggil dari driver dashboard, bukan dari scan sheet
-// ══════════════════════════════════════════════════════════════
 class _CheckoutButton extends StatefulWidget {
   final String qrId;
   final String studentName;

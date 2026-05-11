@@ -72,22 +72,17 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         final waktuNaik = latest['waktu_naik'] as String?;
         final waktuTurun = latest['waktu_turun'] as String?;
 
-        // Status 'pending': QR sudah teregister di server, menunggu scan driver
         if (status == 'pending' && waktuNaik == null) {
           setState(() {
             _isPendingServer = true;
             _isScanned = false;
           });
-          // Tetap polling — menunggu driver scan
+
           _startPolling();
           return;
         }
 
-        // Status checked_in / checked_out / not_checked_out: QR sudah discan driver
         if (waktuNaik != null) {
-          // PERBAIKAN TIMEZONE: backend simpan waktu dalam UTC (timezone = 'UTC' di config/app.php).
-          // Harus .toLocal() agar jam ditampilkan sesuai timezone device (WIB = UTC+7).
-          // Tanpa toLocal(): jam 10:41 WIB tersimpan 03:41 UTC → tampil "03:41" (salah).
           final dt = DateTime.tryParse(waktuNaik)?.toLocal();
           final jamNaik = dt != null
               ? '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}'
@@ -139,7 +134,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       _jarakInfo = null;
     });
 
-    // Fase 1: dapatkan koordinat GPS
+    // dapatkan koordinat GPS
     final pos = await _gpsService.getCurrentPosition();
     if (!mounted) return;
 
@@ -153,7 +148,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       return;
     }
 
-    // Fase 2: kirim koordinat ke server
+    // kirim koordinat ke server
     setState(() => _isGettingGps = false);
 
     final result = await StudentService().generateQrCode(
@@ -168,10 +163,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         _errorMsg = 'Tidak ada respons dari server. Periksa koneksi internet.';
       } else if (result.containsKey('__error')) {
         final errMsg = result['__error'] as String;
-        // Buat pesan error lebih ramah & kontekstual
+
         if (errMsg.contains('halte') || errMsg.contains('dekat')) {
           _errorMsg = errMsg;
-          // Ekstrak info jarak dari pesan jika ada
+
           final jarakMatch = RegExp(r'(\d+(?:\.\d+)?)m').allMatches(errMsg);
           if (jarakMatch.isNotEmpty) {
             final distances = jarakMatch.map((m) => m.group(0)!).toList();
@@ -258,7 +253,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
         child: Column(children: [
-          // ── Status bar ────────────────────────────────
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -341,10 +335,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ]),
           ),
           const SizedBox(height: 12),
-
-          // ── Banner status absensi (muncul setelah QR discan driver) ──
           if (_isScanned) ...[
-            // ── Sudah discan driver: checked_in atau selesai ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(14),
@@ -381,7 +372,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       children: [
                         Text(
                           _isOnTrip
-                              ? '🚌 Kamu sedang dalam perjalanan!'
+                              ? 'Kamu sedang dalam perjalanan!'
                               : '✅ Perjalanan selesai hari ini',
                           style: TextStyle(
                               fontFamily: 'Poppins',
@@ -411,7 +402,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ),
             const SizedBox(height: 12),
           ] else if (_isPendingServer && !_isLoading) ...[
-            // ── QR sudah teregister di server (status pending) — menunggu scan driver ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -491,8 +481,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ),
             const SizedBox(height: 12),
           ],
-
-          // ── Kartu ID ──────────────────────────────────
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -657,7 +645,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                                           .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(20)),
                                   child: Text(
-                                    '📍 $_jarakInfo',
+                                    '$_jarakInfo',
                                     style: const TextStyle(
                                         fontFamily: 'Poppins',
                                         fontSize: 10,
@@ -671,7 +659,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                                   _errorMsg!.contains('Tunggu')) ...[
                                 const SizedBox(height: 8),
                                 const Text(
-                                  '💡 Mendekat ke halte atau tunggu bus tiba',
+                                  'Mendekat ke halte atau tunggu bus tiba',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                       fontFamily: 'Poppins',
@@ -814,7 +802,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                 ]),
               ),
 
-              // Divider + info QR aktual (halte, bus, expired)
               Container(
                   height: 1,
                   margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -919,8 +906,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ]),
           ),
           const SizedBox(height: 16),
-
-          // ── Info card ─────────────────────────────────
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(

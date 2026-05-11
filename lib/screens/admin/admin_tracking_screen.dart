@@ -37,7 +37,6 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
     _mapController.move(LatLng(b.latitude, b.longitude), zoom);
   }
 
-  /// Klik item di list bus → fokus kamera + tutup dropdown
   void _selectBus(BusModel b) {
     setState(() {
       _focusedBus = b;
@@ -104,7 +103,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                 : null,
             child: Stack(
               children: [
-                // ── PETA FULL SCREEN ───────────────────────
+                // ── PETA FULL SCREEN
                 active.isEmpty
                     ? Container(
                         color: AppColors.surface2,
@@ -389,7 +388,6 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                     ),
                   ),
 
-                // ── BOTTOM PANEL detail bus ──────────────────
                 Positioned(
                   left: 0,
                   right: 0,
@@ -496,7 +494,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
   }
 }
 
-// ── Detail card ───────────────────────────────────────────────
+// ── Detail card
 class _BusDetailCard extends StatelessWidget {
   final BusModel bus;
   final VoidCallback onClose;

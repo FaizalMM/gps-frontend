@@ -147,9 +147,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     }
 
-    // PERBAIKAN: kirim semua field termasuk no_hp dan alamat ke backend.
-    // Sebelumnya hanya name & email yang dikirim → no_hp dan alamat hanya
-    // diupdate di memori lokal dan hilang saat login ulang karena tidak tersimpan ke DB.
     await ApiClient().put('/auth/profile', {
       'name': _namaCtrl.text.trim(),
       'email': _emailCtrl.text.trim(),

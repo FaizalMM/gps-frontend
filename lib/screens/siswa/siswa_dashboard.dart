@@ -17,9 +17,8 @@ import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
 import 'qr_code_screen.dart';
 
-// ══════════════════════════════════════════════════════════════
 // ROOT WIDGET
-// ══════════════════════════════════════════════════════════════
+
 class SiswaDashboard extends StatefulWidget {
   const SiswaDashboard({super.key});
   @override
@@ -85,9 +84,8 @@ class _SiswaDashboardState extends State<SiswaDashboard> {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // HOME TAB
-// ══════════════════════════════════════════════════════════════
+
 class _SiswaHomeTab extends StatefulWidget {
   final UserModel siswa;
   final AppDataService dataService;
@@ -205,7 +203,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                        Text('${_greeting()}, $first 👋',
+                        Text('${_greeting()}, $first',
                             style: const TextStyle(
                                 fontFamily: 'Poppins',
                                 fontSize: 13,
@@ -251,7 +249,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             ),
             const SizedBox(height: 18),
 
-            // ── Bus status card ─────────────────────────────
+            // Bus status card
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _loadingBusInfo
@@ -274,7 +272,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             ),
             const SizedBox(height: 10),
 
-            // ── Status banner (offline = waiting, online = siapkan QR) ─
+            // Status banner (offline = waiting, online = siapkan QR)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _loadingBusInfo
@@ -296,7 +294,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             ),
             const SizedBox(height: 12),
 
-            // ── Info bus & driver ───────────────────────────
+            // Info bus & driver
             if (!_loadingBusInfo && _myBusName != null)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -307,7 +305,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
               ),
             const SizedBox(height: 12),
 
-            // ── Quick actions (3 item — tanpa hubungi sekolah) ─
+            // Quick actions (3 item — tanpa hubungi sekolah)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(children: [
@@ -335,7 +333,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
             ),
             const SizedBox(height: 20),
 
-            // ── Bus Beroperasi ─────────────────────────────
+            // Bus Beroperasi
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(children: [
@@ -450,9 +448,8 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // GPS STATUS BADGE
-// ══════════════════════════════════════════════════════════════
+
 class _GpsBadge extends StatelessWidget {
   final bool aktif;
   const _GpsBadge({required this.aktif});
@@ -495,9 +492,8 @@ class _GpsBadge extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // BUS CARD — GPS OFFLINE STATE
-// ══════════════════════════════════════════════════════════════
+
 class _BusOfflineCard extends StatelessWidget {
   final String? busName;
   final String? driverName;
@@ -629,9 +625,8 @@ class _BusOfflineCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // WAITING BANNER — ditampilkan saat GPS belum aktif
-// ══════════════════════════════════════════════════════════════
+
 class _WaitingBanner extends StatelessWidget {
   const _WaitingBanner();
 
@@ -695,9 +690,8 @@ class _WaitingBanner extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// STATUS BANNER — generic (dipakai untuk GPS aktif / siapkan QR)
-// ══════════════════════════════════════════════════════════════
+// STATUS BANNER
+
 class _StatusBanner extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -755,9 +749,8 @@ class _StatusBanner extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // BUS & DRIVER INFO CARD
-// ══════════════════════════════════════════════════════════════
+
 class _BusDriverInfoCard extends StatelessWidget {
   final String busName;
   final String? driverName;
@@ -823,9 +816,8 @@ class _BusDriverInfoCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // BUS LIVE CARD — GPS aktif
-// ══════════════════════════════════════════════════════════════
+
 class _BusLiveCard extends StatelessWidget {
   final BusModel bus;
   final String eta;
@@ -947,9 +939,8 @@ class _BusLiveCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // QUICK ACTION (3-item row)
-// ══════════════════════════════════════════════════════════════
+
 class _QAction extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1001,9 +992,8 @@ class _QAction extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // NO BUS ASSIGNED CARD
-// ══════════════════════════════════════════════════════════════
+
 class _NoBusAssignedCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -1048,9 +1038,8 @@ class _NoBusAssignedCard extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // BUS LIST TILE
-// ══════════════════════════════════════════════════════════════
+
 class _BusListTile extends StatelessWidget {
   final BusModel bus;
   final String eta;
@@ -1120,9 +1109,8 @@ class _BusListTile extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// TRACKING TAB  (tidak berubah dari versi asli)
-// ══════════════════════════════════════════════════════════════
+// TRACKING TAB
+
 class _SiswaTrackingTab extends StatefulWidget {
   final AppDataService dataService;
   const _SiswaTrackingTab({required this.dataService});
@@ -1353,7 +1341,7 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
           else
             _buildAttendanceBanner(),
 
-          // ── Filter chips ──────────────────────────────────
+          // Filter chips
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Row(children: [
@@ -1483,7 +1471,7 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
         borderColor: Colors.green.withValues(alpha: 0.4),
         icon: Icons.directions_bus_rounded,
         iconColor: Colors.green,
-        title: 'Kamu sedang dalam perjalanan 🚌',
+        title: 'Kamu sedang dalam perjalanan',
         subtitle: _waktuNaik != null
             ? 'Naik jam $_waktuNaik${_halteNaik != null ? " di $_halteNaik" : ""}'
             : 'Sudah check-in',
@@ -1538,7 +1526,12 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
           ],
         ),
         child: Row(children: [
-          Text(isVeryClose ? '🚌' : '⚠️', style: const TextStyle(fontSize: 24)),
+          Icon(
+              isVeryClose
+                  ? Icons.directions_bus_rounded
+                  : Icons.warning_amber_rounded,
+              size: 24,
+              color: isVeryClose ? AppColors.primary : AppColors.orange),
           const SizedBox(width: 12),
           Expanded(
               child: Column(
@@ -1819,7 +1812,7 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
       );
     }
 
-    // Filter Online: tampilkan peta jika bus online, atau pesan kosong
+    // Filter Online: tampilkan peta jika bus online,
     if (_selectedFilter == 'Online') {
       if (_myBus == null) return _buildNoBusView();
       if (!_myBus!.gpsActive || _myBus!.latitude == 0) {
@@ -2003,9 +1996,8 @@ class _SiswaTrackingTabState extends State<_SiswaTrackingTab>
       ]));
 }
 
-// ══════════════════════════════════════════════════════════════
-// TRACKING STATUS BANNER (untuk tab Lacak)
-// ══════════════════════════════════════════════════════════════
+// TRACKING STATUS BANNER
+
 class _TrackingStatusBanner extends StatelessWidget {
   final Color color;
   final Color borderColor;
@@ -2073,9 +2065,8 @@ class _TrackingStatusBanner extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // ON BUS OVERLAY
-// ══════════════════════════════════════════════════════════════
+
 class _OnBusOverlay extends StatelessWidget {
   final String busName;
   final double speed;
@@ -2142,9 +2133,8 @@ class _OnBusOverlay extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // INFO TILE
-// ══════════════════════════════════════════════════════════════
+
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -2182,9 +2172,8 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
-// PROFILE TAB  (tidak berubah dari versi asli)
-// ══════════════════════════════════════════════════════════════
+// PROFILE TAB
+
 class _SiswaProfileTab extends StatefulWidget {
   final UserModel siswa;
   const _SiswaProfileTab({required this.siswa});
@@ -2507,7 +2496,7 @@ class _SiswaProfileTabState extends State<_SiswaProfileTab> {
   }
 }
 
-// ── Profile sub-widgets ──────────────────────────────────────
+//  Profile sub-widgets
 class _SProfAvatar extends StatelessWidget {
   final String initial;
   const _SProfAvatar({required this.initial});
@@ -2849,9 +2838,8 @@ class _SProfMenuCard extends StatelessWidget {
       );
 }
 
-// ══════════════════════════════════════════════════════════════
 // SHARED BOTTOM SHEET WIDGETS
-// ══════════════════════════════════════════════════════════════
+
 class _SimpleSheet extends StatelessWidget {
   final String title;
   final Widget child;
@@ -2925,9 +2913,8 @@ class _NotifTile extends StatelessWidget {
   }
 }
 
-// ══════════════════════════════════════════════════════════════
 // HALTE ROUTE SHEET
-// ══════════════════════════════════════════════════════════════
+
 class _HalteRouteSheet extends StatefulWidget {
   final AppDataService dataService;
   final ScrollController scrollCtrl;

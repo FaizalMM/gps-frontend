@@ -2,9 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import '../models/models_api.dart';
 
-// ============================================================
 // StudentService
-// ============================================================
+
 class StudentService {
   final _api = ApiClient();
 
@@ -30,9 +29,8 @@ class StudentService {
   List<UserModel> _parseStudentList(List list) {
     return list.map((e) {
       final json = e as Map<String, dynamic>;
-      // BE returns student with user nested, or user with student nested
+
       if (json['user'] != null) {
-        // student record → wrap as user
         final userJson = json['user'] as Map<String, dynamic>;
         return UserModel.fromJson({
           ...userJson,
@@ -43,14 +41,11 @@ class StudentService {
     }).toList();
   }
 
-  /// Approve siswa dan return students.id dari response backend.
-  /// Mengirim userId (users.id) ke endpoint, backend cari by user_id.
-  /// Return: students.id jika berhasil, null jika gagal.
   Future<int?> approveStudent(int userId) async {
     final res = await _api.post('/students/$userId/approve', {});
     if (!res.success) return null;
     final data = res.data?['data'] as Map<String, dynamic>?;
-    // Backend return student object → ambil students.id
+
     return data?['id'] as int?;
   }
 
@@ -111,8 +106,6 @@ class StudentService {
 
   /// Ambil status absensi siswa hari ini (sudah naik / belum / sudah turun)
   Future<Map<String, dynamic>?> getMyAttendanceToday(int studentId) async {
-    // Pakai endpoint baru /student/attendance/today (tanpa ID di URL)
-    // agar tidak kena 403 karena /students/{id}/attendance/today hanya untuk admin
     final res = await _api.get('/student/attendance/today');
     if (!res.success || res.data == null) return null;
     final data = res.data!['data'];
@@ -128,9 +121,8 @@ class StudentService {
   }
 }
 
-// ============================================================
 // DriverService
-// ============================================================
+
 class DriverService {
   final _api = ApiClient();
 
@@ -224,8 +216,6 @@ class DriverService {
     return res.success;
   }
 
-  // Driver: scan QR siswa (check-in)
-  // Mengembalikan ScanQrResult — bisa sukses, rute tidak sesuai, atau error lain
   Future<ScanQrResult> scanStudentQr(
     Map<String, dynamic> qrData, {
     required double latitude,
@@ -273,14 +263,10 @@ class DriverService {
     return res.success;
   }
 
-  /// Ambil daftar siswa yang sudah naik bus hari ini
-  /// Endpoint: GET /driver/buses/{busId}/attendance/today (driver route)
   Future<List<Map<String, dynamic>>> getBusAttendanceToday(int busId) async {
     final res = await _api.get('/driver/buses/$busId/attendance/today');
     if (!res.success || res.data == null) return [];
-    // PERBAIKAN BUG: backend responseSuccess membungkus dalam {success, data: {bus_id, data:[...]}}
-    // res.data!['data'] = {bus_id, bus_code, date, data:[...]} bukan List langsung
-    // sehingga raw is! List → selalu return [] → penumpang tidak pernah tampil
+
     final wrapper = res.data!['data'];
     final raw = wrapper is Map ? wrapper['data'] : wrapper;
     if (raw is! List) return [];
@@ -295,9 +281,7 @@ class DriverService {
   }
 }
 
-// ============================================================
 // HalteService
-// ============================================================
 class HalteService {
   final _api = ApiClient();
 
@@ -365,9 +349,8 @@ class HalteService {
   }
 }
 
-// ============================================================
 // AttendanceService
-// ============================================================
+
 class AttendanceService {
   final _api = ApiClient();
 
@@ -387,18 +370,8 @@ class AttendanceService {
   }
 }
 
-// ============================================================
-// RouteService — CRUD rute bus + manajemen halte dalam rute
-// Endpoint BE: GET/POST/PUT/DELETE /buses/{id}/routes (via BusService)
-//              POST   /routes/{id}/haltes
-//              PUT    /route-haltes/{id}
-//              DELETE /route-haltes/{id}
-//              GET    /routes/{id}/haltes
-// ============================================================
 class RouteService {
   final _api = ApiClient();
-
-  // ── Rute ───────────────────────────────────────────────────────
 
   /// Ambil semua rute untuk listing (tanpa polyline — ringan)
   /// Untuk polyline lengkap gunakan getRoute(id) atau getRouteByBus(busId)
@@ -478,9 +451,7 @@ class RouteService {
     return res.success;
   }
 
-  // ── Halte dalam Rute ──────────────────────────────────────────
-
-  /// Ambil halte dalam rute tertentu (sudah urut)
+  /// Ambil halte dalam rute tertentu
   Future<List<RouteHalteModel>> getHaltesByRoute(int routeId) async {
     final res = await _api.get('/routes/$routeId/haltes');
     if (!res.success || res.data == null) return [];
@@ -518,9 +489,6 @@ class RouteService {
     return res.success;
   }
 
-  // ── Polyline ──────────────────────────────────────────────────
-
-  /// Sync dari RouteBuilderScreen — simpan polyline + halte sekaligus
   Future<RouteModel?> syncRoute({
     required int routeId,
     required List<Map<String, double>> polyline,

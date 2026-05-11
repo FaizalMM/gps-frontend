@@ -9,7 +9,6 @@ import '../siswa/siswa_dashboard.dart';
 import '../../models/models_api.dart';
 import 'register_siswa_screen.dart';
 import 'pending_screen.dart';
-// [FIX SPLASH] Import untuk set flag _hasNavigated
 import 'splash_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -82,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen>
       // tidak tampil lagi saat resume dari background
       SplashScreen.hasNavigated = true;
 
-      // tertinggal yang bisa memicu rebuild splash saat Android resume
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => nextScreen),
         (_) => false,

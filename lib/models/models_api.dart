@@ -1,11 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-// ============================================================
-// models_api.dart — Model yang sesuai dengan respons Laravel BE
-// Setiap model punya fromJson() untuk parsing API response
-// ============================================================
-
-/// Helper: parse double dari String ATAU num (Laravel kadang kirim keduanya)
+/// Helper: parse double dari String ATAU num
 double _parseDouble(dynamic v, double fallback) {
   if (v == null) return fallback;
   if (v is num) return v.toDouble();

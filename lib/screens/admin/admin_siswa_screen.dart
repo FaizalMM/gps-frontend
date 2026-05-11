@@ -116,14 +116,13 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     }
   }
 
-  // ── Assign / Re-assign bus untuk siswa yang sudah approved ───────────────
+  // ── Assign / Re-assign bus untuk siswa yang sudah approved
   void _showAssignBusSheet(UserModel user) {
     final buses = widget.dataService.buses
         .where((b) => b.status == BusStatus.active)
         .toList();
     final allHaltes = widget.dataService.haltes;
 
-    // Cek bus yang sudah di-assign ke siswa ini (jika ada)
     final currentBusId = user.studentDetail?.busId ?? 0;
     final currentHalteId = user.studentDetail?.halteId ?? 0;
 
@@ -640,7 +639,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                   ScaffoldMessenger.of(context)
                                       .showSnackBar(const SnackBar(
                                     content: Text(
-                                        '❌ ID siswa tidak ditemukan. Refresh dan coba lagi.'),
+                                        'ID siswa tidak ditemukan. Refresh dan coba lagi.'),
                                     backgroundColor: AppColors.red,
                                     behavior: SnackBarBehavior.floating,
                                   ));
@@ -658,8 +657,8 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 ScaffoldMessenger.of(context)
                                     .showSnackBar(SnackBar(
                                   content: Text(ok
-                                      ? '✅ ${user.namaLengkap} berhasil ditugaskan ke ${selectedBus!.nama}'
-                                      : '❌ Gagal assign bus. Coba lagi.'),
+                                      ? '${user.namaLengkap} berhasil ditugaskan ke ${selectedBus!.nama}'
+                                      : 'Gagal assign bus. Coba lagi.'),
                                   backgroundColor:
                                       ok ? AppColors.primary : AppColors.red,
                                   behavior: SnackBarBehavior.floating,
@@ -847,7 +846,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       const SizedBox(height: 12),
                       Text(
                           _filter == 'Belum ada Bus'
-                              ? 'Semua siswa sudah punya bus 🎉'
+                              ? 'Semua siswa sudah punya bus'
                               : 'Tidak ada siswa ditemukan',
                           style: const TextStyle(
                               fontFamily: 'Poppins',
@@ -1125,7 +1124,7 @@ class _SiswaCard extends StatelessWidget {
                   size: 12, color: AppColors.orange),
               SizedBox(width: 5),
               Expanded(
-                child: Text('Belum ditugaskan ke bus — tap 🔄 untuk assign',
+                child: Text('Belum ditugaskan ke bus — tap tombol assign,',
                     style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 11,

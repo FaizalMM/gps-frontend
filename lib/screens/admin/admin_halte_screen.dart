@@ -33,7 +33,6 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  // ── Bug 2 Fix: Hapus field "Rute" yang tidak ada di BE
   void _showAddHalteDialog() {
     final namaCtrl = TextEditingController();
     final alamatCtrl = TextEditingController();
@@ -536,7 +535,6 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-// Bug 5 Fix: Hapus routeLabel dan routeColor — tidak ada relasi halte→rute di level ini
 class _HalteCard extends StatelessWidget {
   final HalteModel halte;
   final VoidCallback onDelete;
@@ -749,7 +747,7 @@ class _HalteCard extends StatelessWidget {
   }
 }
 
-// ── Location picker field ─────────────────────────────────────────────
+// ── Location picker field
 class _LocationPickerField extends StatelessWidget {
   final double? lat;
   final double? lng;

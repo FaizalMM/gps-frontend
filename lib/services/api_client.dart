@@ -42,7 +42,7 @@ class ApiResponse<T> {
   });
 }
 
-/// Core API client — semua request HTTP lewat sini
+/// Core API client
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
@@ -50,8 +50,6 @@ class ApiClient {
 
   final _storage = const FlutterSecureStorage();
   String? _token;
-
-  // ── Token management ─────────────────────────────────────
 
   Future<void> saveToken(String token) async {
     _token = token;
@@ -73,16 +71,12 @@ class ApiClient {
     return t != null && t.isNotEmpty;
   }
 
-  // ── Headers ───────────────────────────────────────────────
-
   Future<Map<String, String>> _headers({bool withAuth = true}) async {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
     if (withAuth) {
-      // [FIX] Selalu baca ulang dari storage — jangan andalkan cache _token
-      // yang bisa null saat polling berjalan sebelum login selesai
       final token = await _storage.read(key: 'api_token');
       _token = token;
       if (token != null && token.isNotEmpty) {
@@ -91,8 +85,6 @@ class ApiClient {
     }
     return headers;
   }
-
-  // ── HTTP Methods ──────────────────────────────────────────
 
   Future<ApiResponse<Map<String, dynamic>>> get(
     String endpoint, {

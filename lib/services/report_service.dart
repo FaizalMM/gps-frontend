@@ -7,8 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'api_client.dart';
 
-// ── Model: satu baris laporan absensi siswa ──────────────────
-
 class AttendanceReportRow {
   final int no;
   final String namaPenumpang;
@@ -73,8 +71,6 @@ class AttendanceReportRow {
   }
 }
 
-// ── Model: hasil lengkap laporan driver ─────────────────────
-
 class DriverReportData {
   final int totalAttendances;
   final List<AttendanceReportRow> rows;
@@ -83,11 +79,7 @@ class DriverReportData {
 
   factory DriverReportData.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? json;
-    // PERBAIKAN BUG: generateDriverReport() backend mengembalikan 2 key berbeda:
-    // - 'reports'            → data dari tabel DailyReport (tidak ada checkout/waktu_turun)
-    // - 'attendance_reports' → data dari tabel Attendance (ada checkout, waktu_turun, dll)
-    // Flutter sebelumnya baca 'reports' sehingga field checkout/status selalu kosong/salah.
-    // Fix: prioritaskan 'attendance_reports', fallback ke 'reports' jika tidak ada.
+
     final rawRows = (data['attendance_reports'] as List<dynamic>?) ??
         (data['reports'] as List<dynamic>?) ??
         [];
@@ -99,8 +91,6 @@ class DriverReportData {
     );
   }
 }
-
-// ── Service ──────────────────────────────────────────────────
 
 class ReportService {
   static final ReportService _instance = ReportService._internal();
@@ -182,8 +172,6 @@ class ReportService {
     );
   }
 
-  // ── Private ───────────────────────────────────────────────
-
   Future<String?> _downloadFile({
     required String endpoint,
     required Map<String, String> params,
@@ -212,12 +200,9 @@ class ReportService {
         return null;
       }
 
-      // Ambil nama file dari header Content-Disposition jika ada
-      // Contoh: attachment; filename="Laporan_Ahmad_2025-01-15.pdf"
       String filename = fallbackFilename;
       final contentDisposition = response.headers['content-disposition'] ?? '';
       if (contentDisposition.contains('filename')) {
-        // Parse: filename="Laporan_Ahmad.pdf" atau filename=Laporan_Ahmad.pdf
         final parts = contentDisposition.split('filename');
         if (parts.length > 1) {
           String namePart = parts.last
@@ -251,9 +236,6 @@ class ReportService {
     }
   }
 
-  /// Simpan ke folder Download yang TERLIHAT di File Manager Android.
-  /// Android <= 28 : minta izin WRITE_EXTERNAL_STORAGE
-  /// Android >= 29  : tulis langsung tanpa izin
   Future<String?> _saveToDownloads(Uint8List bytes, String filename) async {
     if (!Platform.isAndroid) {
       // iOS: simpan ke Documents (tampil di app Files)

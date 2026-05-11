@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart';
 class BusService {
   final _api = ApiClient();
 
-  // ── Admin ─────────────────────────────────────────────────
-
   Future<List<BusModel>> getBuses() async {
     final res = await _api.get('/buses');
     if (!res.success || res.data == null) return [];
@@ -144,8 +142,6 @@ class BusService {
     final wrapper = res.data!['data'];
     debugPrint('[BusService] wrapper type: ${wrapper.runtimeType}');
 
-    // Backend responsePaginated mengembalikan data langsung sebagai List di key 'data'
-    // Fallback ke 'items' atau nested 'data' untuk antisipasi perubahan struktur
     final raw = wrapper is List
         ? wrapper
         : wrapper is Map
@@ -160,8 +156,6 @@ class BusService {
         final student = e as Map<String, dynamic>;
         final user = student['user'] as Map<String, dynamic>?;
 
-        // FIX: user bisa null jika eager load gagal atau relasi belum diset.
-        // Fallback berantai: user.id → user_id langsung di student object
         final userId = user?['id'] ?? student['user_id'];
 
         if (userId == null) {
@@ -242,8 +236,6 @@ class BusService {
     return res.success;
   }
 
-  // ── Driver ────────────────────────────────────────────────
-
   Future<List<BusModel>> getDriverBuses() async {
     final res = await _api.get('/driver/buses');
     if (!res.success || res.data == null) return [];
@@ -277,8 +269,6 @@ class BusService {
 
     return list.map((e) {
       final json = e as Map<String, dynamic>;
-      // Dashboard mengembalikan driver.name (bukan driver.user.name)
-      // Normalisasi agar BusModel.fromJson bisa parsing dengan benar
       final driverRaw = json['driver'] as Map<String, dynamic>?;
       final driverNormalized = driverRaw != null
           ? {
@@ -344,13 +334,6 @@ class BusService {
     });
   }
 
-  // ── Siswa: tracking bus yang di-assign ───────────────────
-
-  /// Tracking bus untuk siswa — return BusModel dengan rute+halte lengkap
-  /// plus my_halte (halte penjemputan siswa ini) sebagai field terpisah.
-  /// Strategi berlapis:
-  /// 1. Coba /student/bus/tracking (data real-time + GPS)
-  /// 2. Fallback ke /student/bus (data statis, tanpa GPS) jika tracking gagal
   Future<({BusModel? bus, Map<String, dynamic>? myHalte, String? driverName})>
       getMyBusTrackingFull() async {
     final res = await _api.get('/student/bus/tracking');
@@ -358,10 +341,7 @@ class BusService {
       final d = res.data!['data'] as Map<String, dynamic>?;
       if (d != null) {
         final pos = d['position'] as Map<String, dynamic>?;
-        // [FIX] Ikuti flag gps_active dari backend secara langsung.
-        // Sebelumnya: && pos != null → menyebabkan gpsActive = false
-        // di jeda awal setelah driver toggle ON (sebelum koordinat pertama masuk).
-        // Backend sudah difix: gps_active = true segera saat gps_status='on'.
+
         final gpsActive = d['gps_active'] as bool? ?? false;
 
         final bus = BusModel.fromJson({
@@ -389,9 +369,6 @@ class BusService {
             gpsActive: true,
           );
         } else if (gpsActive) {
-          // GPS aktif tapi koordinat belum masuk — tetap tandai aktif,
-          // biarkan posisi default (0,0) agar marker tidak muncul di peta
-          // tapi card status di Home berubah ke AKTIF.
           bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: true);
         } else {
           bus.updateGps(latitude: 0, longitude: 0, speed: 0, gpsActive: false);
@@ -403,8 +380,6 @@ class BusService {
       }
     }
 
-    // Fallback: ambil data bus dari /student/bus (tanpa GPS real-time)
-    // Ini memastikan siswa tetap bisa lihat info bus meski driver belum aktif GPS
     final fallback = await _api.get('/student/bus');
     if (!fallback.success || fallback.data == null) {
       return (bus: null, myHalte: null, driverName: null);

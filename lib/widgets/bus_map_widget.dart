@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import '../models/models.dart';
+import '../models/models_api.dart';
 import '../utils/app_theme.dart';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
@@ -16,9 +16,6 @@ class BusMapWidget extends StatefulWidget {
   final bool interactive;
   final MapController? mapController;
 
-  // ── Fitur Rute ──────────────────────────────────────────────
-  /// Data rute yang akan ditampilkan polyline & halte-nya.
-  /// Bisa diisi dari admin_dashboard atau siswa_dashboard.
   final List<RouteModel> routes;
 
   /// Jika true, tampilkan semua rute. Jika false, hanya rute yang
@@ -52,7 +49,7 @@ class BusMapWidget extends StatefulWidget {
 class _BusMapWidgetState extends State<BusMapWidget> {
   late MapController _mapController;
   int? _selectedHalteId;
-  // [FIX] Bus yang sedang dipilih untuk ditampilkan info-nya
+
   int? _selectedBusId;
 
   // Warna rute: orange (bus pertama) dan biru (bus kedua), bergantian
@@ -64,8 +61,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
     Color(0xFFFF6B00),
   ];
 
-  // Menyimpan indeks titik terdekat bus di polyline, per busId
-  // Key: busId, Value: indeks titik polyline terdekat dengan posisi bus
   final Map<int, int> _busPolylineIndex = {};
 
   @override
@@ -74,8 +69,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
     _mapController = widget.mapController ?? MapController();
   }
 
-  // Flag: user sedang menggeser / zoom map secara manual
-  // Selagi true, auto-follow dinonaktifkan agar map tidak balik ke posisi bus
   bool _userInteracting = false;
   // Timer reset interaksi: 5 detik setelah user berhenti geser, auto-follow aktif kembali
   DateTime? _lastInteractionTime;
@@ -105,7 +98,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
       }
     }
 
-    // JANGAN pindahkan kamera jika user sedang berinteraksi dengan map
     if (_isUserInteracting) return;
 
     if (widget.driverLocation != null &&
@@ -122,8 +114,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
     }
   }
 
-  /// Cari titik di polyline yang paling dekat dengan posisi bus,
-  /// lalu simpan indeksnya — dipakai untuk split "sudah dilalui" vs "sisa rute"
   void _updateBusPolylineIndex(BusModel bus) {
     for (final route in widget.routes) {
       if (route.busId != bus.id) continue;
@@ -146,8 +136,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
         }
       }
 
-      // Hanya update jika lebih maju dari posisi sebelumnya
-      // (tidak mundur supaya efek "menghilang" tidak balik lagi)
       final prev = _busPolylineIndex[bus.id] ?? 0;
       if (closestIdx > prev) {
         setState(() => _busPolylineIndex[bus.id] = closestIdx);
@@ -171,7 +159,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
 
   double _toRad(double deg) => deg * math.pi / 180;
 
-  // Koordinat default Madiun — dipakai bila tidak ada bus dengan GPS valid
   static const LatLng _defaultCenter = LatLng(-7.6298, 111.5239);
 
   LatLng _getCenter() {
@@ -235,8 +222,7 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   _selectedHalteId = null;
                   _selectedBusId = null;
                 }),
-                // Deteksi saat user mulai menggeser / zoom map secara manual
-                // Selagi interaksi, auto-follow dinonaktifkan agar map tidak balik
+
                 onPositionChanged: (position, hasGesture) {
                   if (hasGesture) {
                     _userInteracting = true;
@@ -261,7 +247,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   },
                 ),
 
-                // ── Polyline Rute (Progressive) ─────────────────
                 if (visibleRoutes.isNotEmpty)
                   ...visibleRoutes.asMap().entries.expand((entry) {
                     final idx = entry.key;
@@ -289,8 +274,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                         ? allPoints.sublist(splitIdx)
                         : <LatLng>[];
 
-                    // Bagian yang sudah dilalui: dari awal sampai posisi bus
-                    // Tampilkan sangat pudar (hampir transparan)
                     final passedPoints = splitIdx > 0
                         ? allPoints.sublist(0, splitIdx + 1)
                         : <LatLng>[];
@@ -362,7 +345,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                     ];
                   }),
 
-                // ── Marker Halte ─────────────────────────────────
                 if (visibleRoutes.isNotEmpty)
                   MarkerLayer(
                     markers: [
@@ -389,7 +371,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                     ],
                   ),
 
-                // ── Navigasi: garis dari driver ke halte berikutnya ──
                 if (widget.navigationPolyline.isNotEmpty)
                   PolylineLayer(
                     polylines: [
@@ -409,7 +390,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                     ],
                   ),
 
-                // ── Lokasi pengguna (siswa) ──────────────────────
                 if (widget.userLocation != null)
                   MarkerLayer(
                     markers: [
@@ -422,7 +402,7 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                     ],
                   ),
 
-                // ── Marker driver ────────────────────────────────
+                // ── Marker driver
                 if (widget.driverLocation != null)
                   MarkerLayer(
                     markers: [
@@ -435,7 +415,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                     ],
                   ),
 
-                // ── Marker bus aktif (hanya yang punya koordinat valid) ──
                 if (activeBuses.isNotEmpty)
                   MarkerLayer(
                     markers: activeBuses
@@ -467,8 +446,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   ),
               ],
             ),
-
-            // ── Popup info bus saat marker di-tap ────────────────
             if (widget.showInfoCard) ...[
               if (_selectedBusId != null)
                 Positioned(
@@ -509,8 +486,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   child: _DriverGpsInfoCard(),
                 ),
             ],
-
-            // ── Badge "N bus aktif" ──────────────────────────────
             if (widget.showAllBuses)
               Positioned(
                 top: 12,
@@ -544,8 +519,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   ),
                 ),
               ),
-
-            // ── Legend rute (jika lebih dari 1 rute) ────────────
             if (visibleRoutes.length > 1)
               Positioned(
                 top: 12,
@@ -585,7 +558,7 @@ class _BusMapWidgetState extends State<BusMapWidget> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Header ───────────────────────────────────────────
+          // ── Header
           Row(children: [
             Container(
               width: 40,
@@ -654,7 +627,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
           const Divider(height: 1, color: Color(0xFFEEEEEE)),
           const SizedBox(height: 12),
 
-          // ── Info rows ─────────────────────────────────────────
           _BusInfoRow(
             icon: Icons.person_rounded,
             label: 'Driver',
@@ -710,9 +682,6 @@ class _BusMapWidgetState extends State<BusMapWidget> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Marker Halte
-// ─────────────────────────────────────────────────────────────
 class _HalteMarker extends StatelessWidget {
   final int urutan;
   final Color color;
@@ -765,9 +734,6 @@ class _HalteMarker extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Info card halte yang dipilih
-// ─────────────────────────────────────────────────────────────
 class _HalteInfoCard extends StatelessWidget {
   final String namaHalte;
   final int urutan;
@@ -857,9 +823,6 @@ class _HalteInfoCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Legend Rute (multi-rute)
-// ─────────────────────────────────────────────────────────────
 class _RouteLegend extends StatelessWidget {
   final List<RouteModel> routes;
   final List<Color> colors;
@@ -914,15 +877,11 @@ class _RouteLegend extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Marker bus — warna & nomor berbeda per bus agar mudah dibedakan
-// ─────────────────────────────────────────────────────────────
 class _BusMarker extends StatelessWidget {
   final BusModel bus;
   final bool isFocused;
   final bool isSelected;
 
-  // Palet warna berbeda untuk tiap bus (loop berdasarkan bus.id)
   static const List<Color> _busColors = [
     Color(0xFF1565C0), // biru tua
     Color(0xFFE53935), // merah
@@ -994,7 +953,7 @@ class _BusMarker extends StatelessWidget {
   }
 }
 
-// ── Row info dalam popup bus ──────────────────────────────────
+// ── Row info dalam popup bus
 class _BusInfoRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1178,7 +1137,7 @@ class _MapInfoCard extends StatelessWidget {
       );
     }
 
-    // ── Mode single bus ───────────────────────────────────
+    // ── Mode single bus
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
@@ -1300,9 +1259,6 @@ class _DriverGpsInfoCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// Marker driver (pulsing)
-// ─────────────────────────────────────────────────────────────
 class _DriverMarker extends StatefulWidget {
   const _DriverMarker();
 

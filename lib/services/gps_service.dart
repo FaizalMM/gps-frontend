@@ -35,10 +35,6 @@ class GpsService {
   }
 
   bool _isValidPosition(Position p) {
-    // Filter posisi tidak valid:
-    // - Koordinat 0,0 (default GPS belum lock)
-    // - Akurasi > 50m (sinyal lemah)
-    // - Speed negatif (geolocator return -1 jika tidak tersedia)
     if (p.latitude == 0 && p.longitude == 0) return false;
     if (p.accuracy > _maxAccuracyMeters) return false;
     return true;
@@ -106,9 +102,6 @@ class GpsService {
       await _sendPosition(position);
     });
 
-    // Heartbeat setiap 90 detik — kirim posisi terakhir agar last_gps_update fresh
-    // Threshold stale di backend adalah 10 menit, jadi 90 detik memberikan
-    // margin aman yang cukup bahkan saat koneksi lambat atau bus sedang diam
     _heartbeatTimer = Timer.periodic(const Duration(seconds: 90), (_) async {
       if (!_isTracking) return;
       final pos = _lastPosition ?? await getCurrentPosition();
@@ -149,18 +142,12 @@ class GpsService {
     ));
   }
 
-  /// Kirim posisi saat ini (sekali) — saat GPS baru diaktifkan
   Future<bool> sendCurrentPosition(Position position) async {
     if (!_isValidPosition(position)) return false;
     await _sendPosition(position);
     return true;
   }
 
-  /// Ambil posisi sekali (untuk QR scan, init, dll)
-  /// Strategi berlapis agar tidak mudah gagal:
-  /// 1. Coba high accuracy (15 detik)
-  /// 2. Kalau gagal/tidak akurat, fallback ke medium accuracy (10 detik)
-  /// 3. Kalau masih gagal, pakai lastPosition dari tracking aktif (kalau ada)
   Future<Position?> getCurrentPosition() async {
     if (!await requestPermission()) return null;
 
@@ -186,8 +173,6 @@ class GpsService {
       if (pos.latitude != 0 && pos.longitude != 0) return pos;
     } catch (_) {}
 
-    // Fallback terakhir: pakai posisi terakhir dari tracking aktif
-    // (berguna saat GPS driver sedang hangat dan siswa mau scan QR)
     if (_lastPosition != null &&
         _lastPosition!.latitude != 0 &&
         _lastPosition!.longitude != 0) {
