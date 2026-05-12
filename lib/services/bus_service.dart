@@ -61,6 +61,22 @@ class BusService {
     return res.success;
   }
 
+  /// Upload foto bus — endpoint: POST /buses/{id}/photo
+  /// Gunakan multipart dengan field 'photo'
+  Future<String?> uploadBusPhoto(int busId, String filePath) async {
+    final res = await _api.uploadMultipart(
+      '/buses/$busId/photo',
+      filePath,
+      'photo',
+      method: 'POST',
+    );
+    if (res.success && res.data != null) {
+      final data = res.data!['data'] ?? res.data!;
+      return data['photo_url'] as String?;
+    }
+    return null;
+  }
+
   // Guard agar tidak double-call assignDriver
   final Set<String> _assigningKeys = {};
 

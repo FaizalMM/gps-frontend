@@ -3,35 +3,50 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import '../models/models_api.dart';
 
+/// Profile routing yang tersedia
+/// - [busHgv]  : OSRM driving-hgv  — jalan besar, hindari gang sempit (direkomendasikan untuk bus)
+/// - [driving] : OSRM driving       — fallback standar
+enum RoutingProfile { busHgv, driving }
+
 class RoutingService {
   static final RoutingService _instance = RoutingService._internal();
   factory RoutingService() => _instance;
   RoutingService._internal();
 
-  static const String _osrmBase =
+  // ── OSRM public server ───────────────────────────────────────────────────
+  // Profile 'driving-hgv' = Heavy Goods Vehicle → menggunakan jalan besar,
+  // menghindari gang sempit, jembatan rendah, dan jalan dengan tonase rendah.
+  // Cocok untuk rute bus sekolah.
+  static const String _osrmHgv =
+      'http://router.project-osrm.org/route/v1/driving-hgv';
+  static const String _osrmDriving =
       'http://router.project-osrm.org/route/v1/driving';
+
+  // Profile aktif — ganti ke RoutingProfile.driving jika ingin routing biasa
+  static const RoutingProfile activeProfile = RoutingProfile.busHgv;
 
   static const double _haltePassThreshold = 80.0;
 
   final _distance = const Distance();
 
-  // Cache polyline terakhir per halte tujuan
+  // Cache polyline per (profile + halte tujuan)
   final Map<String, List<LatLng>> _polylineCache = {};
-  // Throttle: timestamp request terakhir per halte tujuan
   final Map<String, DateTime> _lastRequestTime = {};
-  // Minimum jeda antar request OSRM ke halte yang sama (detik)
   static const int _requestThrottleSeconds = 5;
+
+  String get _baseUrl =>
+      activeProfile == RoutingProfile.busHgv ? _osrmHgv : _osrmDriving;
 
   Future<List<LatLng>> getNavigationRoute({
     required LatLng from,
     required LatLng to,
   }) async {
+    final profileKey = activeProfile == RoutingProfile.busHgv ? 'hgv' : 'drv';
     final cacheKey =
-        '${to.latitude.toStringAsFixed(5)},${to.longitude.toStringAsFixed(5)}';
+        '$profileKey:${to.latitude.toStringAsFixed(5)},${to.longitude.toStringAsFixed(5)}';
     final now = DateTime.now();
     final lastRequest = _lastRequestTime[cacheKey];
 
-    // Throttle: jika baru request ke halte ini < 5 detik lalu, pakai cache
     if (lastRequest != null &&
         now.difference(lastRequest).inSeconds < _requestThrottleSeconds) {
       final cached = _polylineCache[cacheKey];
@@ -40,7 +55,7 @@ class RoutingService {
 
     try {
       final url =
-          '$_osrmBase/${from.longitude},${from.latitude};${to.longitude},${to.latitude}'
+          '$_baseUrl/${from.longitude},${from.latitude};${to.longitude},${to.latitude}'
           '?overview=full&geometries=geojson';
 
       final res =
@@ -49,7 +64,10 @@ class RoutingService {
       _lastRequestTime[cacheKey] = now;
 
       if (res.statusCode != 200) {
-        // Request gagal → kembalikan cache agar rute tidak hilang
+        // HGV gagal → coba fallback ke driving biasa
+        if (activeProfile == RoutingProfile.busHgv) {
+          return await _fallbackDriving(from, to, cacheKey);
+        }
         final cached = _polylineCache[cacheKey];
         if (cached != null && cached.isNotEmpty) return cached;
         return _straightLine(from, to);
@@ -58,6 +76,9 @@ class RoutingService {
       final json = jsonDecode(res.body) as Map<String, dynamic>;
       final routes = json['routes'] as List?;
       if (routes == null || routes.isEmpty) {
+        if (activeProfile == RoutingProfile.busHgv) {
+          return await _fallbackDriving(from, to, cacheKey);
+        }
         final cached = _polylineCache[cacheKey];
         if (cached != null && cached.isNotEmpty) return cached;
         return _straightLine(from, to);
@@ -68,23 +89,54 @@ class RoutingService {
               (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
           .toList();
 
-      // Simpan ke cache
       _polylineCache[cacheKey] = coords;
       return coords;
     } catch (_) {
-      // Network error / timeout → kembalikan cache terakhir jika ada
+      if (activeProfile == RoutingProfile.busHgv) {
+        return await _fallbackDriving(from, to, cacheKey);
+      }
       final cached = _polylineCache[cacheKey];
       if (cached != null && cached.isNotEmpty) return cached;
       return _straightLine(from, to);
     }
   }
 
-  /// Hapus cache saat driver pindah ke halte berikutnya
+  /// Fallback ke profile driving standar jika HGV gagal
+  Future<List<LatLng>> _fallbackDriving(
+      LatLng from, LatLng to, String cacheKey) async {
+    try {
+      final url =
+          '$_osrmDriving/${from.longitude},${from.latitude};${to.longitude},${to.latitude}'
+          '?overview=full&geometries=geojson';
+      final res =
+          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final json = jsonDecode(res.body) as Map<String, dynamic>;
+        final routes = json['routes'] as List?;
+        if (routes != null && routes.isNotEmpty) {
+          final coords = (routes[0]['geometry']['coordinates'] as List)
+              .map((c) =>
+                  LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+              .toList();
+          _polylineCache[cacheKey] = coords;
+          return coords;
+        }
+      }
+    } catch (_) {}
+    final cached = _polylineCache[cacheKey];
+    if (cached != null && cached.isNotEmpty) return cached;
+    return _straightLine(from, to);
+  }
+
   void clearCacheForHalte(LatLng haltePos) {
     final key =
-        '${haltePos.latitude.toStringAsFixed(5)},${haltePos.longitude.toStringAsFixed(5)}';
+        'hgv:${haltePos.latitude.toStringAsFixed(5)},${haltePos.longitude.toStringAsFixed(5)}';
+    final keyDrv =
+        'drv:${haltePos.latitude.toStringAsFixed(5)},${haltePos.longitude.toStringAsFixed(5)}';
     _polylineCache.remove(key);
+    _polylineCache.remove(keyDrv);
     _lastRequestTime.remove(key);
+    _lastRequestTime.remove(keyDrv);
   }
 
   int getNextHalteIndex({
@@ -98,7 +150,6 @@ class RoutingService {
         final target = LatLng(halte.latitude, halte.longitude);
         final dist = _distance.as(LengthUnit.Meter, driverPos, target);
         if (dist <= _haltePassThreshold) {
-          // Sudah melewati halte ini → lanjut ke berikutnya
           return currentIndex + 1 < haltes.length
               ? currentIndex + 1
               : currentIndex;
@@ -108,7 +159,6 @@ class RoutingService {
     return currentIndex;
   }
 
-  /// Hitung jarak driver ke halte target (meter)
   double distanceToHalte({
     required LatLng driverPos,
     required HalteModel halte,
@@ -120,6 +170,5 @@ class RoutingService {
     );
   }
 
-  /// Fallback: garis lurus dari A ke B
   List<LatLng> _straightLine(LatLng from, LatLng to) => [from, to];
 }

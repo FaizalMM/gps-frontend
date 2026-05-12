@@ -8,8 +8,6 @@ double _parseDouble(dynamic v, double fallback) {
   return fallback;
 }
 
-// ── Enum ─────────────────────────────────────────────────────
-
 enum UserRole { admin, driver, siswa }
 
 enum AccountStatus { pending, active, rejected }
@@ -17,8 +15,6 @@ enum AccountStatus { pending, active, rejected }
 enum BusStatus { active, maintenance, inactive }
 
 enum ApprovalStatus { pending, approved, rejected }
-
-// ── User (dari /auth/me, /auth/login) ────────────────────────
 
 class UserModel {
   final int id;
@@ -248,6 +244,7 @@ class BusModel {
   String driverId;
   String driverName;
   bool gpsActive;
+  String? photoUrl;
 
   double latitude;
   double longitude;
@@ -274,6 +271,7 @@ class BusModel {
     this.heading = 0,
     this.accuracy = 0,
     this.lastUpdate,
+    this.photoUrl,
     required this.createdAt,
   });
 
@@ -442,6 +440,7 @@ class BusModel {
       heading: json['current_position'] != null
           ? _parseDouble((json['current_position'] as Map)['heading'], 0)
           : 0,
+      photoUrl: json['photo_url'] as String?,
       createdAt:
           (DateTime.tryParse(json['created_at'] as String? ?? '')?.toLocal()) ??
               DateTime.now(),

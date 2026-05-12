@@ -207,6 +207,37 @@ class ApiClient {
     }
   }
 
+  // Upload file (multipart) dengan fields tambahan
+  Future<ApiResponse<Map<String, dynamic>>> uploadMultipart(
+    String endpoint,
+    String filePath,
+    String fieldName, {
+    Map<String, String>? fields,
+    String method = 'POST',
+    bool withAuth = true,
+  }) async {
+    try {
+      final token = withAuth ? await getToken() : null;
+      final request = http.MultipartRequest(
+        method,
+        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
+      );
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'application/json';
+      request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+      if (fields != null) request.fields.addAll(fields);
+      final streamed = await request.send().timeout(ApiConfig.timeout);
+      final response = await http.Response.fromStream(streamed);
+      return _parse(response);
+    } on SocketException {
+      return ApiResponse(
+          success: false, message: 'Tidak ada koneksi internet', statusCode: 0);
+    } catch (e) {
+      return ApiResponse(
+          success: false, message: 'Gagal upload: $e', statusCode: 0);
+    }
+  }
+
   // Upload file (multipart)
   Future<ApiResponse<Map<String, dynamic>>> uploadFile(
     String endpoint,

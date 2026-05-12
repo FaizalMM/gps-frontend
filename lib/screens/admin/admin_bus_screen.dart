@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import '../../models/models_api.dart';
 import '../../services/app_data_service.dart';
@@ -31,6 +33,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     final platCtrl = TextEditingController();
     String? selectedDriverId;
     BusStatus selectedStatus = BusStatus.active;
+    XFile? foto;
     final formKey = GlobalKey<FormState>();
     final drivers = widget.dataService.drivers;
 
@@ -74,6 +77,30 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                             fontFamily: 'Poppins',
                             fontSize: 12,
                             color: AppColors.textGrey)),
+                    const SizedBox(height: 18),
+                    // ── Foto Bus ──────────────────────────────────────
+                    Center(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final img = await ImagePicker().pickImage(
+                              source: ImageSource.gallery, imageQuality: 75);
+                          if (img != null) setM(() => foto = img);
+                        },
+                        child: _BusFotoPicker(foto: foto),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Text(
+                        foto != null
+                            ? 'Ketuk untuk ganti foto'
+                            : 'Ketuk untuk pilih foto bus (opsional)',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey),
+                      ),
+                    ),
                     const SizedBox(height: 18),
                     AppTextField(
                       label: 'Kode / Nama Bus',
@@ -165,19 +192,26 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                             platNomor: platCtrl.text.trim(),
                             status: statusStr,
                           );
-                          if (ok && selectedDriverId != null) {
+                          if (ok) {
                             await widget.dataService.loadAll();
                             final newBus = widget.dataService.buses
                                 .where(
                                     (b) => b.platNomor == platCtrl.text.trim())
                                 .firstOrNull;
                             if (newBus != null) {
-                              final driver = drivers.firstWhere(
-                                  (d) => d.idStr == selectedDriverId);
-                              await BusService()
-                                  .assignDriverByUserId(newBus.id, driver);
-                              await Future.delayed(
-                                  const Duration(milliseconds: 500));
+                              // Upload foto jika dipilih
+                              if (foto != null) {
+                                await BusService()
+                                    .uploadBusPhoto(newBus.id, foto!.path);
+                              }
+                              if (selectedDriverId != null) {
+                                final driver = drivers.firstWhere(
+                                    (d) => d.idStr == selectedDriverId);
+                                await BusService()
+                                    .assignDriverByUserId(newBus.id, driver);
+                                await Future.delayed(
+                                    const Duration(milliseconds: 500));
+                              }
                               await widget.dataService.loadAll();
                             }
                           }
@@ -218,6 +252,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     final platCtrl = TextEditingController(text: bus.platNomor);
     String? selDriverId = bus.driverId.isEmpty ? null : bus.driverId;
     BusStatus selStatus = bus.status;
+    XFile? foto;
     final formKey = GlobalKey<FormState>();
     final drivers = widget.dataService.drivers;
 
@@ -255,6 +290,33 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                             fontFamily: 'Poppins',
                             fontSize: 18,
                             fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 18),
+                    // ── Foto Bus ──────────────────────────────────────
+                    Center(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final img = await ImagePicker().pickImage(
+                              source: ImageSource.gallery, imageQuality: 75);
+                          if (img != null) setM(() => foto = img);
+                        },
+                        child: _BusFotoPicker(
+                            foto: foto, existingUrl: bus.photoUrl),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Text(
+                        foto != null
+                            ? 'Foto baru terpilih'
+                            : (bus.photoUrl != null && bus.photoUrl!.isNotEmpty)
+                                ? 'Ketuk foto untuk mengganti'
+                                : 'Ketuk untuk pilih foto bus (opsional)',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey),
+                      ),
+                    ),
                     const SizedBox(height: 18),
                     AppTextField(
                       label: 'Kode / Nama Bus',
@@ -345,6 +407,11 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           );
                           if (ok) {
                             try {
+                              // Upload foto jika ada yang baru dipilih
+                              if (foto != null) {
+                                await BusService()
+                                    .uploadBusPhoto(bus.id, foto!.path);
+                              }
                               final driver = selDriverId != null
                                   ? drivers.cast<UserModel?>().firstWhere(
                                       (d) => d!.idStr == selDriverId,
@@ -674,15 +741,36 @@ class _BusCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Column(children: [
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.directions_bus_rounded,
-                  color: statusColor, size: 30),
+            // ── Foto / Icon Bus ─────────────────────────────────
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: bus.photoUrl != null && bus.photoUrl!.isNotEmpty
+                  ? Image.network(
+                      bus.photoUrl!,
+                      width: 54,
+                      height: 54,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.directions_bus_rounded,
+                            color: statusColor, size: 30),
+                      ),
+                    )
+                  : Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.directions_bus_rounded,
+                          color: statusColor, size: 30),
+                    ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1989,6 +2077,63 @@ class _Chip extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+// ── _BusFotoPicker ────────────────────────────────────────────────────────────
+class _BusFotoPicker extends StatelessWidget {
+  final XFile? foto;
+  final String? existingUrl;
+  const _BusFotoPicker({this.foto, this.existingUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget inner;
+    if (foto != null) {
+      inner = ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.file(File(foto!.path), fit: BoxFit.cover),
+      );
+    } else if (existingUrl != null && existingUrl!.isNotEmpty) {
+      inner = ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          existingUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(Icons.directions_bus_rounded,
+              size: 42, color: AppColors.primary),
+        ),
+      );
+    } else {
+      inner = const Icon(Icons.directions_bus_rounded,
+          size: 42, color: AppColors.primary);
+    }
+
+    return Stack(children: [
+      Container(
+        width: 90,
+        height: 90,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: AppColors.primaryLight,
+          border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.25), width: 2),
+        ),
+        child: inner,
+      ),
+      Positioned(
+        bottom: 0,
+        right: 0,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: const BoxDecoration(
+              shape: BoxShape.circle, color: AppColors.primary),
+          child: const Icon(Icons.camera_alt_rounded,
+              size: 15, color: Colors.white),
+        ),
+      ),
+    ]);
   }
 }
 

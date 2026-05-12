@@ -45,6 +45,10 @@ class OsrmRouteResult {
 
 class RouteSearchService {
   static const _nominatim = 'https://nominatim.openstreetmap.org';
+  // driving-hgv = Heavy Goods Vehicle profile → prioritas jalan besar,
+  // hindari gang sempit & jalan bertonase rendah. Cocok untuk rute bus.
+  static const _osrmHgv =
+      'https://router.project-osrm.org/route/v1/driving-hgv';
   static const _osrm = 'https://router.project-osrm.org';
 
   // Bias default ke area Madiun, Jawa Timur
@@ -140,6 +144,55 @@ class RouteSearchService {
     try {
       final coords =
           waypoints.map((p) => '${p.longitude},${p.latitude}').join(';');
+      // Gunakan driving-hgv untuk mengikuti jalur bus (jalan besar)
+      // Fallback otomatis ke driving biasa jika HGV gagal
+      Uri uri;
+      try {
+        uri = Uri.parse(
+          '$_osrmHgv/$coords'
+          '?overview=full&geometries=geojson&steps=false',
+        );
+      } catch (_) {
+        uri = Uri.parse(
+          '$_osrm/route/v1/driving/$coords'
+          '?overview=full&geometries=geojson&steps=false',
+        );
+      }
+      final res = await http
+          .get(uri, headers: _headers)
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode != 200) return null;
+
+      final body = json.decode(res.body) as Map<String, dynamic>;
+      // Fallback ke driving biasa jika HGV tidak menemukan rute
+      if (body['code'] != 'Ok') {
+        return await _getRouteFallback(waypoints);
+      }
+
+      final route = (body['routes'] as List).first as Map<String, dynamic>;
+      final geom = route['geometry'] as Map<String, dynamic>;
+      final coordList = (geom['coordinates'] as List).cast<List<dynamic>>();
+
+      return OsrmRouteResult(
+        points: coordList
+            .map((c) => LatLng(
+                  (c[1] as num).toDouble(),
+                  (c[0] as num).toDouble(),
+                ))
+            .toList(),
+        distanceMeters: (route['distance'] as num).toDouble(),
+        durationSeconds: (route['duration'] as num).toDouble(),
+      );
+    } catch (_) {
+      return _getRouteFallback(waypoints);
+    }
+  }
+
+  /// Fallback ke profile driving standar jika driving-hgv tidak tersedia
+  Future<OsrmRouteResult?> _getRouteFallback(List<LatLng> waypoints) async {
+    try {
+      final coords =
+          waypoints.map((p) => '${p.longitude},${p.latitude}').join(';');
       final uri = Uri.parse(
         '$_osrm/route/v1/driving/$coords'
         '?overview=full&geometries=geojson&steps=false',
@@ -148,14 +201,11 @@ class RouteSearchService {
           .get(uri, headers: _headers)
           .timeout(const Duration(seconds: 15));
       if (res.statusCode != 200) return null;
-
       final body = json.decode(res.body) as Map<String, dynamic>;
       if (body['code'] != 'Ok') return null;
-
       final route = (body['routes'] as List).first as Map<String, dynamic>;
       final geom = route['geometry'] as Map<String, dynamic>;
       final coordList = (geom['coordinates'] as List).cast<List<dynamic>>();
-
       return OsrmRouteResult(
         points: coordList
             .map((c) => LatLng(
