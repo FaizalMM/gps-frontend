@@ -24,6 +24,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _alamatCtrl;
   bool _isLoading = false;
   File? _pickedImage;
+  bool _deleteExistingPhoto = false;
 
   @override
   void initState() {
@@ -42,6 +43,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _alamatCtrl.dispose();
     super.dispose();
   }
+
+  bool get _hasExistingPhoto =>
+      widget.user.photoUrl != null && widget.user.photoUrl!.isNotEmpty;
 
   void _showPickerOptions() {
     showModalBottomSheet(
@@ -91,12 +95,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 12),
             _PickerOption(
               icon: Icons.delete_rounded,
-              label: 'Hapus Foto',
-              sub: 'Kembali ke inisial nama',
+              label: 'Batal Pilih Foto',
+              sub: 'Kembali ke foto sebelumnya',
               color: AppColors.red,
               onTap: () {
                 Navigator.pop(context);
-                setState(() => _pickedImage = null);
+                setState(() {
+                  _pickedImage = null;
+                  _deleteExistingPhoto = false;
+                });
+              },
+            ),
+          ],
+          if (_pickedImage == null &&
+              _hasExistingPhoto &&
+              !_deleteExistingPhoto) ...[
+            const SizedBox(height: 12),
+            _PickerOption(
+              icon: Icons.delete_forever_rounded,
+              label: 'Hapus Foto Profil',
+              sub: 'Hapus foto profil saat ini',
+              color: AppColors.red,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _deleteExistingPhoto = true);
+              },
+            ),
+          ],
+          if (_deleteExistingPhoto) ...[
+            const SizedBox(height: 12),
+            _PickerOption(
+              icon: Icons.undo_rounded,
+              label: 'Batal Hapus Foto',
+              sub: 'Pertahankan foto profil saat ini',
+              color: AppColors.textGrey,
+              onTap: () {
+                Navigator.pop(context);
+                setState(() => _deleteExistingPhoto = false);
               },
             ),
           ],
@@ -115,7 +150,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         imageQuality: 85,
       );
       if (picked != null && mounted) {
-        setState(() => _pickedImage = File(picked.path));
+        setState(() {
+          _pickedImage = File(picked.path);
+          _deleteExistingPhoto = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -134,8 +172,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    // Upload foto kalau ada yang baru dipilih
-    if (_pickedImage != null) {
+    if (_deleteExistingPhoto && _pickedImage == null) {
+      final res = await ApiClient().delete('/auth/profile/photo');
+      if (res.success) {
+        widget.user.photoUrl = null;
+      }
+    } else if (_pickedImage != null) {
       final res = await ApiClient().uploadFile(
         '/auth/profile/photo',
         _pickedImage!.path,
@@ -160,7 +202,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     widget.user.alamat = _alamatCtrl.text.trim();
 
     if (mounted) {
-      // Refresh currentUser di AuthProvider agar foto muncul di semua screen
       await context.read<AuthProvider>().tryAutoLogin();
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -183,6 +224,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final initials = widget.user.namaLengkap.isNotEmpty
         ? widget.user.namaLengkap[0].toUpperCase()
         : '?';
+
+    final showInitial =
+        _pickedImage == null && (!_hasExistingPhoto || _deleteExistingPhoto);
+
+    ImageProvider? bgImage;
+    if (_pickedImage != null) {
+      bgImage = FileImage(_pickedImage!);
+    } else if (_hasExistingPhoto && !_deleteExistingPhoto) {
+      bgImage = NetworkImage(widget.user.photoUrl!);
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -220,16 +271,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     border: Border.all(
                         color: AppColors.primary.withValues(alpha: 0.3),
                         width: 3),
-                    image: _pickedImage != null
-                        ? DecorationImage(
-                            image: FileImage(_pickedImage!), fit: BoxFit.cover)
-                        : widget.user.photoUrl != null
-                            ? DecorationImage(
-                                image: NetworkImage(widget.user.photoUrl!),
-                                fit: BoxFit.cover)
-                            : null,
+                    image: bgImage != null
+                        ? DecorationImage(image: bgImage, fit: BoxFit.cover)
+                        : null,
                   ),
-                  child: (_pickedImage == null && widget.user.photoUrl == null)
+                  child: showInitial
                       ? Center(
                           child: Text(initials,
                               style: const TextStyle(
@@ -239,25 +285,50 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   color: AppColors.primary)))
                       : null,
                 ),
+                if (_deleteExistingPhoto)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.4),
+                      ),
+                      child: const Icon(Icons.delete_forever_rounded,
+                          color: Colors.white, size: 32),
+                    ),
+                  ),
                 Positioned(
                   bottom: 2,
                   right: 2,
                   child: Container(
                     padding: const EdgeInsets.all(7),
-                    decoration: const BoxDecoration(
-                        color: AppColors.primary, shape: BoxShape.circle),
-                    child: const Icon(Icons.camera_alt_rounded,
-                        color: Colors.white, size: 16),
+                    decoration: BoxDecoration(
+                        color: _deleteExistingPhoto
+                            ? AppColors.red
+                            : AppColors.primary,
+                        shape: BoxShape.circle),
+                    child: Icon(
+                      _deleteExistingPhoto
+                          ? Icons.delete_rounded
+                          : Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ),
               ]),
             ),
             const SizedBox(height: 8),
-            const Text('Tap untuk ubah foto',
-                style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: AppColors.textGrey)),
+            Text(
+              _deleteExistingPhoto
+                  ? 'Foto akan dihapus saat disimpan'
+                  : 'Tap untuk ubah foto',
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: _deleteExistingPhoto
+                      ? AppColors.red
+                      : AppColors.textGrey),
+            ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

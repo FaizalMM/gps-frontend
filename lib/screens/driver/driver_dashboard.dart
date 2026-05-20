@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 import 'package:geolocator/geolocator.dart';
 import '../../models/models_api.dart';
 import '../../services/auth_provider.dart';
@@ -19,6 +19,7 @@ import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
 import 'scan_qr_screen.dart';
 import 'laporan_operasional_screen.dart';
+import 'navigation_screen.dart';
 
 class DriverDashboard extends StatefulWidget {
   const DriverDashboard({super.key});
@@ -51,7 +52,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
     setState(() => _isRefreshingBus = true);
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    await authProvider.refreshDriverBus(); // notifyListeners() ada di dalam
+    await authProvider.refreshDriverBus();
     final refreshedBus = authProvider.authService.cachedDriverBus;
 
     if (mounted) {
@@ -140,12 +141,16 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   int _targetHalteIndex = 0;
   HalteModel? _targetHalte;
   LatLng? _driverLatLng;
+  double _driverSpeed = 0.0;
   StreamSubscription<Position>? _positionSub;
 
-  // Absensi hari ini — diperbarui setiap 15 detik saat GPS aktif
+  final StreamController<({LatLng pos, double heading, double speed})>
+      _navStreamCtrl = StreamController<
+          ({LatLng pos, double heading, double speed})>.broadcast();
+
   List<Map<String, dynamic>> _attendanceToday = [];
   Timer? _attendancePollTimer;
-  bool _isLoadingAttendance = false; // guard: cegah request dobel
+  bool _isLoadingAttendance = false;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnim;
@@ -161,7 +166,18 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     _positionSub = _gpsService.positionStream.listen((position) {
       if (!mounted || position.latitude == 0) return;
       final pos = LatLng(position.latitude, position.longitude);
-      setState(() => _driverLatLng = pos);
+      setState(() {
+        _driverLatLng = pos;
+        _driverSpeed = position.speed * 3.6;
+      });
+
+      if (!_navStreamCtrl.isClosed) {
+        _navStreamCtrl.add((
+          pos: pos,
+          heading: position.heading,
+          speed: position.speed * 3.6,
+        ));
+      }
 
       final bus = widget.bus;
       if (_gpsActive && bus != null && bus.routeList.isNotEmpty) {
@@ -187,7 +203,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
         CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
 
-    // Load absensi awal + mulai polling
     _loadAttendanceToday();
     _attendancePollTimer = Timer.periodic(
         const Duration(seconds: 15), (_) => _loadAttendanceToday());
@@ -197,7 +212,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _gpsActive) {
       if (!_gpsService.isTracking) {
-        // GPS service mati saat layar off — restart tanpa ubah toggle UI
         _resumeTracking();
       }
     }
@@ -222,6 +236,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     _positionSub?.cancel();
     _attendancePollTimer?.cancel();
     _pulseController.dispose();
+    _navStreamCtrl.close();
     super.dispose();
   }
 
@@ -251,8 +266,8 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     await _updateNavigation(driverPos, route.haltes);
   }
 
-  // Flag cegah request navigasi paralel yang bisa tumpang tindih
   bool _navRequestInProgress = false;
+  bool _mapExpanded = false;
 
   Future<void> _updateNavigation(
       LatLng driverPos, List<RouteHalteModel> haltes) async {
@@ -264,7 +279,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
       currentIndex: _targetHalteIndex,
     );
 
-    // Halte berganti — hapus cache rute lama agar rute baru di-fetch
     if (nextIdx != _targetHalteIndex) {
       final oldHalte = _targetHalteIndex < haltes.length
           ? haltes[_targetHalteIndex].halte
@@ -276,7 +290,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
       if (mounted) setState(() => _targetHalteIndex = nextIdx);
     }
 
-    // Semua halte sudah dilewati — rute selesai, jangan kosongkan polyline
     if (_targetHalteIndex >= haltes.length) {
       if (mounted) setState(() => _targetHalte = null);
       return;
@@ -296,7 +309,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
 
     if (mounted) {
       setState(() {
-        // Hanya update jika polyline valid — jaga rute lama tetap tampil jika gagal
         if (polyline.isNotEmpty) _navPolyline = polyline;
         _targetHalte = halte;
       });
@@ -353,6 +365,31 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
         _targetHalteIndex = 0;
       });
     }
+  }
+
+  void _openNavigation(BuildContext ctx, BusModel bus) {
+    if (_driverLatLng == null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('Posisi GPS belum tersedia. Tunggu sebentar.',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppColors.orange,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    Navigator.push(
+      ctx,
+      MaterialPageRoute(
+        builder: (_) => NavigationScreen(
+          bus: bus,
+          initialDriverPos: _driverLatLng!,
+          initialPolyline: _navPolyline,
+          initialHalteIndex: _targetHalteIndex,
+          initialTargetHalte: _targetHalte,
+          positionStream: _navStreamCtrl.stream,
+        ),
+      ),
+    );
   }
 
   void _showSiswaSheet(BuildContext ctx, AppDataService ds) {
@@ -557,24 +594,41 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                             fontFamily: 'Poppins',
                             fontSize: 14,
                             color: AppColors.textGrey)),
-                    RichText(
-                      text: TextSpan(children: [
-                        const TextSpan(
-                            text: 'Siap\n',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.black,
-                                height: 1.2)),
-                        TextSpan(
-                            text: _gpsActive ? 'Beroperasi! ✅' : 'Beroperasi?',
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary)),
-                      ]),
+                    // ── Judul "Siap Beroperasi" tanpa emoji ──
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Siap',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 30,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.black,
+                              height: 1.2),
+                        ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              _gpsActive ? 'Beroperasi!' : 'Beroperasi?',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primary),
+                            ),
+                            if (_gpsActive) ...[
+                              const SizedBox(width: 8),
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.primary,
+                                size: 28,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     if (bus != null) ...[
@@ -733,18 +787,85 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                             final updatedBus = buses.firstWhere(
                                 (b) => b.id == bus.id,
                                 orElse: () => bus);
+                            final screenH = MediaQuery.of(context).size.height;
+                            final mapHeight =
+                                _mapExpanded ? screenH * 0.65 : 260.0;
                             return Column(
                               children: [
-                                BusMapWidget(
-                                  buses: [updatedBus],
-                                  height: 260,
-                                  showAllBuses: false,
-                                  focusBus: updatedBus,
-                                  interactive: true,
-                                  driverLocation: _driverLatLng,
-                                  routes: updatedBus.routeList,
-                                  showRoutes: updatedBus.routeList.isNotEmpty,
-                                  navigationPolyline: _navPolyline,
+                                Stack(children: [
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                    height: mapHeight,
+                                    child: BusMapWidget(
+                                      buses: [updatedBus],
+                                      height: mapHeight,
+                                      showAllBuses: false,
+                                      focusBus: updatedBus,
+                                      interactive: true,
+                                      driverLocation: _driverLatLng,
+                                      routes: updatedBus.routeList,
+                                      showRoutes:
+                                          updatedBus.routeList.isNotEmpty,
+                                      navigationPolyline: _navPolyline,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 10,
+                                    bottom: 10,
+                                    child: GestureDetector(
+                                      onTap: () => setState(
+                                          () => _mapExpanded = !_mapExpanded),
+                                      child: Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.2),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(
+                                          _mapExpanded
+                                              ? Icons.fullscreen_exit_rounded
+                                              : Icons.fullscreen_rounded,
+                                          size: 20,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ]),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _openNavigation(context, updatedBus),
+                                    icon: const Icon(Icons.navigation_rounded,
+                                        size: 18, color: Colors.white),
+                                    label: const Text('Mode Navigasi',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF1A73E8),
+                                      elevation: 0,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
+                                    ),
+                                  ),
                                 ),
                                 if (_gpsActive && _targetHalte != null)
                                   _NextHalteBanner(
@@ -760,7 +881,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                           icon: Icons.speed_rounded,
                                           label: 'Kecepatan',
                                           value:
-                                              '${updatedBus.speed.toStringAsFixed(0)} km/h',
+                                              '${_driverSpeed.toStringAsFixed(0)} km/h',
                                           color: AppColors.primary)),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -879,7 +1000,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Penumpang Hari Ini
                     Row(children: [
                       const Expanded(
                           child: Text('Penumpang Hari Ini',
@@ -1047,7 +1167,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                     ),
                                   ),
                                 ]),
-                                // Tombol checkout — hanya muncul jika siswa masih di bus
                                 if (!sudahTurun && qrId.isNotEmpty) ...[
                                   const SizedBox(height: 8),
                                   SizedBox(
@@ -1077,14 +1196,14 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
   }
 
   String _headingToText(double heading) {
-    if (heading < 22.5 || heading >= 337.5) return 'Utara ↑';
-    if (heading < 67.5) return 'Timur Laut ↗';
-    if (heading < 112.5) return 'Timur →';
-    if (heading < 157.5) return 'Tenggara ↘';
-    if (heading < 202.5) return 'Selatan ↓';
-    if (heading < 247.5) return 'Barat Daya ↙';
-    if (heading < 292.5) return 'Barat ←';
-    return 'Barat Laut ↖';
+    if (heading < 22.5 || heading >= 337.5) return 'Utara';
+    if (heading < 67.5) return 'Timur Laut';
+    if (heading < 112.5) return 'Timur';
+    if (heading < 157.5) return 'Tenggara';
+    if (heading < 202.5) return 'Selatan';
+    if (heading < 247.5) return 'Barat Daya';
+    if (heading < 292.5) return 'Barat';
+    return 'Barat Laut';
   }
 }
 
@@ -1455,7 +1574,6 @@ class _DriverBottomNav extends StatelessWidget {
           clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: [
-            // Baris kiri & kanan
             Row(children: [
               Expanded(
                   child: _NavItem(
@@ -1465,7 +1583,6 @@ class _DriverBottomNav extends StatelessWidget {
                 isActive: currentIndex == 0,
                 onTap: onDashboard,
               )),
-              // Spacer tengah untuk tombol QR
               const Expanded(child: SizedBox()),
               Expanded(
                   child: _NavItem(
@@ -1476,7 +1593,6 @@ class _DriverBottomNav extends StatelessWidget {
                 onTap: onProfile,
               )),
             ]),
-            // Tombol QR menonjol di tengah
             Positioned(
               top: -22,
               child: GestureDetector(
@@ -1757,7 +1873,6 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
   @override
   Widget build(BuildContext context) {
     final driver = widget.driver;
-    // local variable agar Dart bisa promote nullable → non-nullable
     final bus = widget.bus;
     final initial = driver.namaLengkap.isNotEmpty
         ? driver.namaLengkap[0].toUpperCase()
@@ -1955,7 +2070,6 @@ class _DriverProfileTabState extends State<_DriverProfileTab> {
               color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(20)),
           child: Text(
-            // gunakan local var bus agar aman dari non-promo error
             bus != null ? 'Driver \u2022 ${bus.nama}' : 'Driver',
             style: const TextStyle(
                 fontFamily: 'Poppins',
@@ -2474,7 +2588,6 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
                             final initial = s.namaLengkap.isNotEmpty
                                 ? s.namaLengkap[0].toUpperCase()
                                 : '?';
-                            // Ambil info halte dari studentDetail jika tersedia
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
@@ -2567,7 +2680,7 @@ class _SiswaListSheetState extends State<_SiswaListSheet> {
 class _CheckoutButton extends StatefulWidget {
   final String qrId;
   final String studentName;
-  final VoidCallback onDone; // refresh list setelah checkout berhasil
+  final VoidCallback onDone;
 
   const _CheckoutButton({
     required this.qrId,
@@ -2624,7 +2737,6 @@ class _CheckoutButtonState extends State<_CheckoutButton> {
 
     setState(() => _loading = true);
 
-    // Ambil posisi GPS driver saat ini
     Position? pos;
     try {
       pos = await Geolocator.getCurrentPosition(
@@ -2656,7 +2768,7 @@ class _CheckoutButtonState extends State<_CheckoutButton> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         duration: const Duration(seconds: 3),
       ));
-      widget.onDone(); // refresh list penumpang
+      widget.onDone();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Gagal checkout. Coba lagi.',

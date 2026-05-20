@@ -18,9 +18,9 @@ class RoutingService {
   // menghindari gang sempit, jembatan rendah, dan jalan dengan tonase rendah.
   // Cocok untuk rute bus sekolah.
   static const String _osrmHgv =
-      'http://router.project-osrm.org/route/v1/driving-hgv';
+      'https://router.project-osrm.org/route/v1/driving-hgv';
   static const String _osrmDriving =
-      'http://router.project-osrm.org/route/v1/driving';
+      'https://router.project-osrm.org/route/v1/driving';
 
   // Profile aktif — ganti ke RoutingProfile.driving jika ingin routing biasa
   static const RoutingProfile activeProfile = RoutingProfile.busHgv;
@@ -41,7 +41,7 @@ class RoutingService {
     required LatLng from,
     required LatLng to,
   }) async {
-    final profileKey = activeProfile == RoutingProfile.busHgv ? 'hgv' : 'drv';
+    const profileKey = activeProfile == RoutingProfile.busHgv ? 'hgv' : 'drv';
     final cacheKey =
         '$profileKey:${to.latitude.toStringAsFixed(5)},${to.longitude.toStringAsFixed(5)}';
     final now = DateTime.now();
