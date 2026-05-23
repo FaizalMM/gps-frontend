@@ -91,14 +91,23 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
   }
 
   void _toggleStatus(UserModel u) async {
-    final id = int.tryParse(u.idStr);
-    if (id == null) return;
+    // Gunakan student.id (bukan user.id) karena endpoint /students/{id} merujuk ke tabel students
+    final studentId = u.studentDetail?.id;
+    if (studentId == null || studentId == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Data siswa tidak ditemukan',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
     final isActive = u.status == AccountStatus.active;
     bool ok;
     if (isActive) {
-      ok = await StudentService().suspendStudent(id);
+      ok = await StudentService().suspendStudent(studentId);
     } else {
-      ok = await StudentService().unsuspendStudent(id);
+      ok = await StudentService().unsuspendStudent(studentId);
     }
     if (!mounted) return;
     if (ok) {
@@ -113,7 +122,378 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            'Gagal ${isActive ? 'menonaktifkan' : 'mengaktifkan'} ${u.namaLengkap}'),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
     }
+  }
+
+  // ── Edit data siswa oleh admin
+  void _showEditSiswaSheet(UserModel user) {
+    final studentId = user.studentDetail?.id ?? 0;
+    if (studentId == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Data siswa tidak lengkap',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+
+    final namaCtrl = TextEditingController(text: user.namaLengkap);
+    final emailCtrl = TextEditingController(text: user.email);
+    final nisCtrl = TextEditingController(text: user.studentDetail?.nis ?? '');
+    final sekolahCtrl =
+        TextEditingController(text: user.studentDetail?.sekolah ?? '');
+    final kelasCtrl =
+        TextEditingController(text: user.studentDetail?.kelas ?? '');
+    final noHpCtrl = TextEditingController(
+        text: user.studentDetail?.noHp.isNotEmpty == true
+            ? user.studentDetail!.noHp
+            : user.noHp);
+    final alamatCtrl = TextEditingController(
+        text: user.studentDetail?.alamat.isNotEmpty == true
+            ? user.studentDetail!.alamat
+            : user.alamat);
+    final passwordCtrl = TextEditingController();
+    final passwordConfirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+    bool obscurePassword = true;
+    bool obscureConfirm = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setM) => Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                        child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                                color: AppColors.lightGrey,
+                                borderRadius: BorderRadius.circular(2)))),
+                    const SizedBox(height: 20),
+                    // Header
+                    Row(children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                            color: AppColors.primaryLight,
+                            shape: BoxShape.circle),
+                        child: Center(
+                            child: Text(
+                          user.namaLengkap.isNotEmpty
+                              ? user.namaLengkap[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 20,
+                              color: AppColors.primary),
+                        )),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            const Text('Edit Data Siswa',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700)),
+                            Text(user.email,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 12,
+                                    color: AppColors.textGrey)),
+                          ])),
+                    ]),
+                    const SizedBox(height: 24),
+                    // Nama
+                    _EditField(
+                        label: 'Nama Lengkap',
+                        controller: namaCtrl,
+                        validator: (v) => v!.trim().isEmpty
+                            ? 'Nama tidak boleh kosong'
+                            : null),
+                    const SizedBox(height: 14),
+                    // Email
+                    _EditField(
+                        label: 'Email',
+                        controller: emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v!.trim().isEmpty) {
+                            return 'Email tidak boleh kosong';
+                          }
+                          if (!v.contains('@')) {
+                            return 'Format email tidak valid';
+                          }
+                          return null;
+                        }),
+                    const SizedBox(height: 14),
+                    // NIS
+                    _EditField(
+                        label: 'NIS',
+                        controller: nisCtrl,
+                        keyboardType: TextInputType.number),
+                    const SizedBox(height: 14),
+                    // Sekolah
+                    _EditField(label: 'Sekolah', controller: sekolahCtrl),
+                    const SizedBox(height: 14),
+                    // Kelas
+                    _EditField(label: 'Kelas', controller: kelasCtrl),
+                    const SizedBox(height: 14),
+                    // No HP
+                    _EditField(
+                        label: 'No. HP / WhatsApp',
+                        controller: noHpCtrl,
+                        keyboardType: TextInputType.phone),
+                    const SizedBox(height: 14),
+                    // Alamat
+                    _EditField(
+                        label: 'Alamat Rumah',
+                        controller: alamatCtrl,
+                        maxLines: 2),
+                    const SizedBox(height: 20),
+
+                    // ── Ganti Password (opsional) ──
+                    const Divider(height: 1, color: AppColors.lightGrey),
+                    const SizedBox(height: 16),
+                    const Text('Ganti Password (opsional)',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textGrey)),
+                    const SizedBox(height: 4),
+                    const Text('Kosongkan jika tidak ingin mengubah password',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey)),
+                    const SizedBox(height: 12),
+                    // Password baru
+                    TextFormField(
+                      controller: passwordCtrl,
+                      obscureText: obscurePassword,
+                      style:
+                          const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                      validator: (v) {
+                        if (v != null && v.isNotEmpty && v.length < 8) {
+                          return 'Password minimal 8 karakter';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Password Baru',
+                        labelStyle: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: AppColors.textGrey),
+                        filled: true,
+                        fillColor: AppColors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: AppColors.textGrey,
+                              size: 20),
+                          onPressed: () =>
+                              setM(() => obscurePassword = !obscurePassword),
+                        ),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: AppColors.lightGrey)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: AppColors.lightGrey)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: AppColors.primary, width: 1.5)),
+                        errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppColors.red)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Konfirmasi password
+                    TextFormField(
+                      controller: passwordConfirmCtrl,
+                      obscureText: obscureConfirm,
+                      style:
+                          const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                      validator: (v) {
+                        if (passwordCtrl.text.isNotEmpty &&
+                            v != passwordCtrl.text) {
+                          return 'Konfirmasi password tidak cocok';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Konfirmasi Password Baru',
+                        labelStyle: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            color: AppColors.textGrey),
+                        filled: true,
+                        fillColor: AppColors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                              obscureConfirm
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: AppColors.textGrey,
+                              size: 20),
+                          onPressed: () =>
+                              setM(() => obscureConfirm = !obscureConfirm),
+                        ),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: AppColors.lightGrey)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: AppColors.lightGrey)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: AppColors.primary, width: 1.5)),
+                        errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(color: AppColors.red)),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Tombol Simpan
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) return;
+                                setM(() => isSaving = true);
+                                final data = <String, dynamic>{
+                                  'name': namaCtrl.text.trim(),
+                                  'email': emailCtrl.text.trim(),
+                                  'nis': nisCtrl.text.trim(),
+                                  'sekolah': sekolahCtrl.text.trim(),
+                                  'kelas': kelasCtrl.text.trim(),
+                                  'no_hp': noHpCtrl.text.trim(),
+                                  'alamat': alamatCtrl.text.trim(),
+                                };
+                                // Sertakan password hanya jika diisi
+                                if (passwordCtrl.text.isNotEmpty) {
+                                  data['password'] = passwordCtrl.text;
+                                  data['password_confirmation'] =
+                                      passwordConfirmCtrl.text;
+                                }
+                                final ok = await StudentService()
+                                    .updateStudent(studentId, data);
+                                if (!mounted) return;
+                                setM(() => isSaving = false);
+                                if (ok) {
+                                  await widget.dataService.loadStudents();
+
+                                  if (!mounted) return;
+
+                                  Navigator.pop(context);
+
+                                  setState(() {});
+
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                        'Data siswa berhasil diperbarui',
+                                        style: TextStyle(fontFamily: 'Poppins'),
+                                      ),
+                                      backgroundColor: AppColors.primary,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context)
+                                      .showSnackBar(SnackBar(
+                                    content: const Text(
+                                        'Gagal memperbarui data. Coba lagi.',
+                                        style:
+                                            TextStyle(fontFamily: 'Poppins')),
+                                    backgroundColor: AppColors.red,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10)),
+                                  ));
+                                }
+                              },
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2.5, color: Colors.white))
+                            : const Text('Simpan Perubahan',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   // ── Assign / Re-assign bus untuk siswa yang sudah approved
@@ -852,7 +1232,8 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       siswa: list[i],
                       onDelete: () => _deleteUser(list[i]),
                       onToggle: () => _toggleStatus(list[i]),
-                      onAssignBus: () => _showAssignBusSheet(list[i])),
+                      onAssignBus: () => _showAssignBusSheet(list[i]),
+                      onEdit: () => _showEditSiswaSheet(list[i])),
                 );
               }
             },
@@ -915,12 +1296,13 @@ class _SiswaAvatar extends StatelessWidget {
 
 class _SiswaCard extends StatelessWidget {
   final UserModel siswa;
-  final VoidCallback onDelete, onToggle, onAssignBus;
+  final VoidCallback onDelete, onToggle, onAssignBus, onEdit;
   const _SiswaCard(
       {required this.siswa,
       required this.onDelete,
       required this.onToggle,
-      required this.onAssignBus});
+      required this.onAssignBus,
+      required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -1038,6 +1420,15 @@ class _SiswaCard extends StatelessWidget {
               ])),
           const SizedBox(width: 8),
           Column(mainAxisSize: MainAxisSize.min, children: [
+            // Tombol edit data siswa
+            _ActionBtn(
+              icon: Icons.edit_rounded,
+              color: AppColors.primary,
+              bg: AppColors.primaryLight,
+              onTap: onEdit,
+              tooltip: 'Edit Data',
+            ),
+            const SizedBox(height: 6),
             // Tombol assign/ganti bus — tampil untuk siswa aktif
             if (isActive) ...[
               _ActionBtn(
@@ -1152,4 +1543,57 @@ class _ActionBtn extends StatelessWidget {
               child: Icon(icon, color: color, size: 18)),
         ),
       );
+}
+
+// ── Widget input field untuk edit form siswa
+class _EditField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final TextInputType? keyboardType;
+  final int maxLines;
+  final String? Function(String?)? validator;
+
+  const _EditField({
+    required this.label,
+    required this.controller,
+    this.keyboardType,
+    this.maxLines = 1,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      validator: validator,
+      style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+            fontFamily: 'Poppins', fontSize: 12, color: AppColors.textGrey),
+        filled: true,
+        fillColor: AppColors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.lightGrey),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.lightGrey),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.red),
+        ),
+      ),
+    );
+  }
 }

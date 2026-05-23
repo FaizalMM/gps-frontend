@@ -103,9 +103,10 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                     ),
                     const SizedBox(height: 18),
                     AppTextField(
-                      label: 'Kode / Nama Bus',
+                      label: 'Kode Bus',
                       controller: namaCtrl,
-                      validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
+                      validator: (v) =>
+                          v!.isEmpty ? 'Kode bus wajib diisi' : null,
                     ),
                     const SizedBox(height: 12),
                     AppTextField(
@@ -319,9 +320,10 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                     ),
                     const SizedBox(height: 18),
                     AppTextField(
-                      label: 'Kode / Nama Bus',
+                      label: 'Kode Bus',
                       controller: namaCtrl,
-                      validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
+                      validator: (v) =>
+                          v!.isEmpty ? 'Kode bus wajib diisi' : null,
                     ),
                     const SizedBox(height: 12),
                     AppTextField(
@@ -469,7 +471,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
             style:
                 TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
         content: Text(
-            'Bus "${bus.nama}" beserta data rute dan siswa yang terhubung akan dihapus.',
+            'Bus dengan kode "${bus.nama}" (${bus.platNomor}) beserta data rute dan siswa yang terhubung akan dihapus.',
             style: const TextStyle(fontFamily: 'Poppins', fontSize: 13)),
         actions: [
           TextButton(
@@ -598,7 +600,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                   onChanged: (v) => setState(() => _searchQuery = v),
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
                   decoration: const InputDecoration(
-                    hintText: 'Cari nama bus, plat, atau driver...',
+                    hintText: 'Cari kode bus, plat, atau driver...',
                     hintStyle: TextStyle(
                         fontFamily: 'Poppins',
                         color: AppColors.textGrey,
@@ -807,6 +809,22 @@ class _BusCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 color: statusColor)),
                       ]),
+                    ),
+                  ]),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(4)),
+                      child: const Text('Kode Bus',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textGrey)),
                     ),
                   ]),
                   const SizedBox(height: 3),
