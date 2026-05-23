@@ -45,125 +45,94 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModal) => Container(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          decoration: const BoxDecoration(
-            color: AppColors.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                      child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                              color: AppColors.lightGrey,
-                              borderRadius: BorderRadius.circular(2)))),
-                  const SizedBox(height: 20),
-                  const Text('Tambah Halte',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Setelah halte dibuat, tambahkan ke rute di menu Rute Bus.',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        color: AppColors.textGrey),
-                  ),
-                  const SizedBox(height: 20),
-                  AppTextField(
-                      label: 'Nama Halte',
-                      controller: namaCtrl,
-                      validator: (v) =>
-                          v!.isEmpty ? 'Nama tidak boleh kosong' : null),
-                  const SizedBox(height: 14),
-                  // Bug 2 Fix: Tidak ada field "Rute" — halte tidak punya rute langsung
-                  AppTextField(
-                    label: 'Alamat (opsional)',
-                    controller: alamatCtrl,
-                  ),
-                  const SizedBox(height: 14),
-                  _LocationPickerField(
-                    lat: pickedLat,
-                    lng: pickedLng,
-                    onPick: () async {
-                      final result = await Navigator.push<PickedLocation>(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => HalteLocationPicker(
-                                initialLat: pickedLat, initialLng: pickedLng)),
-                      );
-                      if (result != null) {
-                        setModal(() {
-                          pickedLat = result.latitude;
-                          pickedLng = result.longitude;
-                          // Auto-isi alamat dari reverse geocode kalau field masih kosong
-                          if (alamatCtrl.text.trim().isEmpty &&
-                              result.namaAlamat != null) {
-                            alamatCtrl.text = result.namaAlamat!;
-                          }
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  PrimaryButton(
-                    text: 'Tambah Halte',
-                    icon: Icons.add_location_rounded,
-                    onPressed: () {
-                      if (formKey.currentState!.validate()) {
-                        if (pickedLat == null || pickedLng == null) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                            content: const Text(
-                                'Pilih lokasi halte di peta terlebih dahulu'),
-                            backgroundColor: AppColors.pendingOrange,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ));
-                          return;
+        builder: (ctx, setModal) => _HalteSheetWrap(
+          title: 'Tambah Halte',
+          subtitle: 'Setelah halte dibuat, tambahkan ke rute di menu Rute Bus.',
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                    label: 'Nama Halte',
+                    controller: namaCtrl,
+                    validator: (v) =>
+                        v!.isEmpty ? 'Nama tidak boleh kosong' : null),
+                const SizedBox(height: 14),
+                AppTextField(
+                  label: 'Alamat (opsional)',
+                  controller: alamatCtrl,
+                ),
+                const SizedBox(height: 14),
+                _LocationPickerField(
+                  lat: pickedLat,
+                  lng: pickedLng,
+                  onPick: () async {
+                    final result = await Navigator.push<PickedLocation>(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => HalteLocationPicker(
+                              initialLat: pickedLat, initialLng: pickedLng)),
+                    );
+                    if (result != null) {
+                      setModal(() {
+                        pickedLat = result.latitude;
+                        pickedLng = result.longitude;
+                        if (alamatCtrl.text.trim().isEmpty &&
+                            result.namaAlamat != null) {
+                          alamatCtrl.text = result.namaAlamat!;
                         }
-                        final messenger = ScaffoldMessenger.of(context);
-                        final nav = Navigator.of(ctx);
-                        widget.dataService
-                            .createHalte(
-                          namaHalte: namaCtrl.text.trim(),
-                          latitude: pickedLat!,
-                          longitude: pickedLng!,
-                          alamat: alamatCtrl.text.trim(),
-                        )
-                            .then((ok) {
-                          if (!mounted) return;
-                          nav.pop();
-                          if (ok) _refresh();
-                          messenger.showSnackBar(SnackBar(
-                            content: Text(ok
-                                ? 'Halte berhasil ditambahkan!'
-                                : 'Gagal menambah halte'),
-                            backgroundColor:
-                                ok ? AppColors.primary : AppColors.red,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ));
-                        });
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                PrimaryButton(
+                  text: 'Tambah Halte',
+                  icon: Icons.add_location_rounded,
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      if (pickedLat == null || pickedLng == null) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text(
+                              'Pilih lokasi halte di peta terlebih dahulu'),
+                          backgroundColor: AppColors.pendingOrange,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ));
+                        return;
                       }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                      final messenger = ScaffoldMessenger.of(context);
+                      final nav = Navigator.of(ctx);
+                      widget.dataService
+                          .createHalte(
+                        namaHalte: namaCtrl.text.trim(),
+                        latitude: pickedLat!,
+                        longitude: pickedLng!,
+                        alamat: alamatCtrl.text.trim(),
+                      )
+                          .then((ok) {
+                        if (!mounted) return;
+                        nav.pop();
+                        if (ok) _refresh();
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(ok
+                              ? 'Halte berhasil ditambahkan!'
+                              : 'Gagal menambah halte'),
+                          backgroundColor:
+                              ok ? AppColors.primary : AppColors.red,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ));
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           ),
         ),
@@ -855,4 +824,59 @@ class _LocationPickerField extends StatelessWidget {
       ],
     );
   }
+}
+
+// ── Sheet Wrapper (konsisten dengan driver screen) ─────────────
+class _HalteSheetWrap extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget child;
+  const _HalteSheetWrap(
+      {required this.title, this.subtitle, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                  child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(2)),
+              )),
+              const SizedBox(height: 20),
+              Text(title,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+              if (subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(subtitle!,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.textGrey)),
+              ],
+              const SizedBox(height: 20),
+              child,
+            ],
+          ),
+        ),
+      );
 }

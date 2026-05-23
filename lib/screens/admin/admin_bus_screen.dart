@@ -42,205 +42,160 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setM) => Padding(
-          padding:
-              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Center(
-                        child: Container(
-                            width: 40,
-                            height: 4,
-                            decoration: BoxDecoration(
-                                color: AppColors.lightGrey,
-                                borderRadius: BorderRadius.circular(2)))),
-                    const SizedBox(height: 18),
-                    const Text('Tambah Bus Baru',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    const Text('Rute & halte dapat diatur setelah bus dibuat.',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            color: AppColors.textGrey)),
-                    const SizedBox(height: 18),
-                    // ── Foto Bus ──────────────────────────────────────
-                    Center(
-                      child: GestureDetector(
-                        onTap: () async {
-                          final img = await ImagePicker().pickImage(
-                              source: ImageSource.gallery, imageQuality: 75);
-                          if (img != null) setM(() => foto = img);
-                        },
-                        child: _BusFotoPicker(foto: foto),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Center(
-                      child: Text(
-                        foto != null
-                            ? 'Ketuk untuk ganti foto'
-                            : 'Ketuk untuk pilih foto bus (opsional)',
-                        style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: AppColors.textGrey),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    AppTextField(
-                      label: 'Kode Bus',
-                      controller: namaCtrl,
-                      validator: (v) =>
-                          v!.isEmpty ? 'Kode bus wajib diisi' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    AppTextField(
-                      label: 'Plat Nomor',
-                      controller: platCtrl,
-                      validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Status',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textGrey)),
-                    const SizedBox(height: 6),
-                    _DropdownField<BusStatus>(
-                      value: selectedStatus,
-                      items: const [
-                        DropdownMenuItem(
-                            value: BusStatus.active,
-                            child: Text('Aktif',
-                                style: TextStyle(fontFamily: 'Poppins'))),
-                        DropdownMenuItem(
-                            value: BusStatus.maintenance,
-                            child: Text('Perawatan',
-                                style: TextStyle(fontFamily: 'Poppins'))),
-                        DropdownMenuItem(
-                            value: BusStatus.inactive,
-                            child: Text('Nonaktif',
-                                style: TextStyle(fontFamily: 'Poppins'))),
-                      ],
-                      onChanged: (v) => setM(() => selectedStatus = v!),
-                    ),
-                    if (drivers.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      const Text('Driver (opsional)',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textGrey)),
-                      const SizedBox(height: 6),
-                      _DropdownField<String?>(
-                        value: selectedDriverId,
-                        hint: 'Pilih driver...',
-                        items: [
-                          const DropdownMenuItem(
-                              value: null,
-                              child: Text('— Tanpa Driver —',
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      color: AppColors.textGrey))),
-                          ...drivers.map((d) => DropdownMenuItem(
-                              value: d.idStr,
-                              child: Text(d.namaLengkap,
-                                  style:
-                                      const TextStyle(fontFamily: 'Poppins')))),
-                        ],
-                        onChanged: (v) => setM(() => selectedDriverId = v),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () async {
-                          if (!formKey.currentState!.validate()) return;
-                          final messenger = ScaffoldMessenger.of(context);
-                          String statusStr =
-                              selectedStatus == BusStatus.maintenance
-                                  ? 'maintenance'
-                                  : selectedStatus == BusStatus.inactive
-                                      ? 'nonaktif'
-                                      : 'aktif';
-                          final ok = await widget.dataService.createBus(
-                            kodeBus: namaCtrl.text.trim(),
-                            platNomor: platCtrl.text.trim(),
-                            status: statusStr,
-                          );
-                          if (ok) {
-                            await widget.dataService.loadAll();
-                            final newBus = widget.dataService.buses
-                                .where(
-                                    (b) => b.platNomor == platCtrl.text.trim())
-                                .firstOrNull;
-                            if (newBus != null) {
-                              // Upload foto jika dipilih
-                              if (foto != null) {
-                                await BusService()
-                                    .uploadBusPhoto(newBus.id, foto!.path);
-                              }
-                              if (selectedDriverId != null) {
-                                final driver = drivers.firstWhere(
-                                    (d) => d.idStr == selectedDriverId);
-                                await BusService()
-                                    .assignDriverByUserId(newBus.id, driver);
-                                await Future.delayed(
-                                    const Duration(milliseconds: 500));
-                              }
-                              await widget.dataService.loadAll();
-                            }
-                          }
-                          if (!ctx.mounted) return;
-                          Navigator.pop(ctx);
-                          if (!mounted) return;
-                          setState(() {});
-                          messenger.showSnackBar(SnackBar(
-                            content: Text(
-                                ok
-                                    ? 'Bus berhasil ditambahkan!'
-                                    : 'Gagal menambah bus',
-                                style: const TextStyle(fontFamily: 'Poppins')),
-                            backgroundColor:
-                                ok ? AppColors.primary : AppColors.red,
-                            behavior: SnackBarBehavior.floating,
-                          ));
-                        },
-                        child: const Text('Tambah Bus',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15)),
-                      ),
-                    ),
-                  ],
+        builder: (ctx, setM) => _BusSheetWrap(
+          title: 'Tambah Bus Baru',
+          subtitle: 'Rute & halte dapat diatur setelah bus dibuat.',
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Foto Bus ──────────────────────────────────────
+                Center(
+                  child: GestureDetector(
+                    onTap: () async {
+                      final img = await ImagePicker().pickImage(
+                          source: ImageSource.gallery, imageQuality: 75);
+                      if (img != null) setM(() => foto = img);
+                    },
+                    child: _BusFotoPicker(foto: foto),
+                  ),
                 ),
-              ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 6, bottom: 20),
+                    child: Text(
+                      foto != null
+                          ? 'Ketuk untuk ganti foto'
+                          : 'Ketuk untuk pilih foto bus (opsional)',
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: AppColors.textGrey),
+                    ),
+                  ),
+                ),
+                AppTextField(
+                  label: 'Kode Bus',
+                  controller: namaCtrl,
+                  validator: (v) => v!.isEmpty ? 'Kode bus wajib diisi' : null,
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  label: 'Plat Nomor',
+                  controller: platCtrl,
+                  validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
+                ),
+                const SizedBox(height: 12),
+                const Text('Status',
+                    style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textGrey)),
+                const SizedBox(height: 6),
+                _DropdownField<BusStatus>(
+                  value: selectedStatus,
+                  items: const [
+                    DropdownMenuItem(
+                        value: BusStatus.active,
+                        child: Text('Aktif',
+                            style: TextStyle(fontFamily: 'Poppins'))),
+                    DropdownMenuItem(
+                        value: BusStatus.maintenance,
+                        child: Text('Perawatan',
+                            style: TextStyle(fontFamily: 'Poppins'))),
+                    DropdownMenuItem(
+                        value: BusStatus.inactive,
+                        child: Text('Nonaktif',
+                            style: TextStyle(fontFamily: 'Poppins'))),
+                  ],
+                  onChanged: (v) => setM(() => selectedStatus = v!),
+                ),
+                if (drivers.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Driver (opsional)',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textGrey)),
+                  const SizedBox(height: 6),
+                  _DropdownField<String?>(
+                    value: selectedDriverId,
+                    hint: 'Pilih driver...',
+                    items: [
+                      const DropdownMenuItem(
+                          value: null,
+                          child: Text('— Tanpa Driver —',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  color: AppColors.textGrey))),
+                      ...drivers.map((d) => DropdownMenuItem(
+                          value: d.idStr,
+                          child: Text(d.namaLengkap,
+                              style: const TextStyle(fontFamily: 'Poppins')))),
+                    ],
+                    onChanged: (v) => setM(() => selectedDriverId = v),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                PrimaryButton(
+                  text: 'Tambah Bus',
+                  icon: Icons.directions_bus_rounded,
+                  onPressed: () async {
+                    if (!formKey.currentState!.validate()) return;
+                    final messenger = ScaffoldMessenger.of(context);
+                    String statusStr = selectedStatus == BusStatus.maintenance
+                        ? 'maintenance'
+                        : selectedStatus == BusStatus.inactive
+                            ? 'nonaktif'
+                            : 'aktif';
+                    final ok = await widget.dataService.createBus(
+                      kodeBus: namaCtrl.text.trim(),
+                      platNomor: platCtrl.text.trim(),
+                      status: statusStr,
+                    );
+                    if (ok) {
+                      await widget.dataService.loadAll();
+                      final newBus = widget.dataService.buses
+                          .where((b) => b.platNomor == platCtrl.text.trim())
+                          .firstOrNull;
+                      if (newBus != null) {
+                        if (foto != null) {
+                          await BusService()
+                              .uploadBusPhoto(newBus.id, foto!.path);
+                        }
+                        if (selectedDriverId != null) {
+                          final driver = drivers
+                              .firstWhere((d) => d.idStr == selectedDriverId);
+                          await BusService()
+                              .assignDriverByUserId(newBus.id, driver);
+                          await Future.delayed(
+                              const Duration(milliseconds: 500));
+                        }
+                        await widget.dataService.loadAll();
+                      }
+                    }
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    if (!mounted) return;
+                    setState(() {});
+                    messenger.showSnackBar(SnackBar(
+                      content: Text(
+                          ok
+                              ? 'Bus berhasil ditambahkan!'
+                              : 'Gagal menambah bus',
+                          style: const TextStyle(fontFamily: 'Poppins')),
+                      backgroundColor: ok ? AppColors.primary : AppColors.red,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ));
+                  },
+                ),
+              ],
             ),
           ),
         ),
@@ -2153,6 +2108,61 @@ class _BusFotoPicker extends StatelessWidget {
       ),
     ]);
   }
+}
+
+// ── Sheet Wrapper (konsisten dengan driver screen) ─────────────
+class _BusSheetWrap extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget child;
+  const _BusSheetWrap(
+      {required this.title, this.subtitle, required this.child});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.only(
+          left: 24,
+          right: 24,
+          top: 24,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                  child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.lightGrey,
+                    borderRadius: BorderRadius.circular(2)),
+              )),
+              const SizedBox(height: 20),
+              Text(title,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+              if (subtitle != null) ...[
+                const SizedBox(height: 4),
+                Text(subtitle!,
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.textGrey)),
+              ],
+              const SizedBox(height: 20),
+              child,
+            ],
+          ),
+        ),
+      );
 }
 
 class _DropdownField<T> extends StatelessWidget {

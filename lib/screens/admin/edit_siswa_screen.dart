@@ -322,30 +322,96 @@ class _EditSiswaScreenState extends State<EditSiswaScreen> {
                         _ubahPassword ? AppColors.orange : AppColors.lightGrey),
               ),
               child: Column(children: [
-                // Toggle ubah password
-                SwitchListTile.adaptive(
-                  value: _ubahPassword,
-                  onChanged: (v) {
-                    setState(() {
-                      _ubahPassword = v;
-                      if (!v) {
-                        _passwordCtrl.clear();
-                        _passwordConfirmCtrl.clear();
-                      }
-                    });
-                  },
-                  title: const Text('Ubah Password',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Kosongkan jika tidak ingin diubah',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          color: AppColors.textGrey)),
-                  activeColor: AppColors.orange,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                // Toggle ubah password — tombol Enable/Disable
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: _ubahPassword
+                            ? AppColors.orange.withValues(alpha: 0.12)
+                            : AppColors.lightGrey.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.lock_outline_rounded,
+                        size: 18,
+                        color: _ubahPassword
+                            ? AppColors.orange
+                            : AppColors.textGrey,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Ubah Password',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            Text(
+                              _ubahPassword
+                                  ? 'Isi password baru di bawah'
+                                  : 'Ketuk tombol untuk mengubah',
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  color: AppColors.textGrey),
+                            ),
+                          ]),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _ubahPassword = !_ubahPassword;
+                          if (!_ubahPassword) {
+                            _passwordCtrl.clear();
+                            _passwordConfirmCtrl.clear();
+                          }
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: _ubahPassword
+                              ? AppColors.orange
+                              : AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                            _ubahPassword
+                                ? Icons.lock_open_rounded
+                                : Icons.edit_rounded,
+                            size: 13,
+                            color: _ubahPassword
+                                ? Colors.white
+                                : AppColors.primary,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            _ubahPassword ? 'Batal' : 'Ubah',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _ubahPassword
+                                  ? Colors.white
+                                  : AppColors.primary,
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ]),
                 ),
 
                 if (_ubahPassword) ...[
