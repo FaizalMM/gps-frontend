@@ -474,31 +474,12 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                 fontSize: 18,
                 color: AppColors.black)),
         centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: TextButton.icon(
-              onPressed: _showAddBusDialog,
-              icon:
-                  const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-              label: const Text('Tambah',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white)),
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddBusDialog,
+        backgroundColor: AppColors.primary,
+        elevation: 4,
+        child: const Icon(Icons.directions_bus_rounded, color: Colors.white),
       ),
       body: StreamBuilder<List<BusModel>>(
         stream: widget.dataService.busesStream,

@@ -323,31 +323,12 @@ class _AdminHalteScreenState extends State<AdminHalteScreen> {
                 fontSize: 18,
                 color: AppColors.black)),
         centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: TextButton.icon(
-              onPressed: _showAddHalteDialog,
-              icon:
-                  const Icon(Icons.add_rounded, size: 16, color: Colors.white),
-              label: const Text('Tambah',
-                  style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white)),
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddHalteDialog,
+        backgroundColor: AppColors.primary,
+        elevation: 4,
+        child: const Icon(Icons.add_location_alt_rounded, color: Colors.white),
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,

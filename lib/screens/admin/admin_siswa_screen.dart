@@ -167,6 +167,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     bool isSaving = false;
     bool obscurePassword = true;
     bool obscureConfirm = true;
+    bool ubahPassword = false;
 
     showModalBottomSheet(
       context: context,
@@ -283,121 +284,259 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                         maxLines: 2),
                     const SizedBox(height: 20),
 
-                    // ── Ganti Password (opsional) ──
+                    // ── Ganti Password — Toggle Enable/Disable ──
                     const Divider(height: 1, color: AppColors.lightGrey),
-                    const SizedBox(height: 16),
-                    const Text('Ganti Password (opsional)',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textGrey)),
-                    const SizedBox(height: 4),
-                    const Text('Kosongkan jika tidak ingin mengubah password',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: AppColors.textGrey)),
                     const SizedBox(height: 12),
-                    // Password baru
-                    TextFormField(
-                      controller: passwordCtrl,
-                      obscureText: obscurePassword,
-                      style:
-                          const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-                      validator: (v) {
-                        if (v != null && v.isNotEmpty && v.length < 8) {
-                          return 'Password minimal 8 karakter';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Password Baru',
-                        labelStyle: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            color: AppColors.textGrey),
-                        filled: true,
-                        fillColor: AppColors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                              obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              color: AppColors.textGrey,
-                              size: 20),
-                          onPressed: () =>
-                              setM(() => obscurePassword = !obscurePassword),
-                        ),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide:
-                                const BorderSide(color: AppColors.lightGrey)),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide:
-                                const BorderSide(color: AppColors.lightGrey)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                                color: AppColors.primary, width: 1.5)),
-                        errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: AppColors.red)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: ubahPassword
+                                ? AppColors.orange
+                                : AppColors.lightGrey),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    // Konfirmasi password
-                    TextFormField(
-                      controller: passwordConfirmCtrl,
-                      obscureText: obscureConfirm,
-                      style:
-                          const TextStyle(fontFamily: 'Poppins', fontSize: 13),
-                      validator: (v) {
-                        if (passwordCtrl.text.isNotEmpty &&
-                            v != passwordCtrl.text) {
-                          return 'Konfirmasi password tidak cocok';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        labelText: 'Konfirmasi Password Baru',
-                        labelStyle: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            color: AppColors.textGrey),
-                        filled: true,
-                        fillColor: AppColors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                              obscureConfirm
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              color: AppColors.textGrey,
-                              size: 20),
-                          onPressed: () =>
-                              setM(() => obscureConfirm = !obscureConfirm),
+                      child: Column(children: [
+                        // ── Baris header + tombol toggle ──
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          child: Row(children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: ubahPassword
+                                    ? AppColors.orange.withValues(alpha: 0.12)
+                                    : AppColors.lightGrey
+                                        .withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.lock_outline_rounded,
+                                size: 18,
+                                color: ubahPassword
+                                    ? AppColors.orange
+                                    : AppColors.textGrey,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Ubah Password',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600)),
+                                    Text(
+                                      ubahPassword
+                                          ? 'Isi password baru di bawah'
+                                          : 'Ketuk tombol untuk mengubah',
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11,
+                                          color: AppColors.textGrey),
+                                    ),
+                                  ]),
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                setM(() {
+                                  ubahPassword = !ubahPassword;
+                                  if (!ubahPassword) {
+                                    passwordCtrl.clear();
+                                    passwordConfirmCtrl.clear();
+                                  }
+                                });
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: ubahPassword
+                                      ? AppColors.orange
+                                      : AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        ubahPassword
+                                            ? Icons.lock_open_rounded
+                                            : Icons.edit_rounded,
+                                        size: 13,
+                                        color: ubahPassword
+                                            ? Colors.white
+                                            : AppColors.primary,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        ubahPassword ? 'Batal' : 'Ubah',
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: ubahPassword
+                                              ? Colors.white
+                                              : AppColors.primary,
+                                        ),
+                                      ),
+                                    ]),
+                              ),
+                            ),
+                          ]),
                         ),
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide:
-                                const BorderSide(color: AppColors.lightGrey)),
-                        enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide:
-                                const BorderSide(color: AppColors.lightGrey)),
-                        focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                                color: AppColors.primary, width: 1.5)),
-                        errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: AppColors.red)),
-                      ),
+
+                        // ── Field password — hanya tampil saat ubahPassword = true ──
+                        if (ubahPassword) ...[
+                          const Divider(height: 1, color: AppColors.lightGrey),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                            child: Column(children: [
+                              // Password baru
+                              TextFormField(
+                                controller: passwordCtrl,
+                                obscureText: obscurePassword,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins', fontSize: 13),
+                                validator: (v) {
+                                  if (!ubahPassword) return null;
+                                  if (v == null || v.isEmpty) {
+                                    return 'Password baru wajib diisi';
+                                  }
+                                  if (v.length < 8) {
+                                    return 'Password minimal 8 karakter';
+                                  }
+                                  return null;
+                                },
+                                decoration: InputDecoration(
+                                  labelText: 'Password Baru',
+                                  labelStyle: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: AppColors.textGrey),
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                        obscurePassword
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: AppColors.textGrey,
+                                        size: 20),
+                                    onPressed: () => setM(() =>
+                                        obscurePassword = !obscurePassword),
+                                  ),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.lightGrey)),
+                                  enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.lightGrey)),
+                                  focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.orange, width: 1.5)),
+                                  errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.red)),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              // Konfirmasi password
+                              TextFormField(
+                                controller: passwordConfirmCtrl,
+                                obscureText: obscureConfirm,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins', fontSize: 13),
+                                validator: (v) {
+                                  if (!ubahPassword) return null;
+                                  if (v == null || v.isEmpty) {
+                                    return 'Konfirmasi password wajib diisi';
+                                  }
+                                  if (v != passwordCtrl.text) {
+                                    return 'Password tidak cocok';
+                                  }
+                                  return null;
+                                },
+                                decoration: InputDecoration(
+                                  labelText: 'Konfirmasi Password Baru',
+                                  labelStyle: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: AppColors.textGrey),
+                                  filled: true,
+                                  fillColor: AppColors.background,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                        obscureConfirm
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        color: AppColors.textGrey,
+                                        size: 20),
+                                    onPressed: () => setM(
+                                        () => obscureConfirm = !obscureConfirm),
+                                  ),
+                                  border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.lightGrey)),
+                                  enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.lightGrey)),
+                                  focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.orange, width: 1.5)),
+                                  errorBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: const BorderSide(
+                                          color: AppColors.red)),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              // Info warning
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                    color: AppColors.orange
+                                        .withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                        color: AppColors.orange
+                                            .withValues(alpha: 0.3))),
+                                child: const Row(children: [
+                                  Icon(Icons.info_outline_rounded,
+                                      size: 14, color: AppColors.orange),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Siswa akan perlu login ulang menggunakan password baru.',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11,
+                                          color: AppColors.orange),
+                                    ),
+                                  ),
+                                ]),
+                              ),
+                            ]),
+                          ),
+                        ],
+                      ]),
                     ),
                     const SizedBox(height: 28),
 
@@ -427,7 +566,8 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                   'alamat': alamatCtrl.text.trim(),
                                 };
                                 // Sertakan password hanya jika diisi
-                                if (passwordCtrl.text.isNotEmpty) {
+                                if (ubahPassword &&
+                                    passwordCtrl.text.isNotEmpty) {
                                   data['password'] = passwordCtrl.text;
                                   data['password_confirmation'] =
                                       passwordConfirmCtrl.text;
@@ -1312,7 +1452,7 @@ class _SiswaCard extends StatelessWidget {
         ? AppColors.primary
         : isPending
             ? AppColors.orange
-            : AppColors.textGrey;
+            : AppColors.red;
     final statusLabel = isActive
         ? 'Aktif'
         : isPending
@@ -1322,7 +1462,7 @@ class _SiswaCard extends StatelessWidget {
         ? AppColors.primaryLight
         : isPending
             ? AppColors.orange.withValues(alpha: 0.1)
-            : AppColors.lightGrey;
+            : AppColors.red.withValues(alpha: 0.1);
 
     // Cek apakah siswa sudah punya bus
     final hasBus = (siswa.studentDetail?.busId ?? 0) > 0;
@@ -1335,10 +1475,14 @@ class _SiswaCard extends StatelessWidget {
       decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(14),
-          border: !hasBus && isActive
+          border: !isActive && !isPending
               ? Border.all(
-                  color: AppColors.orange.withValues(alpha: 0.4), width: 1.5)
-              : null,
+                  color: AppColors.red.withValues(alpha: 0.3), width: 1.5)
+              : !hasBus && isActive
+                  ? Border.all(
+                      color: AppColors.orange.withValues(alpha: 0.4),
+                      width: 1.5)
+                  : null,
           boxShadow: [
             BoxShadow(
                 color: Colors.black.withValues(alpha: 0.04),
@@ -1444,15 +1588,17 @@ class _SiswaCard extends StatelessWidget {
               const SizedBox(height: 6),
               _ActionBtn(
                 icon:
-                    isActive ? Icons.person_off_rounded : Icons.person_rounded,
-                color: isActive ? AppColors.textGrey : AppColors.primary,
-                bg: AppColors.surface2,
+                    isActive ? Icons.block_rounded : Icons.check_circle_rounded,
+                color: isActive ? AppColors.red : AppColors.primary,
+                bg: isActive
+                    ? AppColors.red.withValues(alpha: 0.1)
+                    : AppColors.primaryLight,
                 onTap: onToggle,
                 tooltip: isActive ? 'Nonaktifkan' : 'Aktifkan',
               ),
             ] else if (!isPending) ...[
               _ActionBtn(
-                icon: Icons.person_rounded,
+                icon: Icons.check_circle_rounded,
                 color: AppColors.primary,
                 bg: AppColors.primaryLight,
                 onTap: onToggle,
