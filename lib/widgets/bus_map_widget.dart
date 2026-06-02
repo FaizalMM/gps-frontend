@@ -24,6 +24,8 @@ class BusMapWidget extends StatefulWidget {
   final bool showInfoCard;
   final List<dynamic> navigationPolyline;
   final void Function(BusModel)? onBusTap;
+  final List<Polyline> extraPolylines;
+  final List<Marker> extraMarkers;
 
   const BusMapWidget({
     super.key,
@@ -39,7 +41,9 @@ class BusMapWidget extends StatefulWidget {
     this.showRoutes = false,
     this.showInfoCard = true,
     this.navigationPolyline = const [],
-    this.onBusTap, // callback saat marker bus di-tap dari luar
+    this.onBusTap,
+    this.extraPolylines = const [],
+    this.extraMarkers = const [],
   });
 
   @override
@@ -444,6 +448,10 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                       );
                     }).toList(),
                   ),
+                if (widget.extraPolylines.isNotEmpty)
+                  PolylineLayer(polylines: widget.extraPolylines),
+                if (widget.extraMarkers.isNotEmpty)
+                  MarkerLayer(markers: widget.extraMarkers),
               ],
             ),
             if (widget.showInfoCard) ...[

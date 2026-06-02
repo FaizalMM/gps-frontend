@@ -80,59 +80,46 @@ class BusService {
   // Guard agar tidak double-call assignDriver
   final Set<String> _assigningKeys = {};
 
-  Future<bool> assignDriver(int busId, int driverId) async {
+  Future<bool> assignDriver(int busId, int driverId,
+      {String? tanggalMulai, String? tanggalSelesai}) async {
     final key = '$busId-$driverId';
-    if (_assigningKeys.contains(key)) return true; // sudah dalam proses
+    if (_assigningKeys.contains(key)) return true;
     _assigningKeys.add(key);
 
     try {
       final today = DateTime.now().toIso8601String().substring(0, 10);
-      debugPrint('[BusService] Assigning driver $driverId to bus $busId');
-      final res = await _api.post('/buses/$busId/drivers', {
+      final body = <String, dynamic>{
         'driver_id': driverId,
-        'tanggal_mulai': today,
-      });
-      debugPrint(
-          '[BusService] Assignment response: ${res.statusCode} - ${res.success}');
-      if (res.data != null) {
-        debugPrint('[BusService] Response data: ${res.data}');
-      }
-      // 201 = berhasil assign baru, 200 = sudah ada assignment aktif (reuse)
+        'tanggal_mulai': tanggalMulai ?? today,
+      };
+      if (tanggalSelesai != null) body['tanggal_selesai'] = tanggalSelesai;
+
+      final res = await _api.post('/buses/$busId/drivers', body);
       return res.success;
     } finally {
       _assigningKeys.remove(key);
     }
   }
 
-  /// Assign driver menggunakan users.id
-  /// Otomatis resolve ke drivers.id via driverDetail atau fallback ke UserModel
-  Future<bool> assignDriverByUserId(int busId, UserModel driver) async {
-    debugPrint(
-        '[assignDriverByUserId] Driver: ${driver.namaLengkap}, ID: ${driver.id}');
-    debugPrint(
-        '[assignDriverByUserId] Has driverDetail: ${driver.driverDetail != null}');
-
-    // Prioritas: pakai driverDetail.id kalau ada
+  Future<bool> assignDriverByUserId(int busId, UserModel driver,
+      {String? tanggalMulai, String? tanggalSelesai}) async {
     if (driver.driverDetail != null) {
-      debugPrint(
-          '[assignDriverByUserId] Using driverDetail.id: ${driver.driverDetail!.id}');
-      return assignDriver(busId, driver.driverDetail!.id);
+      return assignDriver(busId, driver.driverDetail!.id,
+          tanggalMulai: tanggalMulai, tanggalSelesai: tanggalSelesai);
     }
 
-    // Fallback: fetch ulang user dari API untuk dapat driver profile
-    debugPrint('[assignDriverByUserId] Fetching driver profile from API...');
     final res = await _api.get('/admin/users/${driver.id}');
     if (res.success && res.data != null) {
       final data = res.data!['data'] ?? res.data!;
-      debugPrint('[assignDriverByUserId] API response: $data');
       final driverData = data['driver'];
       if (driverData != null) {
         final driverId = driverData['id'] as int?;
-        debugPrint('[assignDriverByUserId] Resolved driver ID: $driverId');
-        if (driverId != null) return assignDriver(busId, driverId);
+        if (driverId != null) {
+          return assignDriver(busId, driverId,
+              tanggalMulai: tanggalMulai, tanggalSelesai: tanggalSelesai);
+        }
       }
     }
-    debugPrint('[assignDriverByUserId] Failed to resolve driver ID');
     return false;
   }
 

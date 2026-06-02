@@ -677,6 +677,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
       return sorted;
     }
 
+    bool sheetOpen = true;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -692,6 +693,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
           if (!isGeocoding && siswaCoords == null && alamat.isNotEmpty) {
             isGeocoding = true;
             _geocodeAlamat(alamat).then((coords) {
+              if (!sheetOpen) return;
               if (coords == null) {
                 setM(() => isGeocoding = false);
                 return;
@@ -1149,11 +1151,13 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                         onPressed: selectedBus == null || selectedHalte == null
                             ? null
                             : () async {
-                                Navigator.pop(ctx);
+                                sheetOpen = false;
                                 final studentId = user.studentDetail?.id ?? 0;
+                                final messenger = ScaffoldMessenger.of(context);
+                                final nav = Navigator.of(ctx);
                                 if (studentId <= 0) {
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(const SnackBar(
+                                  nav.pop();
+                                  messenger.showSnackBar(const SnackBar(
                                     content: Text(
                                         'ID siswa tidak ditemukan. Refresh dan coba lagi.'),
                                     backgroundColor: AppColors.red,
@@ -1169,9 +1173,9 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 );
                                 await widget.dataService.loadStudents();
                                 if (!mounted) return;
+                                nav.pop();
                                 setState(() {});
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
+                                messenger.showSnackBar(SnackBar(
                                   content: Text(ok
                                       ? '${user.namaLengkap} berhasil ditugaskan ke ${selectedBus!.nama}'
                                       : 'Gagal assign bus. Coba lagi.'),
@@ -1205,7 +1209,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
           );
         },
       ),
-    );
+    ).whenComplete(() => sheetOpen = false);
   }
 
   @override

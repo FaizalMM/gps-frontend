@@ -511,3 +511,176 @@ class RouteService {
     return RouteModel.fromJson(d as Map<String, dynamic>);
   }
 }
+
+class AdminService {
+  final _api = ApiClient();
+
+  Future<List<UserModel>> getAdmins() async {
+    final allAdmins = <UserModel>[];
+    int page = 1;
+    int lastPage = 1;
+
+    do {
+      final res = await _api.get('/admins', params: {'page': '$page'});
+      if (!res.success || res.data == null) break;
+
+      final raw = res.data!['data'];
+      final list = raw is List ? raw : [];
+      for (final e in list) {
+        final json = e as Map<String, dynamic>;
+        allAdmins.add(UserModel.fromJson({...json, 'role': 'admin'}));
+      }
+
+      final pagination = res.data!['pagination'] as Map?;
+      if (pagination != null) {
+        lastPage = (pagination['last_page'] as num?)?.toInt() ?? 1;
+      }
+      page++;
+    } while (page <= lastPage);
+
+    return allAdmins;
+  }
+
+  Future<UserModel?> getAdmin(int id) async {
+    final res = await _api.get('/admins/$id');
+    if (!res.success || res.data == null) return null;
+    final d = res.data!['data'];
+    if (d == null) return null;
+    return UserModel.fromJson(
+        {...(d as Map<String, dynamic>), 'role': 'admin'});
+  }
+
+  Future<bool> createAdmin({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+    String? photoPath,
+  }) async {
+    if (photoPath != null) {
+      final res = await _api.uploadMultipart(
+        '/admins',
+        photoPath,
+        'photo',
+        fields: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'password_confirmation': passwordConfirmation,
+        },
+      );
+      return res.success;
+    }
+    final res = await _api.post('/admins', {
+      'name': name,
+      'email': email,
+      'password': password,
+      'password_confirmation': passwordConfirmation,
+    });
+    return res.success;
+  }
+
+  Future<({bool success, String? error})> updateAdmin(
+    int id, {
+    String? name,
+    String? email,
+    String? password,
+    String? passwordConfirmation,
+    String? photoPath,
+  }) async {
+    final fields = <String, String>{};
+    if (name != null) fields['name'] = name;
+    if (email != null) fields['email'] = email;
+    if (password != null) {
+      fields['password'] = password;
+      fields['password_confirmation'] = passwordConfirmation ?? '';
+    }
+
+    if (photoPath != null) {
+      final res = await _api.uploadMultipart(
+        '/admins/$id',
+        photoPath,
+        'photo',
+        fields: {...fields, '_method': 'PUT'},
+      );
+      return (success: res.success, error: res.success ? null : res.message);
+    }
+
+    if (fields.isEmpty) return (success: false, error: 'Tidak ada data');
+
+    final body = <String, dynamic>{};
+    fields.forEach((k, v) => body[k] = v);
+    final res = await _api.put('/admins/$id', body);
+    return (success: res.success, error: res.success ? null : res.message);
+  }
+
+  Future<bool> deleteAdmin(int id) async {
+    final res = await _api.delete('/admins/$id');
+    return res.success;
+  }
+}
+
+class DriverSuspendService {
+  Future<({bool success, String? error})> suspendDriver(int driverId) async {
+    return (
+      success: false,
+      error:
+          'Fitur suspend driver belum tersedia di server. Hubungi pengembang backend untuk menambahkan endpoint /drivers/{id}/suspend.'
+    );
+  }
+
+  Future<({bool success, String? error})> unsuspendDriver(int driverId) async {
+    return (
+      success: false,
+      error:
+          'Fitur aktifkan driver belum tersedia di server. Hubungi pengembang backend untuk menambahkan endpoint /drivers/{id}/unsuspend.'
+    );
+  }
+}
+
+class RejectionHistoryService {
+  final _api = ApiClient();
+
+  Future<List<Map<String, dynamic>>> getStudentRejectionHistories(
+      int studentId) async {
+    final res = await _api.get('/students/$studentId/rejection-histories');
+    if (!res.success || res.data == null) return [];
+    final raw = res.data!['data'];
+    final list = raw is List ? raw : (raw?['data'] as List? ?? []);
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  Future<bool> deleteRejectionHistory(int historyId) async {
+    final res = await _api.delete('/student-rejection-histories/$historyId');
+    return res.success;
+  }
+}
+
+class BusRouteService {
+  final _api = ApiClient();
+
+  Future<RouteModel?> getBusRoute(int busId) async {
+    final res = await _api.get('/buses/$busId/route');
+    if (!res.success || res.data == null) return null;
+    final d = res.data!['data'];
+    if (d == null) return null;
+    return RouteModel.fromJson(d as Map<String, dynamic>);
+  }
+}
+
+class ChangePasswordService {
+  final _api = ApiClient();
+
+  Future<({bool success, String? error})> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirmation,
+  }) async {
+    final res = await _api.post('/auth/change-password', {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+      'new_password_confirmation': newPasswordConfirmation,
+    });
+    return (success: res.success, error: res.success ? null : res.message);
+  }
+}

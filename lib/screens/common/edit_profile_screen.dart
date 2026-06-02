@@ -7,6 +7,7 @@ import '../../services/api_client.dart';
 import '../../services/auth_provider.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
+import 'change_password_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final UserModel user;
@@ -377,6 +378,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 icon: Icons.check_circle_rounded,
                 isLoading: _isLoading,
                 onPressed: _saveChanges),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ChangePasswordScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.lock_reset_rounded, size: 18),
+              label: const Text('Ganti Password',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+            ),
           ]),
         ),
       ),

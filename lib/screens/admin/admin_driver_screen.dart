@@ -2,7 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart'; // ✅ TAMBAHAN: import url_launcher
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/models_api.dart';
 import '../../services/app_data_service.dart';
 import '../../services/domain_services.dart';
@@ -33,7 +33,8 @@ class AdminDriverScreen extends StatefulWidget {
 
 class _AdminDriverScreenState extends State<AdminDriverScreen> {
   final _searchCtrl = TextEditingController();
-  String _filterMode = 'semua'; // semua | online | offline
+  final _suspendService = DriverSuspendService();
+  String _filterMode = 'semua'; // semua | online | offline | no_bus
   String _sortBy = 'name';
 
   @override
@@ -47,6 +48,65 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     return bus?.gpsActive == true;
   }
 
+  bool _isSuspended(UserModel d) => d.status == AccountStatus.rejected;
+
+  void _toggleSuspend(UserModel driver) {
+    final isSuspended = _isSuspended(driver);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(isSuspended ? 'Aktifkan Driver' : 'Nonaktifkan Driver',
+            style: const TextStyle(
+                fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+        content: Text(
+          isSuspended
+              ? 'Aktifkan kembali akun ${driver.namaLengkap}?'
+              : 'Nonaktifkan akun ${driver.namaLengkap}? Driver tidak dapat login.',
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isSuspended ? AppColors.primary : AppColors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final driverId = driver.driverDetail?.id ?? driver.id;
+              final result = isSuspended
+                  ? await _suspendService.unsuspendDriver(driverId)
+                  : await _suspendService.suspendDriver(driverId);
+              if (!mounted) return;
+              if (result.success) {
+                await widget.dataService.loadAll();
+                _snack(
+                  isSuspended
+                      ? '${driver.namaLengkap} diaktifkan'
+                      : '${driver.namaLengkap} dinonaktifkan',
+                  isSuspended ? AppColors.primary : AppColors.red,
+                );
+              } else {
+                _snack(result.error ?? 'Gagal mengubah status driver',
+                    AppColors.red);
+              }
+            },
+            child: Text(isSuspended ? 'Aktifkan' : 'Nonaktifkan',
+                style: const TextStyle(
+                    fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Filter & sort
   List<UserModel> _filtered(List<UserModel> all) {
     var list = all.where((u) => u.role == UserRole.driver).toList();
@@ -55,6 +115,12 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
       list = list.where(_isOnline).toList();
     } else if (_filterMode == 'offline') {
       list = list.where((d) => !_isOnline(d)).toList();
+    } else if (_filterMode == 'no_bus') {
+      list = list
+          .where((d) => widget.dataService.getDriverBus(d.idStr) == null)
+          .toList();
+    } else if (_filterMode == 'suspended') {
+      list = list.where(_isSuspended).toList();
     }
 
     final q = _searchCtrl.text.trim().toLowerCase();
@@ -489,6 +555,10 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
           final drivers = all.where((u) => u.role == UserRole.driver).toList();
           final onlineCount = drivers.where(_isOnline).length;
           final offlineCount = drivers.length - onlineCount;
+          final noBusCount = drivers
+              .where((d) => widget.dataService.getDriverBus(d.idStr) == null)
+              .length;
+          final suspendedCount = drivers.where(_isSuspended).length;
           final list = _filtered(all);
 
           return Column(
@@ -549,34 +619,55 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                             ),
                             const SizedBox(height: 10),
                             // Filter chips
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              child: Row(children: [
-                                _Chip(
-                                  label: 'Semua',
-                                  count: drivers.length,
-                                  active: _filterMode == 'semua',
-                                  onTap: () =>
-                                      setState(() => _filterMode = 'semua'),
-                                ),
-                                const SizedBox(width: 8),
-                                _Chip(
-                                  label: 'Online',
-                                  count: onlineCount,
-                                  active: _filterMode == 'online',
-                                  onTap: () =>
-                                      setState(() => _filterMode = 'online'),
-                                ),
-                                const SizedBox(width: 8),
-                                _Chip(
-                                  label: 'Offline',
-                                  count: offlineCount,
-                                  active: _filterMode == 'offline',
-                                  onTap: () =>
-                                      setState(() => _filterMode = 'offline'),
-                                ),
-                              ]),
+                            SizedBox(
+                              height: 36,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 16),
+                                children: [
+                                  _Chip(
+                                    label: 'Semua',
+                                    count: drivers.length,
+                                    active: _filterMode == 'semua',
+                                    onTap: () =>
+                                        setState(() => _filterMode = 'semua'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _Chip(
+                                    label: 'Online',
+                                    count: onlineCount,
+                                    active: _filterMode == 'online',
+                                    onTap: () =>
+                                        setState(() => _filterMode = 'online'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _Chip(
+                                    label: 'Offline',
+                                    count: offlineCount,
+                                    active: _filterMode == 'offline',
+                                    onTap: () =>
+                                        setState(() => _filterMode = 'offline'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _Chip(
+                                    label: 'Tanpa Bus',
+                                    count: noBusCount,
+                                    active: _filterMode == 'no_bus',
+                                    onTap: () =>
+                                        setState(() => _filterMode = 'no_bus'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _Chip(
+                                    label: 'Nonaktif',
+                                    count: suspendedCount,
+                                    active: _filterMode == 'suspended',
+                                    activeColor: AppColors.red,
+                                    onTap: () => setState(
+                                        () => _filterMode = 'suspended'),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 10),
                             const Divider(
@@ -678,9 +769,11 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                         driver: d,
                         bus: bus,
                         isOnline: _isOnline(d),
+                        isSuspended: _isSuspended(d),
                         onEdit: () => _showEdit(d),
                         onDelete: () => _hapus(d),
                         onCall: () => _hubungi(d),
+                        onSuspend: () => _toggleSuspend(d),
                       ),
                     );
                   },
@@ -706,17 +799,21 @@ class _DriverCard extends StatelessWidget {
   final UserModel driver;
   final dynamic bus;
   final bool isOnline;
+  final bool isSuspended;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onCall;
+  final VoidCallback onSuspend;
 
   const _DriverCard({
     required this.driver,
     this.bus,
     required this.isOnline,
+    this.isSuspended = false,
     required this.onEdit,
     required this.onDelete,
     required this.onCall,
+    required this.onSuspend,
   });
 
   @override
@@ -830,6 +927,23 @@ class _DriverCard extends StatelessWidget {
                               : AppColors.textGrey),
                     ),
                   ),
+                  if (isSuspended) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.red.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text('Nonaktif',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.red)),
+                    ),
+                  ],
                 ],
               ),
 
@@ -870,6 +984,17 @@ class _DriverCard extends StatelessWidget {
                     color: AppColors.textGrey,
                     onTap: onEdit,
                     tip: 'Edit'),
+                const SizedBox(width: 6),
+                _IkonBtn(
+                    icon: isSuspended
+                        ? Icons.lock_open_rounded
+                        : Icons.block_rounded,
+                    bg: isSuspended
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : AppColors.red.withValues(alpha: 0.1),
+                    color: isSuspended ? AppColors.primary : AppColors.red,
+                    onTap: onSuspend,
+                    tip: isSuspended ? 'Aktifkan' : 'Nonaktifkan'),
                 const SizedBox(width: 6),
                 _IkonBtn(
                     icon: Icons.delete_outline_rounded,
@@ -1209,37 +1334,42 @@ class _Chip extends StatelessWidget {
   final int count;
   final bool active;
   final VoidCallback? onTap;
+  final Color? activeColor;
   const _Chip(
       {required this.label,
       required this.count,
       required this.active,
-      this.onTap});
+      this.onTap,
+      this.activeColor});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: active ? AppColors.primary : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: active ? AppColors.primary : AppColors.lightGrey,
-              width: active ? 1.5 : 1,
-            ),
-          ),
-          child: Text(
-            count > 0 ? '$label ($count)' : label,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: active ? Colors.white : AppColors.textGrey,
-            ),
+  Widget build(BuildContext context) {
+    final color = activeColor ?? AppColors.primary;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: active ? color : AppColors.lightGrey,
+            width: active ? 1.5 : 1,
           ),
         ),
-      );
+        child: Text(
+          count > 0 ? '$label ($count)' : label,
+          style: TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: active ? Colors.white : AppColors.textGrey,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _SortOpt extends StatelessWidget {

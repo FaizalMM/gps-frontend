@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../../models/models_api.dart';
 import '../../services/app_data_service.dart';
 import '../../services/bus_service.dart';
+import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
@@ -792,22 +793,116 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
   }
 
   void _rejectUser(UserModel user) {
-    widget.dataService
-        .updateUserStatus(
-      user.idStr,
-      AccountStatus.rejected,
-      studentDetailId: user.studentDetail?.id,
-    )
-        .then((_) {
-      if (!mounted) return;
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${user.namaLengkap} ditolak'),
-        backgroundColor: AppColors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-    });
+    final reasonCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Tolak Pendaftaran',
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w700,
+                fontSize: 16)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Berikan alasan penolakan untuk ${user.namaLengkap}:',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: AppColors.textGrey)),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: reasonCtrl,
+            maxLines: 3,
+            maxLength: 500,
+            style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Contoh: Data tidak lengkap, NIK tidak valid...',
+              hintStyle: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: AppColors.textGrey),
+              filled: true,
+              fillColor: AppColors.background,
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.lightGrey)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.lightGrey)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 1.5)),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+          ),
+        ]),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            onPressed: () async {
+              final reason = reasonCtrl.text.trim();
+              if (reason.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Alasan penolakan wajib diisi',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+                  backgroundColor: AppColors.red,
+                  behavior: SnackBarBehavior.floating,
+                ));
+                return;
+              }
+              Navigator.pop(ctx);
+              final studentId = user.studentDetail?.id ?? user.id;
+              final ok =
+                  await StudentService().rejectStudent(studentId, reason);
+              if (!mounted) return;
+              if (ok) {
+                await _refreshData();
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('${user.namaLengkap} ditolak'),
+                  backgroundColor: AppColors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Gagal menolak siswa',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+                  backgroundColor: AppColors.red,
+                  behavior: SnackBarBehavior.floating,
+                ));
+              }
+            },
+            child: const Text('Tolak',
+                style: TextStyle(
+                    fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRejectionHistory(UserModel student) {
+    final studentId = student.studentDetail?.id ?? student.id;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _RejectionHistorySheet(
+          studentId: studentId, studentName: student.namaLengkap),
+    );
   }
 
   void _deleteUser(UserModel user) {
@@ -1142,7 +1237,8 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onReject: _rejectUser,
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
-                        onIdCard: _showIdCard),
+                        onIdCard: _showIdCard,
+                        onHistory: _showRejectionHistory),
                     _StudentList(
                         students: search(pendingStudents),
                         isPending: true,
@@ -1150,14 +1246,16 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onReject: _rejectUser,
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
-                        onIdCard: _showIdCard),
+                        onIdCard: _showIdCard,
+                        onHistory: _showRejectionHistory),
                     _StudentList(
                         students: search(suspended),
                         onApprove: _approveUser,
                         onReject: _rejectUser,
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
-                        onIdCard: _showIdCard),
+                        onIdCard: _showIdCard,
+                        onHistory: _showRejectionHistory),
                   ],
                 ),
               ),
@@ -1201,6 +1299,7 @@ class _StudentList extends StatelessWidget {
   final Function(UserModel) onDelete;
   final Function(UserModel) onEdit;
   final Function(UserModel) onIdCard;
+  final Function(UserModel) onHistory;
 
   const _StudentList({
     required this.students,
@@ -1209,6 +1308,7 @@ class _StudentList extends StatelessWidget {
     required this.onDelete,
     required this.onEdit,
     required this.onIdCard,
+    required this.onHistory,
     this.isPending = false,
   });
 
@@ -1264,7 +1364,8 @@ class _StudentList extends StatelessWidget {
             onReject: () => onReject(student),
             onDelete: () => onDelete(student),
             onEdit: () => onEdit(student),
-            onIdCard: () => onIdCard(student));
+            onIdCard: () => onIdCard(student),
+            onHistory: () => onHistory(student));
       },
     );
   }
@@ -1277,6 +1378,7 @@ class _StudentCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onEdit;
   final VoidCallback onIdCard;
+  final VoidCallback onHistory;
 
   const _StudentCard(
       {required this.student,
@@ -1284,7 +1386,8 @@ class _StudentCard extends StatelessWidget {
       required this.onReject,
       required this.onDelete,
       required this.onEdit,
-      required this.onIdCard});
+      required this.onIdCard,
+      required this.onHistory});
 
   @override
   Widget build(BuildContext context) {
@@ -1522,6 +1625,11 @@ class _StudentCard extends StatelessWidget {
                   icon: Icons.badge_rounded, label: 'ID Card', onTap: onIdCard),
               const SizedBox(width: 8),
               _ActionBtn(
+                  icon: Icons.history_rounded,
+                  label: 'Riwayat',
+                  onTap: onHistory),
+              const SizedBox(width: 8),
+              _ActionBtn(
                   icon: Icons.edit_rounded, label: 'Ubah', onTap: onEdit),
               const SizedBox(width: 8),
               _ActionBtn(
@@ -1630,6 +1738,191 @@ class _MoreOption extends StatelessWidget {
               fontSize: 14,
               fontWeight: FontWeight.w500,
               color: color)),
+    );
+  }
+}
+
+class _RejectionHistorySheet extends StatefulWidget {
+  final int studentId;
+  final String studentName;
+
+  const _RejectionHistorySheet(
+      {required this.studentId, required this.studentName});
+
+  @override
+  State<_RejectionHistorySheet> createState() => _RejectionHistorySheetState();
+}
+
+class _RejectionHistorySheetState extends State<_RejectionHistorySheet> {
+  final _histService = RejectionHistoryService();
+  List<Map<String, dynamic>> _histories = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final result =
+        await _histService.getStudentRejectionHistories(widget.studentId);
+    if (mounted)
+      setState(() {
+        _histories = result;
+        _loading = false;
+      });
+  }
+
+  Future<void> _delete(int historyId) async {
+    final ok = await _histService.deleteRejectionHistory(historyId);
+    if (ok) {
+      _load();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Gagal menghapus riwayat',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  String _formatDate(String? raw) {
+    if (raw == null) return '-';
+    final dt = DateTime.tryParse(raw)?.toLocal();
+    if (dt == null) return '-';
+    return '${dt.day.toString().padLeft(2, '0')}/'
+        '${dt.month.toString().padLeft(2, '0')}/'
+        '${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).padding.bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottom + 16),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 12),
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+              color: AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        Row(children: [
+          const Icon(Icons.history_rounded, size: 20, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Riwayat Penolakan — ${widget.studentName}',
+                style: const TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: CircularProgressIndicator(color: AppColors.primary),
+          )
+        else if (_histories.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Column(children: [
+              Icon(Icons.check_circle_outline_rounded,
+                  size: 40, color: AppColors.primary),
+              SizedBox(height: 10),
+              Text('Belum ada riwayat penolakan',
+                  style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      color: AppColors.textGrey)),
+            ]),
+          )
+        else
+          ConstrainedBox(
+            constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.45),
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: _histories.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final h = _histories[i];
+                final id = (h['id'] as num?)?.toInt() ?? 0;
+                final reason = h['reason'] as String? ?? '-';
+                final createdAt = _formatDate(h['created_at'] as String?);
+                final rejectedBy =
+                    (h['rejected_by'] as Map?)?['name'] as String? ?? '-';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.cancel_outlined,
+                              size: 16, color: AppColors.red),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(reason,
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500)),
+                                const SizedBox(height: 4),
+                                Row(children: [
+                                  const Icon(Icons.person_rounded,
+                                      size: 12, color: AppColors.textGrey),
+                                  const SizedBox(width: 3),
+                                  Text(rejectedBy,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11,
+                                          color: AppColors.textGrey)),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.schedule_rounded,
+                                      size: 12, color: AppColors.textGrey),
+                                  const SizedBox(width: 3),
+                                  Text(createdAt,
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 11,
+                                          color: AppColors.textGrey)),
+                                ]),
+                              ]),
+                        ),
+                        GestureDetector(
+                          onTap: () => _delete(id),
+                          child: const Padding(
+                            padding: EdgeInsets.only(left: 8),
+                            child: Icon(Icons.delete_outline_rounded,
+                                size: 18, color: AppColors.textGrey),
+                          ),
+                        ),
+                      ]),
+                );
+              },
+            ),
+          ),
+      ]),
     );
   }
 }

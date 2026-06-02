@@ -18,6 +18,7 @@ import 'admin_bus_screen.dart';
 import 'admin_halte_screen.dart';
 import 'admin_analitik_screen.dart';
 import 'admin_tracking_screen.dart';
+import 'admin_management_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -182,38 +183,84 @@ class _HomeTabState extends State<_HomeTab> {
                       final pending = users
                           .where((u) => u.status == AccountStatus.pending)
                           .length;
-                      return Row(children: [
-                        Expanded(
+                      final adminCount =
+                          users.where((u) => u.role == UserRole.admin).length;
+                      return Column(children: [
+                        Row(children: [
+                          Expanded(
+                              child: _StatCard(
+                                  value: '$gpsActive',
+                                  label: 'Bus Beroperasi',
+                                  sub: 'dari ${buses.length} bus',
+                                  icon: Icons.directions_bus_rounded,
+                                  color: AppColors.primary,
+                                  filled: true)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: _StatCard(
+                                  value: '$siswa',
+                                  label: 'Siswa',
+                                  sub: 'Terdaftar',
+                                  icon: Icons.school_rounded,
+                                  color: AppColors.blue)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: GestureDetector(
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) => AdminPendingScreen(
+                                        dataService: widget.dataService))),
                             child: _StatCard(
-                                value: '$gpsActive',
-                                label: 'Bus Beroperasi',
-                                sub: 'dari ${buses.length} bus',
-                                icon: Icons.directions_bus_rounded,
-                                color: AppColors.primary,
-                                filled: true)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: _StatCard(
-                                value: '$siswa',
-                                label: 'Siswa',
-                                sub: 'Terdaftar',
-                                icon: Icons.school_rounded,
-                                color: AppColors.blue)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: GestureDetector(
-                          onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => AdminPendingScreen(
-                                      dataService: widget.dataService))),
-                          child: _StatCard(
-                              value: '$pending',
-                              label: 'Persetujuan',
-                              sub: 'Menunggu',
-                              icon: Icons.pending_rounded,
-                              color: AppColors.orange),
-                        )),
+                                value: '$pending',
+                                label: 'Persetujuan',
+                                sub: 'Menunggu',
+                                icon: Icons.pending_rounded,
+                                color: AppColors.orange),
+                          )),
+                        ]),
+                        if (adminCount > 0) ...[
+                          const SizedBox(height: 10),
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const AdminManagementScreen())),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.15)),
+                              ),
+                              child: Row(children: [
+                                const Icon(Icons.admin_panel_settings_rounded,
+                                    size: 16, color: AppColors.primary),
+                                const SizedBox(width: 8),
+                                Text('$adminCount Admin Terdaftar',
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primary)),
+                                const Spacer(),
+                                const Text('Kelola',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 11,
+                                        color: AppColors.primary)),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.chevron_right_rounded,
+                                    size: 14, color: AppColors.primary),
+                              ]),
+                            ),
+                          ),
+                        ],
                       ]);
                     },
                   );
@@ -526,6 +573,58 @@ class _HomeTabState extends State<_HomeTab> {
                               dataService: widget.dataService))),
                 )),
               ]),
+            ),
+            const SizedBox(height: 12),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const AdminManagementScreen())),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.lightGrey),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.admin_panel_settings_rounded,
+                          size: 20, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Manajemen Admin',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.black)),
+                            Text('Kelola akun admin sistem',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: AppColors.textGrey)),
+                          ]),
+                    ),
+                    const Icon(Icons.chevron_right_rounded,
+                        size: 20, color: AppColors.textGrey),
+                  ]),
+                ),
+              ),
             ),
             const SizedBox(height: 12),
 

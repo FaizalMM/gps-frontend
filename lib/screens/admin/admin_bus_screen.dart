@@ -13,7 +13,7 @@ import '../../widgets/common_widgets.dart';
 import '../../widgets/skeleton_widgets.dart';
 import 'route_builder_screen.dart';
 
-enum _BusFilter { all, active, maintenance, inactive }
+enum _BusFilter { all, active, maintenance, inactive, noDriver }
 
 class AdminBusScreen extends StatefulWidget {
   final AppDataService dataService;
@@ -211,6 +211,9 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     XFile? foto;
     final formKey = GlobalKey<FormState>();
     final drivers = widget.dataService.drivers;
+    final today = DateTime.now();
+    DateTime tanggalMulai = today;
+    DateTime? tanggalSelesai;
 
     showModalBottomSheet(
       context: context,
@@ -337,6 +340,33 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                       ],
                       onChanged: (v) => setM(() => selDriverId = v),
                     ),
+                    if (selDriverId != null) ...[
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(
+                          child: _DatePickerField(
+                            label: 'Tanggal Mulai',
+                            value: tanggalMulai,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                            onChanged: (d) => setM(() {
+                              if (d != null) tanggalMulai = d;
+                            }),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DatePickerField(
+                            label: 'Tanggal Selesai',
+                            value: tanggalSelesai,
+                            firstDate: tanggalMulai,
+                            lastDate: DateTime(2100),
+                            nullable: true,
+                            onChanged: (d) => setM(() => tanggalSelesai = d),
+                          ),
+                        ),
+                      ]),
+                    ],
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
@@ -375,8 +405,16 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                                       orElse: () => null)
                                   : null;
                               if (driver != null) {
-                                await BusService()
-                                    .assignDriverByUserId(bus.id, driver);
+                                final mulai = tanggalMulai
+                                    .toIso8601String()
+                                    .substring(0, 10);
+                                final selesai = tanggalSelesai
+                                    ?.toIso8601String()
+                                    .substring(0, 10);
+                                await BusService().assignDriverByUserId(
+                                    bus.id, driver,
+                                    tanggalMulai: mulai,
+                                    tanggalSelesai: selesai);
                               } else if (bus.driverId.isNotEmpty) {
                                 await BusService().unassignDriver(bus.id);
                               }
@@ -504,6 +542,9 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
             filtered =
                 allBuses.where((b) => b.status == BusStatus.inactive).toList();
           }
+          if (_filter == _BusFilter.noDriver) {
+            filtered = allBuses.where((b) => b.driverName.isEmpty).toList();
+          }
           if (_searchQuery.isNotEmpty) {
             filtered = filtered
                 .where((b) =>
@@ -578,6 +619,14 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                       dot: AppColors.textGrey,
                       onTap: () =>
                           setState(() => _filter = _BusFilter.inactive)),
+                  const SizedBox(width: 8),
+                  _Chip(
+                      label:
+                          'Tanpa Driver (${allBuses.where((b) => b.driverName.isEmpty).length})',
+                      active: _filter == _BusFilter.noDriver,
+                      dot: AppColors.orange,
+                      onTap: () =>
+                          setState(() => _filter = _BusFilter.noDriver)),
                 ]),
               ),
             ),
@@ -1832,6 +1881,20 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
     );
   }
 
+  void _showSiswaDetail(UserModel s) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _SiswaDetailSheet(
+          siswa: s,
+          onRemove: () {
+            Navigator.pop(context);
+            _removeSiswa(s);
+          }),
+    );
+  }
+
   Future<void> _removeSiswa(UserModel s) async {
     final studentId = s.studentDetail?.id ?? s.id;
     final ok =
@@ -1919,62 +1982,104 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
                       itemCount: _siswa.length,
                       itemBuilder: (_, i) {
                         final s = _siswa[i];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2))
-                            ],
+                        final hasPhoto =
+                            s.photoUrl != null && s.photoUrl!.isNotEmpty;
+                        return GestureDetector(
+                          onTap: () => _showSiswaDetail(s),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.04),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2))
+                              ],
+                            ),
+                            child: Row(children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    shape: BoxShape.circle,
+                                    image: hasPhoto
+                                        ? DecorationImage(
+                                            image: NetworkImage(s.photoUrl!),
+                                            fit: BoxFit.cover)
+                                        : null),
+                                child: hasPhoto
+                                    ? null
+                                    : Center(
+                                        child: Text(
+                                            s.namaLengkap.isNotEmpty
+                                                ? s.namaLengkap[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.primary))),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                    Text(s.namaLengkap,
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 2),
+                                    Text('NIS: ${s.studentDetail?.nis ?? '-'}',
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 11,
+                                            color: AppColors.textGrey)),
+                                    if ((s.studentDetail?.sekolah ?? '')
+                                            .isNotEmpty ||
+                                        (s.studentDetail?.kelas ?? '')
+                                            .isNotEmpty)
+                                      Text(
+                                        [
+                                          if ((s.studentDetail?.kelas ?? '')
+                                              .isNotEmpty)
+                                            s.studentDetail!.kelas,
+                                          if ((s.studentDetail?.sekolah ?? '')
+                                              .isNotEmpty)
+                                            s.studentDetail!.sekolah,
+                                        ].join(' • '),
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 11,
+                                            color: AppColors.textGrey),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ])),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.info_outline_rounded,
+                                      size: 16, color: AppColors.textGrey),
+                                  const SizedBox(height: 4),
+                                  GestureDetector(
+                                    onTap: () => _removeSiswa(s),
+                                    child: const Icon(
+                                        Icons.person_remove_rounded,
+                                        color: AppColors.red,
+                                        size: 18),
+                                  ),
+                                ],
+                              ),
+                            ]),
                           ),
-                          child: Row(children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: const BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  shape: BoxShape.circle),
-                              child: Center(
-                                  child: Text(
-                                      s.namaLengkap.isNotEmpty
-                                          ? s.namaLengkap[0].toUpperCase()
-                                          : '?',
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.primary))),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(s.namaLengkap,
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600)),
-                                  Text('NIS: ${s.studentDetail?.nis ?? '-'}',
-                                      style: const TextStyle(
-                                          fontFamily: 'Poppins',
-                                          fontSize: 11,
-                                          color: AppColors.textGrey)),
-                                ])),
-                            IconButton(
-                              icon: const Icon(Icons.person_remove_rounded,
-                                  color: Colors.red, size: 20),
-                              onPressed: () => _removeSiswa(s),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ]),
                         );
                       },
                     ),
@@ -2180,5 +2285,236 @@ class _DropdownField<T> extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  final String label;
+  final DateTime? value;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final bool nullable;
+  final ValueChanged<DateTime?> onChanged;
+
+  const _DatePickerField({
+    required this.label,
+    required this.value,
+    required this.firstDate,
+    required this.lastDate,
+    required this.onChanged,
+    this.nullable = false,
+  });
+
+  String _fmt(DateTime dt) =>
+      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: value ?? firstDate,
+          firstDate: firstDate,
+          lastDate: lastDate,
+          builder: (ctx, child) => Theme(
+            data: Theme.of(ctx).copyWith(
+              colorScheme: const ColorScheme.light(
+                primary: AppColors.primary,
+                onPrimary: Colors.white,
+                surface: Colors.white,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) onChanged(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.lightGrey),
+        ),
+        child: Row(children: [
+          const Icon(Icons.calendar_today_rounded,
+              size: 14, color: AppColors.textGrey),
+          const SizedBox(width: 6),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 10,
+                      color: AppColors.textGrey)),
+              Text(
+                value != null ? _fmt(value!) : (nullable ? 'Opsional' : '-'),
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: value != null ? AppColors.black : AppColors.textGrey,
+                ),
+              ),
+            ]),
+          ),
+          if (nullable && value != null)
+            GestureDetector(
+              onTap: () => onChanged(null),
+              child: const Icon(Icons.close_rounded,
+                  size: 14, color: AppColors.textGrey),
+            ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _SiswaDetailSheet extends StatelessWidget {
+  final UserModel siswa;
+  final VoidCallback onRemove;
+
+  const _SiswaDetailSheet({required this.siswa, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final d = siswa.studentDetail;
+    final hasPhoto = siswa.photoUrl != null && siswa.photoUrl!.isNotEmpty;
+    final bottom = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottom + 20),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          margin: const EdgeInsets.symmetric(vertical: 12),
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+              color: AppColors.lightGrey,
+              borderRadius: BorderRadius.circular(2)),
+        ),
+        Row(children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              shape: BoxShape.circle,
+              image: hasPhoto
+                  ? DecorationImage(
+                      image: NetworkImage(siswa.photoUrl!), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: hasPhoto
+                ? null
+                : Center(
+                    child: Text(
+                        siswa.namaLengkap.isNotEmpty
+                            ? siswa.namaLengkap[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary))),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(siswa.namaLengkap,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700)),
+              Text(siswa.email,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      color: AppColors.textGrey)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 16),
+        const Divider(height: 1, color: AppColors.lightGrey),
+        const SizedBox(height: 14),
+        _DetailRow(
+            icon: Icons.badge_rounded, label: 'NIS', value: d?.nis ?? '-'),
+        const SizedBox(height: 8),
+        _DetailRow(
+            icon: Icons.class_rounded, label: 'Kelas', value: d?.kelas ?? '-'),
+        const SizedBox(height: 8),
+        _DetailRow(
+            icon: Icons.school_rounded,
+            label: 'Sekolah',
+            value: d?.sekolah ?? '-'),
+        const SizedBox(height: 8),
+        _DetailRow(
+            icon: Icons.phone_rounded,
+            label: 'No. HP',
+            value: siswa.noHp.isNotEmpty ? siswa.noHp : '-'),
+        const SizedBox(height: 8),
+        _DetailRow(
+            icon: Icons.location_on_rounded,
+            label: 'Alamat',
+            value: siswa.alamat.isNotEmpty ? siswa.alamat : '-'),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onRemove,
+            icon: const Icon(Icons.person_remove_rounded, size: 16),
+            label: const Text('Hapus dari Bus',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.red,
+              side: const BorderSide(color: AppColors.red),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _DetailRow(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(icon, size: 16, color: AppColors.textGrey),
+      const SizedBox(width: 10),
+      SizedBox(
+          width: 70,
+          child: Text(label,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: AppColors.textGrey))),
+      Expanded(
+          child: Text(value,
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis)),
+    ]);
   }
 }
