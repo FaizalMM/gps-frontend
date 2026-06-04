@@ -26,6 +26,7 @@ class BusMapWidget extends StatefulWidget {
   final void Function(BusModel)? onBusTap;
   final List<Polyline> extraPolylines;
   final List<Marker> extraMarkers;
+  final VoidCallback? onMapTap;
 
   const BusMapWidget({
     super.key,
@@ -44,6 +45,7 @@ class BusMapWidget extends StatefulWidget {
     this.onBusTap,
     this.extraPolylines = const [],
     this.extraMarkers = const [],
+    this.onMapTap,
   });
 
   @override
@@ -222,10 +224,13 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                       ? InteractiveFlag.all
                       : InteractiveFlag.none,
                 ),
-                onTap: (_, __) => setState(() {
-                  _selectedHalteId = null;
-                  _selectedBusId = null;
-                }),
+                onTap: (_, __) {
+                  setState(() {
+                    _selectedHalteId = null;
+                    _selectedBusId = null;
+                  });
+                  widget.onMapTap?.call();
+                },
 
                 onPositionChanged: (position, hasGesture) {
                   if (hasGesture) {

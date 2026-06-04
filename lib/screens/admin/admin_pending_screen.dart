@@ -21,14 +21,12 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String _searchQuery = '';
-
   bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
     });
@@ -67,7 +65,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     }
   }
 
-  // ── Hitung jarak dua titik koordinat (Haversine, meter)
   double _hitungJarak(double lat1, double lng1, double lat2, double lng2) {
     const r = 6371000.0;
     final dLat = (lat2 - lat1) * pi / 180;
@@ -80,7 +77,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     return r * 2 * atan2(sqrt(a), sqrt(1 - a));
   }
 
-  // ── Format jarak ke teks (m / km)
   String _formatJarak(double meter) {
     if (meter < 1000) return '${meter.round()} m';
     return '${(meter / 1000).toStringAsFixed(1)} km';
@@ -96,10 +92,9 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     HalteModel? selectedHalte;
 
     bool isGeocoding = false;
-    Map<String, double>? siswaCoords; // koordinat hasil geocode alamat siswa
-    Map<int, double> jarakKeHalte = {}; // halteId → jarak meter
+    Map<String, double>? siswaCoords;
+    Map<int, double> jarakKeHalte = {};
 
-    // Halte yang ada di rute bus terpilih
     List<HalteModel> haltesForBus(BusModel? bus) {
       if (bus == null) return [];
       if (bus.routeList.isEmpty) return allHaltes;
@@ -109,7 +104,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
       return filtered.isEmpty ? allHaltes : filtered;
     }
 
-    // Urutkan halte: yang punya jarak diurutkan dari terdekat
     List<HalteModel> sortedHaltes(List<HalteModel> haltes) {
       if (jarakKeHalte.isEmpty) return haltes;
       final sorted = List<HalteModel>.from(haltes);
@@ -132,7 +126,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
               ? user.studentDetail!.alamat
               : user.alamat;
 
-          // Geocode otomatis saat sheet dibuka
           if (!isGeocoding && siswaCoords == null && alamat.isNotEmpty) {
             isGeocoding = true;
             _geocodeAlamat(alamat).then((coords) {
@@ -140,7 +133,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                 setM(() => isGeocoding = false);
                 return;
               }
-              // Hitung jarak ke semua halte
               final jarak = <int, double>{};
               for (final h in allHaltes) {
                 jarak[h.id] = _hitungJarak(
@@ -150,7 +142,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                 siswaCoords = coords;
                 jarakKeHalte = jarak;
                 isGeocoding = false;
-                // Auto-suggest halte terdekat jika bus sudah dipilih
                 if (selectedBus != null) {
                   final haltesBus = haltesForBus(selectedBus);
                   if (haltesBus.isNotEmpty) {
@@ -183,8 +174,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                                 color: AppColors.lightGrey,
                                 borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 20),
-
-                    // ── Header siswa
                     Row(children: [
                       Container(
                         width: 44,
@@ -223,7 +212,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                           ])),
                     ]),
                     const SizedBox(height: 12),
-
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -306,8 +294,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                           ]),
                     ),
                     const SizedBox(height: 20),
-
-                    // ── Pilih Bus
                     const Text('Pilih Bus / Rute',
                         style: TextStyle(
                             fontFamily: 'Poppins',
@@ -321,14 +307,12 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                             fontSize: 11,
                             color: AppColors.textGrey)),
                     const SizedBox(height: 10),
-
                     ...buses.map((b) {
                       final isSelected = selectedBus?.id == b.id;
                       final namaRute = b.routeList.isNotEmpty
                           ? b.routeList.first.namaRute
                           : b.rute;
 
-                      // Cari halte terdekat dari rute bus ini
                       String saranHalte = '';
                       if (siswaCoords != null) {
                         final hBus = haltesForBus(b);
@@ -346,7 +330,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onTap: () => setM(() {
                           selectedBus = b;
                           selectedHalte = null;
-                          // Auto-select halte terdekat untuk bus ini
                           if (siswaCoords != null) {
                             final hBus = haltesForBus(b);
                             if (hBus.isNotEmpty) {
@@ -417,7 +400,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                                               fontFamily: 'Poppins',
                                               fontSize: 11,
                                               color: AppColors.textGrey)),
-                                      // Saran halte terdekat untuk bus ini
                                       if (saranHalte.isNotEmpty) ...[
                                         const SizedBox(height: 4),
                                         Container(
@@ -469,8 +451,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                       );
                     }),
                     const SizedBox(height: 16),
-
-                    // ── Pilih Halte
                     if (selectedBus != null) ...[
                       Row(children: [
                         const Expanded(
@@ -596,8 +576,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                       }),
                       const SizedBox(height: 16),
                     ],
-
-                    // ── Ringkasan
                     if (selectedBus != null && selectedHalte != null) ...[
                       Container(
                         width: double.infinity,
@@ -652,7 +630,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                       ),
                       const SizedBox(height: 16),
                     ],
-
                     PrimaryButton(
                       text: 'Setujui & Assign Bus',
                       icon: Icons.check_circle_rounded,
@@ -688,14 +665,12 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                           return;
                         }
 
-                        // Assign ke bus — approve sudah dipastikan berhasil
                         final assigned = await BusService().assignStudentToBus(
                           selectedBus!.id,
                           studentDbId,
                           selectedHalte!.id,
                         );
 
-                        // Refresh data siswa SETELAH semua proses selesai
                         await widget.dataService.loadStudents();
 
                         if (!mounted) return;
@@ -717,7 +692,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                     Center(
                         child: TextButton(
                       onPressed: () {
-                        // Konfirmasi dulu sebelum setujui tanpa bus
                         showDialog(
                           context: ctx,
                           builder: (dCtx) => AlertDialog(
@@ -888,6 +862,76 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
             child: const Text('Tolak',
                 style: TextStyle(
                     fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _suspendUser(UserModel user) {
+    final studentId = user.studentDetail?.id ?? user.id;
+    final isSuspended = user.status == AccountStatus.rejected;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          isSuspended ? 'Aktifkan Siswa' : 'Nonaktifkan Siswa',
+          style: const TextStyle(
+              fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          isSuspended
+              ? 'Aktifkan kembali akun ${user.namaLengkap}?'
+              : 'Nonaktifkan akun ${user.namaLengkap}? Siswa tidak dapat login.',
+          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isSuspended ? AppColors.primary : AppColors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = isSuspended
+                  ? await StudentService().unsuspendStudent(studentId)
+                  : await StudentService().suspendStudent(studentId);
+              if (!mounted) return;
+              if (ok) {
+                await _refreshData();
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(
+                    isSuspended
+                        ? '${user.namaLengkap} diaktifkan'
+                        : '${user.namaLengkap} dinonaktifkan',
+                  ),
+                  backgroundColor:
+                      isSuspended ? AppColors.primary : AppColors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Gagal mengubah status siswa'),
+                  backgroundColor: AppColors.red,
+                  behavior: SnackBarBehavior.floating,
+                ));
+              }
+            },
+            child: Text(
+              isSuspended ? 'Aktifkan' : 'Nonaktifkan',
+              style: const TextStyle(
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -1092,7 +1136,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     );
   }
 
-  // ── Build
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<UserModel>>(
@@ -1238,7 +1281,8 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
                         onIdCard: _showIdCard,
-                        onHistory: _showRejectionHistory),
+                        onHistory: _showRejectionHistory,
+                        onSuspend: _suspendUser),
                     _StudentList(
                         students: search(pendingStudents),
                         isPending: true,
@@ -1247,7 +1291,8 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
                         onIdCard: _showIdCard,
-                        onHistory: _showRejectionHistory),
+                        onHistory: _showRejectionHistory,
+                        onSuspend: _suspendUser),
                     _StudentList(
                         students: search(suspended),
                         onApprove: _approveUser,
@@ -1255,7 +1300,8 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                         onDelete: _deleteUser,
                         onEdit: _showEditStudentDialog,
                         onIdCard: _showIdCard,
-                        onHistory: _showRejectionHistory),
+                        onHistory: _showRejectionHistory,
+                        onSuspend: _suspendUser),
                   ],
                 ),
               ),
@@ -1267,7 +1313,6 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
   }
 }
 
-// ── Tab badge
 class _TabBadge extends StatelessWidget {
   final int count;
   final Color color;
@@ -1290,7 +1335,6 @@ class _TabBadge extends StatelessWidget {
   }
 }
 
-// ── Student list
 class _StudentList extends StatelessWidget {
   final List<UserModel> students;
   final bool isPending;
@@ -1300,6 +1344,7 @@ class _StudentList extends StatelessWidget {
   final Function(UserModel) onEdit;
   final Function(UserModel) onIdCard;
   final Function(UserModel) onHistory;
+  final Function(UserModel) onSuspend;
 
   const _StudentList({
     required this.students,
@@ -1309,6 +1354,7 @@ class _StudentList extends StatelessWidget {
     required this.onEdit,
     required this.onIdCard,
     required this.onHistory,
+    required this.onSuspend,
     this.isPending = false,
   });
 
@@ -1332,7 +1378,6 @@ class _StudentList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       itemCount: students.length + (isPending ? 1 : 0),
       itemBuilder: (_, i) {
-        // Header "Tandai Semua" untuk tab pending
         if (isPending && i == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -1346,7 +1391,7 @@ class _StudentList extends StatelessWidget {
                           color: AppColors.black))),
               TextButton(
                 onPressed: () {
-                  for (final _ in students) {/* mark all read */}
+                  for (final _ in students) {}
                 },
                 child: const Text('Tandai Semua Dibaca',
                     style: TextStyle(
@@ -1365,7 +1410,8 @@ class _StudentList extends StatelessWidget {
             onDelete: () => onDelete(student),
             onEdit: () => onEdit(student),
             onIdCard: () => onIdCard(student),
-            onHistory: () => onHistory(student));
+            onHistory: () => onHistory(student),
+            onSuspend: () => onSuspend(student));
       },
     );
   }
@@ -1379,6 +1425,7 @@ class _StudentCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onIdCard;
   final VoidCallback onHistory;
+  final VoidCallback onSuspend;
 
   const _StudentCard(
       {required this.student,
@@ -1387,7 +1434,8 @@ class _StudentCard extends StatelessWidget {
       required this.onDelete,
       required this.onEdit,
       required this.onIdCard,
-      required this.onHistory});
+      required this.onHistory,
+      required this.onSuspend});
 
   @override
   Widget build(BuildContext context) {
@@ -1397,17 +1445,17 @@ class _StudentCard extends StatelessWidget {
         ? student.namaLengkap[0].toUpperCase()
         : '?';
 
-    Color badgeColor = isActive
+    final Color badgeColor = isActive
         ? AppColors.primary
         : isPending
             ? AppColors.orange
             : AppColors.textGrey;
-    Color badgeBg = isActive
+    final Color badgeBg = isActive
         ? AppColors.primaryLight
         : isPending
             ? AppColors.orange.withValues(alpha: 0.12)
             : AppColors.surface2;
-    String badgeText = isActive
+    final String badgeText = isActive
         ? 'AKTIF'
         : isPending
             ? 'MENUNGGU'
@@ -1428,7 +1476,6 @@ class _StudentCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Row atas: avatar + info + badge
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(
               width: 44,
@@ -1494,10 +1541,8 @@ class _StudentCard extends StatelessWidget {
                       color: badgeColor)),
             ),
           ]),
-
           if (isPending) ...[
             const SizedBox(height: 12),
-            // Baris Rute & Wali
             Row(children: [
               Expanded(
                   child: _InfoChip(
@@ -1509,7 +1554,6 @@ class _StudentCard extends StatelessWidget {
               Expanded(child: _InfoChip(label: 'EMAIL', value: student.email)),
             ]),
             const SizedBox(height: 10),
-            // Action buttons — persis seperti referensi
             Row(children: [
               Expanded(
                 child: GestureDetector(
@@ -1620,25 +1664,43 @@ class _StudentCard extends StatelessWidget {
             ]),
           ] else ...[
             const SizedBox(height: 10),
-            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-              _ActionBtn(
-                  icon: Icons.badge_rounded, label: 'ID Card', onTap: onIdCard),
-              const SizedBox(width: 8),
-              _ActionBtn(
-                  icon: Icons.history_rounded,
-                  label: 'Riwayat',
-                  onTap: onHistory),
-              const SizedBox(width: 8),
-              _ActionBtn(
-                  icon: Icons.edit_rounded, label: 'Ubah', onTap: onEdit),
-              const SizedBox(width: 8),
-              _ActionBtn(
-                  icon: Icons.delete_rounded,
-                  label: 'Hapus',
-                  onTap: onDelete,
-                  color: AppColors.red,
-                  bgColor: AppColors.red.withValues(alpha: 0.08)),
-            ]),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              alignment: WrapAlignment.end,
+              children: [
+                _ActionBtn(
+                    icon: Icons.badge_rounded,
+                    label: 'ID Card',
+                    onTap: onIdCard),
+                _ActionBtn(
+                    icon: Icons.history_rounded,
+                    label: 'Riwayat',
+                    onTap: onHistory),
+                _ActionBtn(
+                    icon: student.status == AccountStatus.rejected
+                        ? Icons.lock_open_rounded
+                        : Icons.block_rounded,
+                    label: student.status == AccountStatus.rejected
+                        ? 'Aktifkan'
+                        : 'Nonaktifkan',
+                    onTap: onSuspend,
+                    color: student.status == AccountStatus.rejected
+                        ? AppColors.primary
+                        : AppColors.orange,
+                    bgColor: student.status == AccountStatus.rejected
+                        ? AppColors.primary.withValues(alpha: 0.08)
+                        : AppColors.orange.withValues(alpha: 0.08)),
+                _ActionBtn(
+                    icon: Icons.edit_rounded, label: 'Ubah', onTap: onEdit),
+                _ActionBtn(
+                    icon: Icons.delete_rounded,
+                    label: 'Hapus',
+                    onTap: onDelete,
+                    color: AppColors.red,
+                    bgColor: AppColors.red.withValues(alpha: 0.08)),
+              ],
+            ),
           ],
         ]),
       ),
@@ -1694,13 +1756,13 @@ class _ActionBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppColors.lightGrey)),
-        child: Row(children: [
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 4),
           Text(label,

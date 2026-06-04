@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,6 +7,8 @@ import '../../services/app_data_service.dart';
 import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/bus_map_widget.dart';
+
+enum _ConnStatus { live, reconnecting, error }
 
 class AdminTrackingScreen extends StatefulWidget {
   final AppDataService dataService;
@@ -28,48 +31,71 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
   bool _showBusList = false;
   RouteModel? _activeRoute;
   bool _loadingRoute = false;
-  List<BusModel> _prevBuses = [];
-
-  void _checkGpsChanges(List<BusModel> current) {
-    for (final bus in current) {
-      final prev = _prevBuses.where((b) => b.id == bus.id).firstOrNull;
-      if (prev != null && prev.gpsActive != bus.gpsActive) {
-        final msg = bus.gpsActive
-            ? '${bus.driverName.isNotEmpty ? bus.driverName : bus.nama} mengaktifkan GPS'
-            : '${bus.driverName.isNotEmpty ? bus.driverName : bus.nama} mematikan GPS';
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Row(children: [
-              Icon(
-                bus.gpsActive ? Icons.gps_fixed_rounded : Icons.gps_off_rounded,
-                size: 16,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: Text(msg,
-                      style: const TextStyle(
-                          fontFamily: 'Poppins', fontSize: 13))),
-            ]),
-            backgroundColor:
-                bus.gpsActive ? AppColors.primary : AppColors.textGrey,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ));
-        }
-      }
-    }
-    _prevBuses = List.from(current);
-  }
+  Map<int, bool> _prevGpsState = {};
+  bool _initialFocusDone = false;
+  StreamSubscription<List<BusModel>>? _busSub;
+  _ConnStatus _connStatus = _ConnStatus.live;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialFocus != null) {
       _focusedBus = widget.initialFocus;
+      _initialFocusDone = true;
     }
+    _prevGpsState = {
+      for (final b in widget.dataService.buses) b.id: b.gpsActive
+    };
+    _busSub = widget.dataService.busesStream.listen(
+      (buses) {
+        if (!mounted) return;
+        _checkGpsChanges(buses);
+        if (_connStatus != _ConnStatus.live) {
+          setState(() => _connStatus = _ConnStatus.live);
+        }
+      },
+      onError: (_) {
+        if (mounted) setState(() => _connStatus = _ConnStatus.error);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _busSub?.cancel();
+    super.dispose();
+  }
+
+  void _checkGpsChanges(List<BusModel> current) {
+    for (final bus in current) {
+      final prevActive = _prevGpsState[bus.id];
+      if (prevActive != null && prevActive != bus.gpsActive) {
+        final name = bus.driverName.isNotEmpty ? bus.driverName : bus.nama;
+        final msg =
+            bus.gpsActive ? '$name mengaktifkan GPS' : '$name mematikan GPS';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Row(children: [
+            Icon(
+              bus.gpsActive ? Icons.gps_fixed_rounded : Icons.gps_off_rounded,
+              size: 16,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(msg,
+                  style: const TextStyle(fontFamily: 'Poppins', fontSize: 13)),
+            ),
+          ]),
+          backgroundColor:
+              bus.gpsActive ? AppColors.primary : AppColors.textGrey,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    }
+    _prevGpsState = {for (final b in current) b.id: b.gpsActive};
   }
 
   void _moveCameraTo(BusModel b, {double zoom = 16.0}) {
@@ -107,41 +133,80 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
       });
   }
 
+  static const _halteColors = [
+    Color(0xFF4CAF50),
+    Color(0xFFF44336),
+    Color(0xFF2196F3),
+    Color(0xFFFF9800),
+    Color(0xFF9C27B0),
+    Color(0xFF00BCD4),
+    Color(0xFF795548),
+    Color(0xFF607D8B),
+  ];
+
   List<Polyline> get _routePolylines {
-    if (_activeRoute == null || _activeRoute!.polyline.isEmpty) return [];
+    if (_activeRoute == null) return [];
+    if (_activeRoute!.polyline.isNotEmpty) {
+      return [
+        Polyline(
+          points: _activeRoute!.polyline
+              .map((p) => LatLng(p.latitude, p.longitude))
+              .toList(),
+          color: AppColors.primary.withValues(alpha: 0.85),
+          strokeWidth: 4.5,
+        ),
+      ];
+    }
+    final haltes = _activeRoute!.haltes.where((h) => h.halte != null).toList()
+      ..sort((a, b) => a.urutan.compareTo(b.urutan));
+    if (haltes.length < 2) return [];
     return [
       Polyline(
-        points: _activeRoute!.polyline
-            .map((p) => LatLng(p.latitude, p.longitude))
+        points: haltes
+            .map((h) => LatLng(h.halte!.latitude, h.halte!.longitude))
             .toList(),
-        color: AppColors.primary.withValues(alpha: 0.75),
-        strokeWidth: 4,
+        color: const Color(0xFF1B5E37).withValues(alpha: 0.65),
+        strokeWidth: 3.5,
       ),
     ];
   }
 
   List<Marker> get _halteMarkers {
     if (_activeRoute == null) return [];
-    return _activeRoute!.haltes.where((h) => h.halte != null).map((h) {
+    final sorted = _activeRoute!.haltes.where((h) => h.halte != null).toList()
+      ..sort((a, b) => a.urutan.compareTo(b.urutan));
+    return sorted.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final h = entry.value;
       final halte = h.halte!;
+      final color = _halteColors[idx % _halteColors.length];
       return Marker(
         point: LatLng(halte.latitude, halte.longitude),
-        width: 32,
-        height: 32,
+        width: 30,
+        height: 30,
         child: Tooltip(
-          message: halte.namaHalte,
+          message: 'Halte ${idx + 1}: ${halte.namaHalte}',
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: color,
               shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary, width: 2),
+              border: Border.all(color: Colors.white, width: 2),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15), blurRadius: 4)
+                    color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)
               ],
             ),
-            child: const Icon(Icons.directions_bus_filled_rounded,
-                size: 14, color: AppColors.primary),
+            child: Center(
+              child: Text(
+                '${idx + 1}',
+                style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ),
         ),
       );
@@ -162,14 +227,8 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
           final buses = s.data ?? widget.dataService.buses;
           final active = buses.where((b) => b.gpsActive).toList();
 
-          if (_prevBuses.isNotEmpty) {
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _checkGpsChanges(buses));
-          } else {
-            _prevBuses = List.from(buses);
-          }
-
-          if (_focusedBus == null && active.isNotEmpty) {
+          if (!_initialFocusDone && active.isNotEmpty) {
+            _initialFocusDone = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) _selectBus(active.first);
             });
@@ -198,101 +257,114 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                 ? () => setState(() => _showBusList = false)
                 : null,
             child: Stack(children: [
-              active.isEmpty
-                  ? Container(
-                      color: AppColors.surface2,
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.directions_bus_outlined,
-                                size: 52, color: AppColors.textGrey),
-                            SizedBox(height: 12),
-                            Text('Belum ada bus yang beroperasi',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textGrey)),
-                            SizedBox(height: 6),
-                            Text(
-                                'GPS muncul saat driver\nmengaktifkan tracking',
-                                textAlign: TextAlign.center,
+              SizedBox.expand(
+                child: Stack(children: [
+                  BusMapWidget(
+                    buses: active,
+                    height: double.infinity,
+                    showAllBuses: _focusedBus == null,
+                    focusBus: _focusedBus,
+                    interactive: true,
+                    mapController: _mapController,
+                    showInfoCard: false,
+                    onBusTap: _tapBus,
+                    extraPolylines: _routePolylines,
+                    extraMarkers: _halteMarkers,
+                    onMapTap: () => setState(() {
+                      _activeRoute = null;
+                      _showDetail = false;
+                    }),
+                  ),
+                  if (active.isEmpty)
+                    Positioned(
+                      bottom: bottom + 24,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2))
+                            ],
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: AppColors.textGrey,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            const Text('Tidak ada bus aktif saat ini',
                                 style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                     color: AppColors.textGrey)),
-                          ],
+                          ]),
                         ),
                       ),
-                    )
-                  : SizedBox.expand(
-                      child: Stack(children: [
-                        BusMapWidget(
-                          buses: active,
-                          height: double.infinity,
-                          showAllBuses: _focusedBus == null,
-                          focusBus: _focusedBus,
-                          interactive: true,
-                          mapController: _mapController,
-                          showInfoCard: false,
-                          onBusTap: _tapBus,
-                          extraPolylines: _routePolylines,
-                          extraMarkers: _halteMarkers,
-                        ),
-                        if (_loadingRoute)
-                          Positioned(
-                            top: top + 70,
-                            left: 0,
-                            right: 0,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color:
-                                            Colors.black.withValues(alpha: 0.1),
-                                        blurRadius: 6)
-                                  ],
-                                ),
-                                child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(
-                                              color: AppColors.primary,
-                                              strokeWidth: 2)),
-                                      SizedBox(width: 8),
-                                      Text('Memuat rute...',
-                                          style: TextStyle(
-                                              fontFamily: 'Poppins',
-                                              fontSize: 11,
-                                              color: AppColors.primary)),
-                                    ]),
-                              ),
-                            ),
-                          ),
-                        if (_activeRoute != null && !_loadingRoute)
-                          Positioned(
-                            top: top + 70,
-                            left: 12,
-                            child: _RouteInfoPill(
-                              namaRute: _activeRoute!.namaRute.isNotEmpty
-                                  ? _activeRoute!.namaRute
-                                  : '${_activeRoute!.haltes.length} halte',
-                              halteCount: _activeRoute!.haltes.length,
-                              onDismiss: () =>
-                                  setState(() => _activeRoute = null),
-                            ),
-                          ),
-                      ]),
                     ),
+                  if (_loadingRoute)
+                    Positioned(
+                      top: top + 70,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 6)
+                            ],
+                          ),
+                          child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        color: AppColors.primary,
+                                        strokeWidth: 2)),
+                                SizedBox(width: 8),
+                                Text('Memuat rute...',
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 11,
+                                        color: AppColors.primary)),
+                              ]),
+                        ),
+                      ),
+                    ),
+                  if (_activeRoute != null && !_loadingRoute)
+                    Positioned(
+                      top: top + 70,
+                      left: 12,
+                      child: _RouteInfoPill(
+                        namaRute: _activeRoute!.namaRute.isNotEmpty
+                            ? _activeRoute!.namaRute
+                            : '${_activeRoute!.haltes.length} halte',
+                        halteCount: _activeRoute!.haltes.length,
+                        onDismiss: () => setState(() => _activeRoute = null),
+                      ),
+                    ),
+                ]),
+              ),
               Positioned(
                 top: top + 10,
                 left: 12,
@@ -323,6 +395,8 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.black)),
+                        const SizedBox(width: 8),
+                        _ConnStatusDot(status: _connStatus),
                         const Spacer(),
                         if (active.isNotEmpty) ...[
                           Container(
@@ -826,5 +900,38 @@ class _CircleBtn extends StatelessWidget {
             color: active ? Colors.white : AppColors.black, size: 20),
       ),
     );
+  }
+}
+
+class _ConnStatusDot extends StatelessWidget {
+  final _ConnStatus status;
+  const _ConnStatusDot({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = switch (status) {
+      _ConnStatus.live => AppColors.primary,
+      _ConnStatus.reconnecting => AppColors.orange,
+      _ConnStatus.error => AppColors.red,
+    };
+    final label = switch (status) {
+      _ConnStatus.live => 'Live',
+      _ConnStatus.reconnecting => 'Reconnecting',
+      _ConnStatus.error => 'Error',
+    };
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 4),
+      Text(label,
+          style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color)),
+    ]);
   }
 }
