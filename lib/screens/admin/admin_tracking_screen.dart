@@ -267,6 +267,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                     interactive: true,
                     mapController: _mapController,
                     showInfoCard: false,
+                    showBusCountBadge: false,
                     onBusTap: _tapBus,
                     extraPolylines: _routePolylines,
                     extraMarkers: _halteMarkers,
@@ -376,7 +377,7 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Container(
-                      height: 42,
+                      height: 44,
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -395,34 +396,18 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.black)),
-                        const SizedBox(width: 8),
-                        _ConnStatusDot(status: _connStatus),
                         const Spacer(),
-                        if (active.isNotEmpty) ...[
-                          Container(
-                              width: 7,
-                              height: 7,
-                              decoration: const BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle)),
-                          const SizedBox(width: 5),
-                          Text('${active.length} aktif',
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primary)),
-                        ],
+                        _ConnStatusDot(status: _connStatus),
                       ]),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  if (active.isNotEmpty)
-                    _CircleBtn(
-                      icon: Icons.format_list_bulleted_rounded,
-                      active: _showBusList,
-                      onTap: () => setState(() => _showBusList = !_showBusList),
-                    ),
+                  _CircleBtn(
+                    icon: Icons.format_list_bulleted_rounded,
+                    active: _showBusList,
+                    onTap: () => setState(() => _showBusList = !_showBusList),
+                    badge: active.isNotEmpty ? '${active.length}' : null,
+                  ),
                 ]),
               ),
               if (_showBusList && active.isNotEmpty)
@@ -876,29 +861,54 @@ class _CircleBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool active;
+  final String? badge;
   const _CircleBtn(
-      {required this.icon, required this.onTap, this.active = false});
+      {required this.icon,
+      required this.onTap,
+      this.active = false,
+      this.badge});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: active ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 8,
-                offset: const Offset(0, 2))
-          ],
+      child: Stack(clipBehavior: Clip.none, children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: active ? AppColors.primary : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2))
+            ],
+          ),
+          child: Icon(icon,
+              color: active ? Colors.white : AppColors.black, size: 20),
         ),
-        child: Icon(icon,
-            color: active ? Colors.white : AppColors.black, size: 20),
-      ),
+        if (badge != null)
+          Positioned(
+            top: -4,
+            right: -4,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(badge!,
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
+            ),
+          ),
+      ]),
     );
   }
 }
@@ -919,19 +929,27 @@ class _ConnStatusDot extends StatelessWidget {
       _ConnStatus.reconnecting => 'Reconnecting',
       _ConnStatus.error => 'Error',
     };
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(
-        width: 7,
-        height: 7,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
-      const SizedBox(width: 4),
-      Text(label,
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: color)),
-    ]);
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(label,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: color)),
+      ]),
+    );
   }
 }

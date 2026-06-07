@@ -27,6 +27,7 @@ class BusMapWidget extends StatefulWidget {
   final List<Polyline> extraPolylines;
   final List<Marker> extraMarkers;
   final VoidCallback? onMapTap;
+  final bool showBusCountBadge;
 
   const BusMapWidget({
     super.key,
@@ -46,6 +47,7 @@ class BusMapWidget extends StatefulWidget {
     this.extraPolylines = const [],
     this.extraMarkers = const [],
     this.onMapTap,
+    this.showBusCountBadge = true,
   });
 
   @override
@@ -499,7 +501,7 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                   child: _DriverGpsInfoCard(),
                 ),
             ],
-            if (widget.showAllBuses)
+            if (widget.showAllBuses && widget.showBusCountBadge)
               Positioned(
                 top: 12,
                 left: 12,

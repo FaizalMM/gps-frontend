@@ -122,21 +122,9 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           fontWeight: FontWeight.w600,
                           color: AppColors.textGrey)),
                   const SizedBox(height: 6),
-                  _DropdownField<String?>(
-                    value: selectedDriverId,
-                    hint: 'Pilih driver...',
-                    items: [
-                      const DropdownMenuItem(
-                          value: null,
-                          child: Text('— Tanpa Driver —',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  color: AppColors.textGrey))),
-                      ...drivers.map((d) => DropdownMenuItem(
-                          value: d.idStr,
-                          child: Text(d.namaLengkap,
-                              style: const TextStyle(fontFamily: 'Poppins')))),
-                    ],
+                  _DriverSearchField(
+                    drivers: drivers,
+                    selectedDriverId: selectedDriverId,
                     onChanged: (v) => setM(() => selectedDriverId = v),
                   ),
                 ],
@@ -211,10 +199,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     XFile? foto;
     final formKey = GlobalKey<FormState>();
     final drivers = widget.dataService.drivers;
-    final today = DateTime.now();
-    DateTime tanggalMulai = today;
-    DateTime? tanggalSelesai;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -323,50 +307,12 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                             fontWeight: FontWeight.w600,
                             color: AppColors.textGrey)),
                     const SizedBox(height: 6),
-                    _DropdownField<String?>(
-                      value: selDriverId,
-                      items: [
-                        const DropdownMenuItem(
-                            value: null,
-                            child: Text('— Tanpa Driver —',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    color: AppColors.textGrey))),
-                        ...drivers.map((d) => DropdownMenuItem(
-                            value: d.idStr,
-                            child: Text(d.namaLengkap,
-                                style:
-                                    const TextStyle(fontFamily: 'Poppins')))),
-                      ],
+                    _DriverSearchField(
+                      drivers: drivers,
+                      selectedDriverId: selDriverId,
                       onChanged: (v) => setM(() => selDriverId = v),
                     ),
-                    if (selDriverId != null) ...[
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(
-                          child: _DatePickerField(
-                            label: 'Tanggal Mulai',
-                            value: tanggalMulai,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2100),
-                            onChanged: (d) => setM(() {
-                              if (d != null) tanggalMulai = d;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _DatePickerField(
-                            label: 'Tanggal Selesai',
-                            value: tanggalSelesai,
-                            firstDate: tanggalMulai,
-                            lastDate: DateTime(2100),
-                            nullable: true,
-                            onChanged: (d) => setM(() => tanggalSelesai = d),
-                          ),
-                        ),
-                      ]),
-                    ],
+
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
@@ -405,16 +351,8 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                                       orElse: () => null)
                                   : null;
                               if (driver != null) {
-                                final mulai = tanggalMulai
-                                    .toIso8601String()
-                                    .substring(0, 10);
-                                final selesai = tanggalSelesai
-                                    ?.toIso8601String()
-                                    .substring(0, 10);
-                                await BusService().assignDriverByUserId(
-                                    bus.id, driver,
-                                    tanggalMulai: mulai,
-                                    tanggalSelesai: selesai);
+                                await BusService()
+                                    .assignDriverByUserId(bus.id, driver);
                               } else if (bus.driverId.isNotEmpty) {
                                 await BusService().unassignDriver(bus.id);
                               }
@@ -2288,90 +2226,6 @@ class _DropdownField<T> extends StatelessWidget {
   }
 }
 
-class _DatePickerField extends StatelessWidget {
-  final String label;
-  final DateTime? value;
-  final DateTime firstDate;
-  final DateTime lastDate;
-  final bool nullable;
-  final ValueChanged<DateTime?> onChanged;
-
-  const _DatePickerField({
-    required this.label,
-    required this.value,
-    required this.firstDate,
-    required this.lastDate,
-    required this.onChanged,
-    this.nullable = false,
-  });
-
-  String _fmt(DateTime dt) =>
-      '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () async {
-        final picked = await showDatePicker(
-          context: context,
-          initialDate: value ?? firstDate,
-          firstDate: firstDate,
-          lastDate: lastDate,
-          builder: (ctx, child) => Theme(
-            data: Theme.of(ctx).copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: AppColors.primary,
-                onPrimary: Colors.white,
-                surface: Colors.white,
-              ),
-            ),
-            child: child!,
-          ),
-        );
-        if (picked != null) onChanged(picked);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.lightGrey),
-        ),
-        child: Row(children: [
-          const Icon(Icons.calendar_today_rounded,
-              size: 14, color: AppColors.textGrey),
-          const SizedBox(width: 6),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 10,
-                      color: AppColors.textGrey)),
-              Text(
-                value != null ? _fmt(value!) : (nullable ? 'Opsional' : '-'),
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: value != null ? AppColors.black : AppColors.textGrey,
-                ),
-              ),
-            ]),
-          ),
-          if (nullable && value != null)
-            GestureDetector(
-              onTap: () => onChanged(null),
-              child: const Icon(Icons.close_rounded,
-                  size: 14, color: AppColors.textGrey),
-            ),
-        ]),
-      ),
-    );
-  }
-}
-
 class _SiswaDetailSheet extends StatelessWidget {
   final UserModel siswa;
   final VoidCallback onRemove;
@@ -2516,5 +2370,227 @@ class _DetailRow extends StatelessWidget {
                   fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis)),
     ]);
+  }
+}
+
+class _DriverSearchField extends StatefulWidget {
+  final List<UserModel> drivers;
+  final String? selectedDriverId;
+  final ValueChanged<String?> onChanged;
+
+  const _DriverSearchField({
+    required this.drivers,
+    required this.selectedDriverId,
+    required this.onChanged,
+  });
+
+  @override
+  State<_DriverSearchField> createState() => _DriverSearchFieldState();
+}
+
+class _DriverSearchFieldState extends State<_DriverSearchField> {
+  final _ctrl = TextEditingController();
+  bool _open = false;
+  List<UserModel> _filtered = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.drivers;
+    final sel = widget.drivers
+        .where((d) => d.idStr == widget.selectedDriverId)
+        .firstOrNull;
+    if (sel != null) _ctrl.text = sel.namaLengkap;
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _filter(String q) {
+    setState(() {
+      _filtered = q.isEmpty
+          ? widget.drivers
+          : widget.drivers
+              .where((d) =>
+                  d.namaLengkap.toLowerCase().contains(q.toLowerCase()) ||
+                  d.email.toLowerCase().contains(q.toLowerCase()))
+              .toList();
+    });
+  }
+
+  void _select(UserModel? driver) {
+    setState(() {
+      _open = false;
+      _ctrl.text = driver?.namaLengkap ?? '';
+    });
+    widget.onChanged(driver?.idStr);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() {
+            _open = !_open;
+            if (_open) _filtered = widget.drivers;
+          }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                  color: _open ? AppColors.primary : AppColors.lightGrey,
+                  width: _open ? 1.5 : 1),
+            ),
+            child: Row(children: [
+              const Icon(Icons.person_rounded,
+                  size: 16, color: AppColors.textGrey),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _ctrl.text.isEmpty ? '— Tanpa Driver —' : _ctrl.text,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    color: _ctrl.text.isEmpty
+                        ? AppColors.textGrey
+                        : AppColors.black,
+                  ),
+                ),
+              ),
+              Icon(
+                  _open
+                      ? Icons.keyboard_arrow_up_rounded
+                      : Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textGrey,
+                  size: 18),
+            ]),
+          ),
+        ),
+        if (_open) ...[
+          const SizedBox(height: 6),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.lightGrey),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: TextField(
+                    controller: _ctrl,
+                    onChanged: _filter,
+                    autofocus: true,
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'Cari nama atau email driver...',
+                      hintStyle: const TextStyle(
+                          fontFamily: 'Poppins',
+                          color: AppColors.textGrey,
+                          fontSize: 12),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: AppColors.textGrey, size: 18),
+                      isDense: true,
+                      filled: true,
+                      fillColor: AppColors.surface2,
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(bottom: 8),
+                    children: [
+                      ListTile(
+                        dense: true,
+                        leading: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                              color: AppColors.surface2,
+                              borderRadius: BorderRadius.circular(8)),
+                          child: const Icon(Icons.person_off_rounded,
+                              size: 16, color: AppColors.textGrey),
+                        ),
+                        title: const Text('— Tanpa Driver —',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                color: AppColors.textGrey)),
+                        onTap: () => _select(null),
+                      ),
+                      ..._filtered.map((d) => ListTile(
+                            dense: true,
+                            leading: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                  color: AppColors.primaryLight,
+                                  borderRadius: BorderRadius.circular(8)),
+                              child: Center(
+                                child: Text(
+                                  d.namaLengkap.isNotEmpty
+                                      ? d.namaLengkap[0].toUpperCase()
+                                      : '?',
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: AppColors.primary),
+                                ),
+                              ),
+                            ),
+                            title: Text(d.namaLengkap,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins', fontSize: 13)),
+                            subtitle: Text(d.email,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    color: AppColors.textGrey)),
+                            selected: d.idStr == widget.selectedDriverId,
+                            selectedTileColor: AppColors.primaryLight,
+                            onTap: () => _select(d),
+                          )),
+                      if (_filtered.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                              child: Text('Driver tidak ditemukan',
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 13,
+                                      color: AppColors.textGrey))),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }

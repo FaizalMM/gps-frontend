@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -11,6 +12,7 @@ import '../../widgets/bus_map_widget.dart';
 import '../../widgets/skeleton_widgets.dart';
 import '../auth/login_screen.dart';
 import '../common/edit_profile_screen.dart';
+import '../common/change_password_screen.dart';
 import 'admin_siswa_screen.dart';
 import 'admin_driver_screen.dart';
 import 'admin_pending_screen.dart';
@@ -30,6 +32,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   int _currentIndex = 0;
   final AppDataService _dataService = AppDataService();
   late final List<Widget> _screens;
+  StreamSubscription<List<BusModel>>? _gpsSub;
+  Map<int, bool> _prevGpsState = {};
 
   @override
   void initState() {
@@ -43,9 +47,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = Provider.of<AuthProvider>(context, listen: false);
-      if (!auth.isLoggedIn) return; // belum login, jangan mulai polling
+      if (!auth.isLoggedIn) return;
 
-      // Set handler agar polling otomatis berhenti + logout jika token expired
       _dataService.onUnauthorized = () {
         if (!mounted) return;
         auth.logout();
@@ -58,11 +61,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
       _dataService.startGpsPolling();
       _dataService.startPendingPolling();
 
-      // Tampilkan notifikasi toast saat ada siswa baru daftar
       _dataService.onNewPendingStudent = (jumlahBaru) {
         if (!mounted) return;
         _showNewPendingToast(jumlahBaru);
       };
+
+      _prevGpsState = {for (final b in _dataService.buses) b.id: b.gpsActive};
+      _gpsSub = _dataService.busesStream.listen((buses) {
+        if (!mounted) return;
+        for (final bus in buses) {
+          final prev = _prevGpsState[bus.id];
+          if (prev != null && prev != bus.gpsActive) {
+            final name = bus.driverName.isNotEmpty ? bus.driverName : bus.nama;
+            _showGpsToast(name, bus.nama, bus.gpsActive);
+          }
+        }
+        _prevGpsState = {for (final b in buses) b.id: b.gpsActive};
+      });
     });
   }
 
@@ -75,8 +90,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
     Future.delayed(const Duration(seconds: 4), () => entry.remove());
   }
 
+  void _showGpsToast(String driverName, String busName, bool gpsActive) {
+    final overlay = Overlay.of(context);
+    final entry = OverlayEntry(
+      builder: (ctx) => _GpsToast(
+        driverName: driverName,
+        busName: busName,
+        gpsActive: gpsActive,
+      ),
+    );
+    overlay.insert(entry);
+    Future.delayed(const Duration(seconds: 5), () => entry.remove());
+  }
+
   @override
   void dispose() {
+    _gpsSub?.cancel();
     _dataService.stopGpsPolling();
     _dataService.stopPendingPolling();
     super.dispose();
@@ -165,8 +194,6 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // ── Stats
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: StreamBuilder<List<BusModel>>(
@@ -268,7 +295,6 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
             const SizedBox(height: 24),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -319,49 +345,11 @@ class _HomeTabState extends State<_HomeTab> {
                 final buses = s.data ?? widget.dataService.buses;
                 final active = buses.where((b) => b.gpsActive).toList();
 
-                if (active.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      height: 220,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.directions_bus_outlined,
-                                size: 36, color: AppColors.textGrey),
-                            SizedBox(height: 8),
-                            Text('Belum ada bus yang beroperasi',
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textGrey)),
-                            SizedBox(height: 4),
-                            Text('GPS muncul saat driver mengaktifkan tracking',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 11,
-                                    color: AppColors.textGrey)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                // Peta + list bus terpisah
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Peta — non-interactive di dashboard, tap untuk buka fullscreen
                       GestureDetector(
                         onTap: () => Navigator.push(
                             context,
@@ -371,19 +359,63 @@ class _HomeTabState extends State<_HomeTab> {
                                     initialFocus: _focusedBus))),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: BusMapWidget(
-                            buses: active,
-                            height: 185,
-                            showAllBuses: true,
-                            interactive: false,
-                            mapController: _mapController,
-                            focusBus: _focusedBus,
-                            showInfoCard: false,
-                          ),
+                          child: Stack(children: [
+                            BusMapWidget(
+                              buses: active,
+                              height: 185,
+                              showAllBuses: true,
+                              interactive: false,
+                              mapController: _mapController,
+                              focusBus: _focusedBus,
+                              showInfoCard: false,
+                            ),
+                            if (active.isEmpty)
+                              Positioned(
+                                bottom: 10,
+                                left: 0,
+                                right: 0,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.92),
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.1),
+                                            blurRadius: 6)
+                                      ],
+                                    ),
+                                    child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 6,
+                                            height: 6,
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.textGrey,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          const Text(
+                                              'Tidak ada bus aktif saat ini',
+                                              style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppColors.textGrey)),
+                                        ]),
+                                  ),
+                                ),
+                              ),
+                          ]),
                         ),
                       ),
                       const SizedBox(height: 10),
-                      // List bus di bawah peta — rapi, tidak overlay
                       ...active.map((b) {
                         final isFocused = _focusedBus?.id == b.id;
                         return GestureDetector(
@@ -499,7 +531,6 @@ class _HomeTabState extends State<_HomeTab> {
                       color: AppColors.black)),
             ),
             const SizedBox(height: 12),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(children: [
@@ -575,7 +606,6 @@ class _HomeTabState extends State<_HomeTab> {
               ]),
             ),
             const SizedBox(height: 12),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: GestureDetector(
@@ -627,8 +657,6 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // Info: Rute diatur dari menu Bus
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -655,7 +683,6 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
             const SizedBox(height: 12),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: GestureDetector(
@@ -760,8 +787,6 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-
             const SizedBox(height: 28),
           ],
         ),
@@ -931,6 +956,17 @@ class _ProfileTabState extends State<_ProfileTab> {
                         }
                       },
                     ),
+                    const SizedBox(height: 10),
+                    _AProfMenuCard(
+                      icon: Icons.lock_reset_rounded,
+                      title: 'Ganti Password',
+                      subtitle: 'Ubah password akun admin',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const ChangePasswordScreen()),
+                      ),
+                    ),
                     const SizedBox(height: 28),
                     SizedBox(
                       width: double.infinity,
@@ -964,7 +1000,6 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
-  // ── Header admin
   Widget _buildAdminHeader(UserModel? user, String initial) {
     return Container(
       width: double.infinity,
@@ -974,7 +1009,6 @@ class _ProfileTabState extends State<_ProfileTab> {
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
       ),
       child: Column(children: [
-        // Avatar kotak rounded — berbeda dari driver/siswa yang bulat
         Container(
           width: 86,
           height: 86,
@@ -1007,7 +1041,6 @@ class _ProfileTabState extends State<_ProfileTab> {
                 fontWeight: FontWeight.w700,
                 color: Colors.white)),
         const SizedBox(height: 6),
-        // Badge admin — berbeda bentuk dari driver/siswa
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
@@ -1040,8 +1073,6 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 }
-
-// ── Admin profile sub-widgets
 
 class _AStatCard extends StatelessWidget {
   final String value, label;
@@ -1329,7 +1360,6 @@ class _QuickCard extends StatelessWidget {
     Widget countWidget;
 
     if (halteStream && halteCount != null) {
-      // Halte: pakai haltesStream, fallback ke initialCount saat belum emit
       countWidget = StreamBuilder<List<HalteModel>>(
         stream: stream as Stream<List<HalteModel>>,
         builder: (_, s) {
@@ -1352,7 +1382,6 @@ class _QuickCard extends StatelessWidget {
         },
       );
     } else if (busStream && busCount != null) {
-      // Bus: pakai busesStream, fallback ke initialCount saat belum emit
       countWidget = StreamBuilder<List<BusModel>>(
         stream: stream as Stream<List<BusModel>>,
         builder: (_, s) {
@@ -1375,7 +1404,6 @@ class _QuickCard extends StatelessWidget {
         },
       );
     } else {
-      // Siswa / Driver: pakai usersStream, fallback ke initialCount
       countWidget = StreamBuilder<List<UserModel>>(
         stream: stream as Stream<List<UserModel>>,
         builder: (_, s) {
@@ -1436,8 +1464,6 @@ class _QuickCard extends StatelessWidget {
   }
 }
 
-// ── Toast notifikasi siswa baru pending
-// Muncul di atas semua UI (via Overlay), auto-hilang setelah 4 detik.
 class _NewPendingToast extends StatefulWidget {
   final int count;
   const _NewPendingToast({required this.count});
@@ -1560,6 +1586,111 @@ class _NewPendingToastState extends State<_NewPendingToast>
                       ),
                     ],
                   ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GpsToast extends StatefulWidget {
+  final String driverName;
+  final String busName;
+  final bool gpsActive;
+
+  const _GpsToast({
+    required this.driverName,
+    required this.busName,
+    required this.gpsActive,
+  });
+
+  @override
+  State<_GpsToast> createState() => _GpsToastState();
+}
+
+class _GpsToastState extends State<_GpsToast>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<Offset> _slide;
+  late Animation<double> _fade;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    )..forward();
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        widget.gpsActive ? AppColors.primary : const Color(0xFF616161);
+    final icon =
+        widget.gpsActive ? Icons.gps_fixed_rounded : Icons.gps_off_rounded;
+    final title = widget.gpsActive ? 'GPS DIAKTIFKAN' : 'GPS DIMATIKAN';
+    final msg = widget.gpsActive
+        ? '${widget.driverName} mengaktifkan GPS (${widget.busName})'
+        : '${widget.driverName} mematikan GPS (${widget.busName})';
+
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 12,
+      left: 16,
+      right: 16,
+      child: SlideTransition(
+        position: _slide,
+        child: FadeTransition(
+          opacity: _fade,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(children: [
+                Icon(icon, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.5)),
+                        Text(msg,
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                color: Colors.white)),
+                      ]),
                 ),
               ]),
             ),

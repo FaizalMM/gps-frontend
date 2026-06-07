@@ -128,7 +128,9 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
       list = list
           .where((d) =>
               d.namaLengkap.toLowerCase().contains(q) ||
-              d.email.toLowerCase().contains(q))
+              d.email.toLowerCase().contains(q) ||
+              (d.driverDetail?.nik ?? '').toLowerCase().contains(q) ||
+              d.noHp.contains(q))
           .toList();
     }
 
@@ -591,7 +593,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                                   style: const TextStyle(
                                       fontFamily: 'Poppins', fontSize: 13),
                                   decoration: InputDecoration(
-                                    hintText: 'Cari nama atau ID bus...',
+                                    hintText: 'Cari nama, NIK, atau no. HP...',
                                     hintStyle: const TextStyle(
                                         fontFamily: 'Poppins',
                                         color: AppColors.textGrey,

@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import '../../models/models_api.dart';
@@ -168,6 +170,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     bool obscurePassword = true;
     bool obscureConfirm = true;
     bool ubahPassword = false;
+    XFile? foto;
 
     showModalBottomSheet(
       context: context,
@@ -235,7 +238,72 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                     color: AppColors.textGrey)),
                           ])),
                     ]),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final img = await ImagePicker().pickImage(
+                              source: ImageSource.gallery, imageQuality: 75);
+                          if (img != null) setM(() => foto = img);
+                        },
+                        child: Stack(children: [
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primaryLight,
+                              border: Border.all(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.25),
+                                  width: 2),
+                            ),
+                            child: ClipOval(
+                              child: foto != null
+                                  ? Image.file(File(foto!.path),
+                                      fit: BoxFit.cover)
+                                  : (user.photoUrl != null &&
+                                          user.photoUrl!.isNotEmpty)
+                                      ? Image.network(user.photoUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.person_rounded,
+                                                  size: 36,
+                                                  color: AppColors.primary))
+                                      : const Icon(Icons.person_rounded,
+                                          size: 36, color: AppColors.primary),
+                            ),
+                          ),
+                          Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 26,
+                                height: 26,
+                                decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: AppColors.primary),
+                                child: const Icon(Icons.camera_alt_rounded,
+                                    size: 13, color: Colors.white),
+                              )),
+                        ]),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Center(
+                      child: Text(
+                        foto != null
+                            ? 'Foto baru terpilih — ketuk untuk ganti'
+                            : (user.photoUrl != null
+                                ? 'Ketuk foto untuk mengganti'
+                                : 'Ketuk untuk pilih foto (opsional)'),
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     // Nama
                     _EditField(
                         label: 'Nama Lengkap',
@@ -572,8 +640,9 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                   data['password_confirmation'] =
                                       passwordConfirmCtrl.text;
                                 }
-                                final ok = await StudentService()
-                                    .updateStudent(studentId, data);
+                                final ok = await StudentService().updateStudent(
+                                    studentId, data,
+                                    photoPath: foto?.path);
                                 if (!mounted) return;
                                 setM(() => isSaving = false);
                                 if (ok) {
@@ -1212,6 +1281,228 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     ).whenComplete(() => sheetOpen = false);
   }
 
+  void _showAssignHalteSheet(UserModel user) {
+    final allHaltes = widget.dataService.haltes;
+    final buses = widget.dataService.buses
+        .where((b) => b.status == BusStatus.active)
+        .toList();
+
+    final currentBusId = user.studentDetail?.busId ?? 0;
+    final currentHalteId = user.studentDetail?.halteId ?? 0;
+
+    final currentBus = currentBusId > 0
+        ? buses.where((b) => b.id == currentBusId).firstOrNull
+        : null;
+
+    List<HalteModel> haltesForBus(BusModel? bus) {
+      if (bus == null || bus.routeList.isEmpty) return allHaltes;
+      final halteIds =
+          bus.routeList.expand((r) => r.haltes).map((h) => h.halteId).toSet();
+      final filtered = allHaltes.where((h) => halteIds.contains(h.id)).toList();
+      return filtered.isEmpty ? allHaltes : filtered;
+    }
+
+    HalteModel? selectedHalte = currentHalteId > 0
+        ? allHaltes.where((h) => h.id == currentHalteId).firstOrNull
+        : null;
+
+    final haltes = haltesForBus(currentBus);
+
+    if (currentBus == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Siswa harus ditugaskan ke bus terlebih dahulu',
+            style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setM) {
+          return Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: AppColors.lightGrey,
+                          borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    const Icon(Icons.place_rounded,
+                        color: Color(0xFF1565C0), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Tetapkan Halte untuk ${user.namaLengkap}',
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Bus: ${currentBus.nama} · ${currentBus.platNomor}',
+                    style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 12,
+                        color: AppColors.textGrey),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Pilih Halte',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textGrey)),
+                  const SizedBox(height: 8),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 280),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: haltes.length,
+                      itemBuilder: (_, i) {
+                        final h = haltes[i];
+                        final selected = selectedHalte?.id == h.id;
+                        return GestureDetector(
+                          onTap: () => setM(() => selectedHalte = h),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? const Color(0xFFE3F2FD)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected
+                                    ? const Color(0xFF1565C0)
+                                    : AppColors.lightGrey,
+                                width: selected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(children: [
+                              Icon(Icons.location_on_rounded,
+                                  size: 16,
+                                  color: selected
+                                      ? const Color(0xFF1565C0)
+                                      : AppColors.textGrey),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(h.namaHalte,
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: selected
+                                                  ? const Color(0xFF1565C0)
+                                                  : AppColors.black)),
+                                      if (h.alamat.isNotEmpty)
+                                        Text(h.alamat,
+                                            style: const TextStyle(
+                                                fontFamily: 'Poppins',
+                                                fontSize: 11,
+                                                color: AppColors.textGrey)),
+                                    ]),
+                              ),
+                              if (selected)
+                                const Icon(Icons.check_circle_rounded,
+                                    color: Color(0xFF1565C0), size: 18),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.check_rounded,
+                          size: 18, color: Colors.white),
+                      label: const Text('Simpan Halte',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1565C0),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: selectedHalte == null
+                          ? null
+                          : () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final nav = Navigator.of(ctx);
+                              final ok = await StudentService()
+                                  .updateStudent(user.id, {
+                                'bus_id': currentBus.id,
+                                'halte_id': selectedHalte!.id,
+                              });
+                              if (ok) {
+                                await widget.dataService.loadAll();
+                                user.studentDetail?.halteId = selectedHalte!.id;
+                                user.studentDetail?.namaHalte =
+                                    selectedHalte!.namaHalte;
+                              }
+                              if (!mounted) return;
+                              nav.pop();
+                              setState(() {});
+                              messenger.showSnackBar(SnackBar(
+                                content: Text(
+                                    ok
+                                        ? 'Halte berhasil ditetapkan'
+                                        : 'Gagal menetapkan halte',
+                                    style:
+                                        const TextStyle(fontFamily: 'Poppins')),
+                                backgroundColor:
+                                    ok ? AppColors.primary : AppColors.red,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
+                              ));
+                            },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1377,6 +1668,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       onDelete: () => _deleteUser(list[i]),
                       onToggle: () => _toggleStatus(list[i]),
                       onAssignBus: () => _showAssignBusSheet(list[i]),
+                      onAssignHalte: () => _showAssignHalteSheet(list[i]),
                       onEdit: () => _showEditSiswaSheet(list[i])),
                 );
               }
@@ -1440,12 +1732,13 @@ class _SiswaAvatar extends StatelessWidget {
 
 class _SiswaCard extends StatelessWidget {
   final UserModel siswa;
-  final VoidCallback onDelete, onToggle, onAssignBus, onEdit;
+  final VoidCallback onDelete, onToggle, onAssignBus, onAssignHalte, onEdit;
   const _SiswaCard(
       {required this.siswa,
       required this.onDelete,
       required this.onToggle,
       required this.onAssignBus,
+      required this.onAssignHalte,
       required this.onEdit});
 
   @override
@@ -1564,6 +1857,30 @@ class _SiswaCard extends StatelessWidget {
                                     : AppColors.orange)),
                       ]),
                     ),
+                  if (isActive && hasBus && namaHalte.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1565C0).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.place_rounded,
+                            size: 10, color: Color(0xFF1565C0)),
+                        const SizedBox(width: 3),
+                        Text(namaHalte,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1565C0))),
+                      ]),
+                    ),
+                  ],
                 ]),
               ])),
           const SizedBox(width: 8),
@@ -1588,6 +1905,14 @@ class _SiswaCard extends StatelessWidget {
                     : AppColors.orange.withValues(alpha: 0.1),
                 onTap: onAssignBus,
                 tooltip: hasBus ? 'Ganti Bus' : 'Assign Bus',
+              ),
+              const SizedBox(height: 6),
+              _ActionBtn(
+                icon: Icons.place_rounded,
+                color: const Color(0xFF1565C0),
+                bg: const Color(0xFFE3F2FD),
+                onTap: onAssignHalte,
+                tooltip: 'Tetapkan Halte',
               ),
               const SizedBox(height: 6),
               _ActionBtn(

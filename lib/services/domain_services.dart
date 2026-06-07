@@ -71,7 +71,16 @@ class StudentService {
     return res.success;
   }
 
-  Future<bool> updateStudent(int studentId, Map<String, dynamic> data) async {
+  Future<bool> updateStudent(int studentId, Map<String, dynamic> data,
+      {String? photoPath}) async {
+    if (photoPath != null) {
+      final fields = data.map((k, v) => MapEntry(k, v.toString()));
+      fields['_method'] = 'PUT';
+      final res = await _api.uploadMultipart(
+          '/students/$studentId', photoPath, 'photo',
+          fields: fields);
+      return res.success;
+    }
     final res = await _api.put('/students/$studentId', data);
     return res.success;
   }
@@ -621,19 +630,27 @@ class AdminService {
 }
 
 class DriverSuspendService {
+  final _api = ApiClient();
+
   Future<({bool success, String? error})> suspendDriver(int driverId) async {
+    final res = await _api.post('/drivers/$driverId/suspend', {});
     return (
-      success: false,
-      error:
-          'Fitur suspend driver belum tersedia di server. Hubungi pengembang backend untuk menambahkan endpoint /drivers/{id}/suspend.'
+      success: res.success,
+      error: res.success
+          ? null
+          : (res.message.isNotEmpty
+              ? res.message
+              : 'Gagal menonaktifkan driver')
     );
   }
 
   Future<({bool success, String? error})> unsuspendDriver(int driverId) async {
+    final res = await _api.post('/drivers/$driverId/unsuspend', {});
     return (
-      success: false,
-      error:
-          'Fitur aktifkan driver belum tersedia di server. Hubungi pengembang backend untuk menambahkan endpoint /drivers/{id}/unsuspend.'
+      success: res.success,
+      error: res.success
+          ? null
+          : (res.message.isNotEmpty ? res.message : 'Gagal mengaktifkan driver')
     );
   }
 }
