@@ -22,18 +22,24 @@ class RouteBuilderResult {
     required this.distanceMeters,
     required this.durationSeconds,
   });
+
+  /// Heuristic: polyline valid jika memiliki cukup titik (minimal 3x halte)
+  /// untuk mengindikasikan geometry jalan lengkap, bukan hanya garis lurus antar-halte.
+  bool get isPolylineValid => polylinePoints.length > orderedHaltes.length * 2;
 }
 
 class RouteBuilderScreen extends StatefulWidget {
   final List<HalteModel> availableHaltes;
   final String? initialName;
   final List<LatLng>? initialPoints;
+  final List<HalteModel>? initialOrderedHaltes;
 
   const RouteBuilderScreen({
     super.key,
     required this.availableHaltes,
     this.initialName,
     this.initialPoints,
+    this.initialOrderedHaltes,
   });
 
   @override
@@ -52,6 +58,7 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
 
   List<LatLng> _routePolyline = [];
   bool _routing = false;
+  bool _routeError = false;
   double _distM = 0;
   double _durS = 0;
 
@@ -65,11 +72,20 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
   void initState() {
     super.initState();
     _allHaltes = List.from(widget.availableHaltes);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.initialPoints != null && widget.initialPoints!.length >= 2) {
-        _fitBounds(widget.initialPoints!);
-      }
-    });
+
+    if (widget.initialOrderedHaltes != null &&
+        widget.initialOrderedHaltes!.isNotEmpty) {
+      _waypoints.addAll(widget.initialOrderedHaltes!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _calcRoute();
+      });
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (widget.initialPoints != null && widget.initialPoints!.length >= 2) {
+          _fitBounds(widget.initialPoints!);
+        }
+      });
+    }
   }
 
   @override
@@ -86,6 +102,7 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
       _routePolyline = [];
       _distM = 0;
       _durS = 0;
+      _routeError = false;
       _showHalteList = false;
     });
     _mapCtrl.move(LatLng(h.latitude, h.longitude), 14.5);
@@ -116,18 +133,32 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
 
   Future<void> _calcRoute() async {
     if (_waypoints.length < 2) return;
-    setState(() => _routing = true);
+    setState(() {
+      _routing = true;
+      _routeError = false;
+    });
     final pts = _waypoints.map((h) => LatLng(h.latitude, h.longitude)).toList();
-    final result = await _svc.getRoute(pts);
+    OsrmRouteResult? result;
+
+    // Retry hingga 3 kali jika OSRM gagal
+    for (int attempt = 0; attempt < 3 && result == null; attempt++) {
+      result = await _svc.getRoute(pts);
+      if (result == null && attempt < 2) {
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
     if (!mounted) return;
     setState(() {
       _routing = false;
-      if (result != null) {
+      if (result != null && result.points.isNotEmpty) {
         _routePolyline = result.points;
         _distM = result.distanceMeters;
         _durS = result.durationSeconds;
+        _routeError = false;
       } else {
-        _routePolyline = pts;
+        _routePolyline = [];
+        _routeError = true;
       }
     });
     if (_routePolyline.isNotEmpty) {
@@ -331,14 +362,98 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
     } catch (_) {}
   }
 
-  void _simpanRute() {
+  Future<void> _simpanRute() async {
     if (_waypoints.length < 2) return;
-    final pts = _routePolyline.isNotEmpty
-        ? _routePolyline
-        : _waypoints.map((h) => LatLng(h.latitude, h.longitude)).toList();
+    if (_routing) {
+      await Future.doWhile(() async {
+        await Future.delayed(const Duration(milliseconds: 200));
+        return _routing;
+      });
+    }
+    if (_routePolyline.isEmpty && _waypoints.length >= 2) {
+      await _calcRoute();
+    }
+    if (!mounted) return;
+    if (_routeError || _routePolyline.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+          'Gagal menghitung jalur. Periksa koneksi internet dan coba lagi.',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 3),
+      ));
+      return;
+    }
+    final pts = _routePolyline;
     final nama = widget.initialName?.isNotEmpty == true
         ? widget.initialName!
         : '${_waypoints.first.namaHalte} → ${_waypoints.last.namaHalte}';
+
+    // Validasi: jika titik polyline terlalu sedikit, ingatkan user bahwa mungkin belum mengikuti jalan
+    if (pts.length <= _waypoints.length * 2) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('⚠️ Polyline Tidak Lengkap'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Polyline hanya ${pts.length} titik vs ${_waypoints.length} halte.',
+                style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Ini mungkin belum mengikuti jalur jalan sebenarnya (bisa hanya garis lurus antar-halte atau masuk gang). Rute bus akan terlihat tidak benar di peta.',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: Colors.orangeAccent,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Solusi:',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Text(
+                '• Periksa koneksi internet',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11),
+              ),
+              const Text(
+                '• Ubah urutan halte / tambah waypoint detail',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11),
+              ),
+              const Text(
+                '• Tap "Gagal — Coba Lagi" untuk hitung ulang',
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Batal - Coba Lagi',
+                    style: TextStyle(color: Colors.blue))),
+            ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                ),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Simpan Tetap (Berisiko)',
+                    style: TextStyle(color: Colors.white))),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
     Navigator.pop(
         context,
         RouteBuilderResult(
@@ -772,6 +887,16 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
                         'Tambah minimal 1 halte lagi agar jalur bisa dihitung.'),
               ),
           ],
+          if (_routeError)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+              child: _InfoBanner(
+                ikon: Icons.wifi_off_rounded,
+                warna: Colors.orange,
+                pesan:
+                    'Gagal menghitung jalur dari server. Periksa koneksi internet lalu tap "Gagal — Coba Lagi".',
+              ),
+            ),
           if (_distM > 0)
             Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -782,28 +907,52 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
               width: double.infinity,
               height: 52,
               child: ElevatedButton.icon(
-                icon: const Icon(Icons.check_circle_rounded, size: 20),
+                icon: _routing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : Icon(
+                        _routeError
+                            ? Icons.refresh_rounded
+                            : Icons.check_circle_rounded,
+                        size: 20),
                 label: Text(
-                  _waypoints.length < 2
-                      ? 'Pilih minimal 2 halte'
-                      : 'Gunakan Rute Ini  (${_waypoints.length} Halte)',
+                  _routing
+                      ? 'Menghitung jalur...'
+                      : _routeError
+                          ? 'Gagal — Coba Lagi'
+                          : _waypoints.length < 2
+                              ? 'Pilih minimal 2 halte'
+                              : 'Gunakan Rute Ini  (${_waypoints.length} Halte)',
                   style: const TextStyle(
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w700,
                       fontSize: 14),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _waypoints.length >= 2
-                      ? AppColors.primary
-                      : AppColors.lightGrey,
-                  foregroundColor: _waypoints.length >= 2
-                      ? Colors.white
-                      : AppColors.textGrey,
+                  backgroundColor: _routing
+                      ? AppColors.lightGrey
+                      : _routeError
+                          ? Colors.orange
+                          : _waypoints.length >= 2
+                              ? AppColors.primary
+                              : AppColors.lightGrey,
+                  foregroundColor: _routing || _waypoints.length < 2
+                      ? AppColors.textGrey
+                      : Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                onPressed: _waypoints.length >= 2 ? _simpanRute : null,
+                onPressed: _routing
+                    ? null
+                    : _routeError
+                        ? _calcRoute
+                        : _waypoints.length >= 2
+                            ? _simpanRute
+                            : null,
               ),
             ),
           ),

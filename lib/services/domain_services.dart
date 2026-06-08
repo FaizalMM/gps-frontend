@@ -34,6 +34,7 @@ class StudentService {
         final userJson = json['user'] as Map<String, dynamic>;
         return UserModel.fromJson({
           ...userJson,
+          'is_suspended': json['is_suspended'],
           'student': json,
         });
       }

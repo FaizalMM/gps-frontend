@@ -31,8 +31,10 @@ class AppDataService {
   List<BusModel> get buses => _buses;
   List<HalteModel> get haltes => _haltes;
 
-  List<UserModel> get siswaList =>
-      _users.where((u) => u.role == UserRole.siswa).toList();
+  List<UserModel> get siswaList => _users
+      .where(
+          (u) => u.role == UserRole.siswa && u.status != AccountStatus.pending)
+      .toList();
   List<UserModel> get drivers =>
       _users.where((u) => u.role == UserRole.driver).toList();
   List<UserModel> get pendingUsers =>

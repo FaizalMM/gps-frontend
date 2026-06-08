@@ -943,6 +943,12 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                         .map((p) => LatLng(p.latitude, p.longitude))
                         .toList()
                     : null,
+                initialOrderedHaltes: route.haltes.isNotEmpty
+                    ? route.haltes
+                        .where((rh) => rh.halte != null)
+                        .map((rh) => rh.halte!)
+                        .toList()
+                    : null,
               )),
     );
     if (result == null || !mounted) return;

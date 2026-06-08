@@ -205,8 +205,11 @@ class _HomeTabState extends State<_HomeTab> {
                     builder: (_, us) {
                       final users = us.data ?? widget.dataService.users;
                       final gpsActive = buses.where((b) => b.gpsActive).length;
-                      final siswa =
-                          users.where((u) => u.role == UserRole.siswa).length;
+                      final siswa = users
+                          .where((u) =>
+                              u.role == UserRole.siswa &&
+                              u.status != AccountStatus.pending)
+                          .length;
                       final pending = users
                           .where((u) => u.status == AccountStatus.pending)
                           .length;
@@ -542,7 +545,9 @@ class _HomeTabState extends State<_HomeTab> {
                   stream: widget.dataService.usersStream,
                   initialCount: widget.dataService.siswaList.length,
                   count: (u) => u
-                      .where((x) => x.role == UserRole.siswa)
+                      .where((x) =>
+                          x.role == UserRole.siswa &&
+                          x.status != AccountStatus.pending)
                       .length
                       .toString(),
                   onTap: () => Navigator.push(

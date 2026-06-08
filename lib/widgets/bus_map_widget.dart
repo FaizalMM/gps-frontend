@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -914,14 +915,9 @@ class _BusMarker extends StatelessWidget {
     this.isSelected = false,
   });
 
-  Color get _color {
-    final base = _busColors[bus.id % _busColors.length];
-    if (isFocused || isSelected) return base;
-    // Bus tidak difokus: sedikit lebih transparan
-    return base;
-  }
+  Color get _color => _busColors[bus.id % _busColors.length];
 
-  /// Label singkat untuk marker: ambil angka dari nama bus, fallback huruf pertama
+  /// Label singkat untuk fallback: ambil angka dari nama bus, fallback huruf pertama
   String get _label {
     final digits = bus.nama.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isNotEmpty) {
@@ -933,9 +929,9 @@ class _BusMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _color;
-    final size = isSelected ? 44.0 : (isFocused ? 38.0 : 32.0);
-    final fontSize = isSelected ? 13.0 : (isFocused ? 12.0 : 10.0);
-    final border = (isFocused || isSelected) ? 3.0 : 2.0;
+    final size = isSelected ? 52.0 : (isFocused ? 46.0 : 40.0);
+    final border = (isFocused || isSelected) ? 3.0 : 2.5;
+    final hasPhoto = bus.photoUrl != null && bus.photoUrl!.isNotEmpty;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
@@ -953,16 +949,49 @@ class _BusMarker extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: Text(
-          _label,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            fontFamily: 'Poppins',
-            height: 1.0,
-          ),
+      child: ClipOval(
+        child: hasPhoto
+            ? CachedNetworkImage(
+                imageUrl: bus.photoUrl!,
+                fit: BoxFit.cover,
+                httpHeaders: const {
+                  'ngrok-skip-browser-warning': 'true',
+                  'User-Agent': 'Mobitra-App/1.0',
+                },
+                placeholder: (_, __) => _LabelFallback(
+                  label: _label,
+                  fontSize: isSelected ? 13.0 : (isFocused ? 12.0 : 10.0),
+                ),
+                errorWidget: (_, __, ___) => _LabelFallback(
+                  label: _label,
+                  fontSize: isSelected ? 13.0 : (isFocused ? 12.0 : 10.0),
+                ),
+              )
+            : _LabelFallback(
+                label: _label,
+                fontSize: isSelected ? 13.0 : (isFocused ? 12.0 : 10.0),
+              ),
+      ),
+    );
+  }
+}
+
+class _LabelFallback extends StatelessWidget {
+  final String label;
+  final double fontSize;
+  const _LabelFallback({required this.label, required this.fontSize});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          fontFamily: 'Poppins',
+          height: 1.0,
         ),
       ),
     );

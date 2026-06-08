@@ -141,82 +141,154 @@ class RouteSearchService {
 
   Future<OsrmRouteResult?> getRoute(List<LatLng> waypoints) async {
     if (waypoints.length < 2) return null;
+
+    // Strategi utama: gunakan segmentasi pairwise (lebih detail daripada global)
     try {
-      final coords =
-          waypoints.map((p) => '${p.longitude},${p.latitude}').join(';');
-      // Gunakan driving-hgv untuk mengikuti jalur bus (jalan besar)
-      // Fallback otomatis ke driving biasa jika HGV gagal
-      Uri uri;
+      // ignore: avoid_print
+      print('Starting segmented routing for ${waypoints.length} waypoints');
+    } catch (_) {}
+
+    final segPoints = <LatLng>[];
+    double totalDist = 0;
+    double totalDur = 0;
+
+    for (int i = 0; i < waypoints.length - 1; i++) {
+      final a = waypoints[i];
+      final b = waypoints[i + 1];
       try {
-        uri = Uri.parse(
-          '$_osrmHgv/$coords'
-          '?overview=full&geometries=geojson&steps=false',
-        );
-      } catch (_) {
-        uri = Uri.parse(
-          '$_osrm/route/v1/driving/$coords'
-          '?overview=full&geometries=geojson&steps=false',
-        );
+        // ignore: avoid_print
+        print(
+            'Routing segment $i: ${a.latitude.toStringAsFixed(4)},${a.longitude.toStringAsFixed(4)} → ${b.latitude.toStringAsFixed(4)},${b.longitude.toStringAsFixed(4)}');
+      } catch (_) {}
+
+      final seg = await _routePair(a, b);
+      if (seg != null && seg.points.isNotEmpty) {
+        // Avoid duplicate: skip first point if segPoints not empty
+        if (segPoints.isNotEmpty) {
+          segPoints.addAll(seg.points.sublist(1));
+        } else {
+          segPoints.addAll(seg.points);
+        }
+        totalDist += seg.distanceMeters;
+        totalDur += seg.durationSeconds;
+        try {
+          // ignore: avoid_print
+          print(
+              '  Segment $i: ${seg.points.length} points, ${seg.distanceMeters.toStringAsFixed(0)}m');
+        } catch (_) {}
+      } else {
+        try {
+          // ignore: avoid_print
+          print('  Segment $i: FAILED (returning null)');
+        } catch (_) {}
       }
-      final res = await http
-          .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 15));
-      if (res.statusCode != 200) return null;
-
-      final body = json.decode(res.body) as Map<String, dynamic>;
-      // Fallback ke driving biasa jika HGV tidak menemukan rute
-      if (body['code'] != 'Ok') {
-        return await _getRouteFallback(waypoints);
-      }
-
-      final route = (body['routes'] as List).first as Map<String, dynamic>;
-      final geom = route['geometry'] as Map<String, dynamic>;
-      final coordList = (geom['coordinates'] as List).cast<List<dynamic>>();
-
-      return OsrmRouteResult(
-        points: coordList
-            .map((c) => LatLng(
-                  (c[1] as num).toDouble(),
-                  (c[0] as num).toDouble(),
-                ))
-            .toList(),
-        distanceMeters: (route['distance'] as num).toDouble(),
-        durationSeconds: (route['duration'] as num).toDouble(),
-      );
-    } catch (_) {
-      return _getRouteFallback(waypoints);
     }
+
+    if (segPoints.isNotEmpty) {
+      try {
+        // ignore: avoid_print
+        print(
+            'Segmented routing complete: ${segPoints.length} total points, ${totalDist.toStringAsFixed(0)}m');
+      } catch (_) {}
+      return OsrmRouteResult(
+        points: segPoints,
+        distanceMeters: totalDist,
+        durationSeconds: totalDur,
+      );
+    }
+
+    try {
+      // ignore: avoid_print
+      print('Segmented routing failed, returning null');
+    } catch (_) {}
+    return null;
   }
 
-  /// Fallback ke profile driving standar jika driving-hgv tidak tersedia
-  Future<OsrmRouteResult?> _getRouteFallback(List<LatLng> waypoints) async {
+  // Route between two consecutive points using HGV then driving fallback.
+  // Hindari jalan kecil/buntu dengan menggunakan profile HGV & exclude residential.
+  Future<OsrmRouteResult?> _routePair(LatLng a, LatLng b) async {
     try {
+      // Gunakan hanya 2 titik (start & end) tanpa intermediate.
+      // Intermediate waypoints kadang malah membuat rute ambil jalan buntu.
       final coords =
-          waypoints.map((p) => '${p.longitude},${p.latitude}').join(';');
-      final uri = Uri.parse(
-        '$_osrm/route/v1/driving/$coords'
-        '?overview=full&geometries=geojson&steps=false',
+          '${a.longitude},${a.latitude};${b.longitude},${b.latitude}';
+
+      try {
+        // ignore: avoid_print
+        print('    _routePair: $coords');
+      } catch (_) {}
+
+      // OSRM HGV profile: prioritas jalan besar, hindari gang sempit (cocok untuk bus)
+      var uri = Uri.parse(
+        '$_osrmHgv/$coords?overview=full&geometries=geojson&steps=false',
       );
-      final res = await http
-          .get(uri, headers: _headers)
-          .timeout(const Duration(seconds: 15));
-      if (res.statusCode != 200) return null;
+      var res = await http.get(uri, headers: _headers).timeout(
+            const Duration(seconds: 10),
+          );
+
+      // Jika HGV gagal, fallback ke driving biasa
+      if (res.statusCode != 200) {
+        try {
+          // ignore: avoid_print
+          print(
+              '    _routePair: HGV failed (${res.statusCode}), trying driving...');
+        } catch (_) {}
+
+        uri = Uri.parse(
+            '$_osrm/route/v1/driving/$coords?overview=full&geometries=geojson&steps=false');
+        res = await http.get(uri, headers: _headers).timeout(
+              const Duration(seconds: 10),
+            );
+        if (res.statusCode != 200) {
+          try {
+            // ignore: avoid_print
+            print('    _routePair: driving also failed (${res.statusCode})');
+          } catch (_) {}
+          return null;
+        }
+      }
+
       final body = json.decode(res.body) as Map<String, dynamic>;
-      if (body['code'] != 'Ok') return null;
+      if (body['code'] != 'Ok') {
+        try {
+          // ignore: avoid_print
+          print('    _routePair: OSRM code ${body['code']}');
+        } catch (_) {}
+        return null;
+      }
+
       final route = (body['routes'] as List).first as Map<String, dynamic>;
       final geom = route['geometry'] as Map<String, dynamic>;
       final coordList = (geom['coordinates'] as List).cast<List<dynamic>>();
+
+      if (coordList.isEmpty) {
+        try {
+          // ignore: avoid_print
+          print('    _routePair: empty coordList');
+        } catch (_) {}
+        return null;
+      }
+
+      final pts = coordList
+          .map(
+              (c) => LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()))
+          .toList();
+
+      try {
+        // ignore: avoid_print
+        print('    _routePair result: ${pts.length} points');
+      } catch (_) {}
+
       return OsrmRouteResult(
-        points: coordList
-            .map((c) => LatLng(
-                  (c[1] as num).toDouble(),
-                  (c[0] as num).toDouble(),
-                ))
-            .toList(),
+        points: pts,
         distanceMeters: (route['distance'] as num).toDouble(),
         durationSeconds: (route['duration'] as num).toDouble(),
       );
-    } catch (_) {
+    } catch (e) {
+      try {
+        // ignore: avoid_print
+        print('    _routePair exception: $e');
+      } catch (_) {}
       return null;
     }
   }

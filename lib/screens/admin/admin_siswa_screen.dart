@@ -79,7 +79,26 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                 TextButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      widget.dataService.deleteUser(u.idStr).then((_) {
+                      // Gunakan studentDetail.id karena endpoint /students/{id}
+                      // merujuk ke tabel students, bukan tabel users
+                      final studentId = u.studentDetail?.id ?? 0;
+                      if (studentId <= 0) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'ID siswa tidak ditemukan. Refresh dan coba lagi.',
+                                  style: TextStyle(fontFamily: 'Poppins')),
+                              backgroundColor: AppColors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                        return;
+                      }
+                      widget.dataService
+                          .deleteUser(studentId.toString())
+                          .then((_) {
                         if (mounted) setState(() {});
                       });
                     },
@@ -1464,8 +1483,20 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                           : () async {
                               final messenger = ScaffoldMessenger.of(context);
                               final nav = Navigator.of(ctx);
+                              final studentId = user.studentDetail?.id ?? 0;
+                              if (studentId <= 0) {
+                                nav.pop();
+                                messenger.showSnackBar(const SnackBar(
+                                  content: Text(
+                                      'ID siswa tidak ditemukan. Refresh dan coba lagi.',
+                                      style: TextStyle(fontFamily: 'Poppins')),
+                                  backgroundColor: AppColors.red,
+                                  behavior: SnackBarBehavior.floating,
+                                ));
+                                return;
+                              }
                               final ok = await StudentService()
-                                  .updateStudent(user.id, {
+                                  .updateStudent(studentId, {
                                 'bus_id': currentBus.id,
                                 'halte_id': selectedHalte!.id,
                               });
@@ -1619,6 +1650,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             builder: (_, snap) {
               var list = (snap.data ?? widget.dataService.users)
                   .where((u) => u.role == UserRole.siswa)
+                  .where((u) => u.status != AccountStatus.pending)
                   .where((u) =>
                       u.namaLengkap
                           .toLowerCase()
@@ -1627,8 +1659,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                   .where((u) {
                 if (_filter == 'Aktif') return u.status == AccountStatus.active;
                 if (_filter == 'Nonaktif') {
-                  return u.status != AccountStatus.active &&
-                      u.status != AccountStatus.pending;
+                  return u.status != AccountStatus.active;
                 }
                 if (_filter == 'Belum ada Bus') {
                   // Siswa aktif tapi belum punya bus assignment
