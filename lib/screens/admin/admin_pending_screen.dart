@@ -28,7 +28,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
+    _tabController = TabController(length: 4, vsync: this, initialIndex: 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
     });
@@ -1202,7 +1202,13 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
         final suspended = allStudents
             .where((u) => u.status == AccountStatus.rejected)
             .toList();
+        // Ditolak: approval_status = rejected (bukan sekadar nonaktif)
+        final rejectedStudents = allStudents
+            .where((u) =>
+                u.studentDetail?.approvalStatus == ApprovalStatus.rejected)
+            .toList();
         final totalPending = pendingStudents.length;
+        final totalRejected = rejectedStudents.length;
 
         List<UserModel> search(List<UserModel> list) {
           if (_searchQuery.isEmpty) return list;
@@ -1315,6 +1321,14 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                       _TabBadge(count: totalPending, color: AppColors.orange)
                     ],
                   ])),
+                  Tab(
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Text('Ditolak'),
+                    if (totalRejected > 0) ...[
+                      const SizedBox(width: 6),
+                      _TabBadge(count: totalRejected, color: AppColors.red)
+                    ],
+                  ])),
                   const Tab(text: 'Nonaktif'),
                 ],
               ),
@@ -1338,6 +1352,16 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
                     _StudentList(
                         students: search(pendingStudents),
                         isPending: true,
+                        onApprove: _approveUser,
+                        onReject: _rejectUser,
+                        onDelete: _deleteUser,
+                        onEdit: _showEditStudentDialog,
+                        onIdCard: _showIdCard,
+                        onHistory: _showRejectionHistory,
+                        onSuspend: _suspendUser),
+                    _StudentList(
+                        students: search(rejectedStudents),
+                        isRejected: true,
                         onApprove: _approveUser,
                         onReject: _rejectUser,
                         onDelete: _deleteUser,
@@ -1390,6 +1414,7 @@ class _TabBadge extends StatelessWidget {
 class _StudentList extends StatelessWidget {
   final List<UserModel> students;
   final bool isPending;
+  final bool isRejected;
   final Function(UserModel) onApprove;
   final Function(UserModel) onReject;
   final Function(UserModel) onDelete;
@@ -1408,6 +1433,7 @@ class _StudentList extends StatelessWidget {
     required this.onHistory,
     required this.onSuspend,
     this.isPending = false,
+    this.isRejected = false,
   });
 
   @override
@@ -1415,48 +1441,55 @@ class _StudentList extends StatelessWidget {
     if (students.isEmpty) {
       return Center(
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(Icons.people_outline,
-            size: 56, color: AppColors.primary.withValues(alpha: 0.3)),
+        Icon(isRejected ? Icons.cancel_outlined : Icons.people_outline,
+            size: 56,
+            color: (isRejected ? AppColors.red : AppColors.primary)
+                .withValues(alpha: 0.3)),
         const SizedBox(height: 12),
-        const Text('Tidak ada data siswa',
-            style: TextStyle(
+        Text(isRejected ? 'Tidak ada siswa ditolak' : 'Tidak ada data siswa',
+            style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 14,
                 color: AppColors.textGrey)),
       ]));
     }
 
+    final hasHeader = isPending || isRejected;
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
-      itemCount: students.length + (isPending ? 1 : 0),
+      itemCount: students.length + (hasHeader ? 1 : 0),
       itemBuilder: (_, i) {
-        if (isPending && i == 0) {
+        if (hasHeader && i == 0) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(children: [
-              const Expanded(
-                  child: Text('Pendaftaran Baru',
+              Expanded(
+                  child: Text(
+                isRejected ? 'Pendaftaran Ditolak' : 'Pendaftaran Baru',
+                style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isRejected ? AppColors.red : AppColors.black),
+              )),
+              if (isPending)
+                TextButton(
+                  onPressed: () {
+                    for (final _ in students) {}
+                  },
+                  child: const Text('Tandai Semua Dibaca',
                       style: TextStyle(
                           fontFamily: 'Poppins',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.black))),
-              TextButton(
-                onPressed: () {
-                  for (final _ in students) {}
-                },
-                child: const Text('Tandai Semua Dibaca',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        color: AppColors.primary)),
-              ),
+                          fontSize: 12,
+                          color: AppColors.primary)),
+                ),
             ]),
           );
         }
-        final student = students[isPending ? i - 1 : i];
+        final student = students[hasHeader ? i - 1 : i];
         return _StudentCard(
             student: student,
+            isRejectedTab: isRejected,
             onApprove: () => onApprove(student),
             onReject: () => onReject(student),
             onDelete: () => onDelete(student),
@@ -1471,6 +1504,7 @@ class _StudentList extends StatelessWidget {
 
 class _StudentCard extends StatelessWidget {
   final UserModel student;
+  final bool isRejectedTab;
   final VoidCallback onApprove;
   final VoidCallback onReject;
   final VoidCallback onDelete;
@@ -1487,7 +1521,8 @@ class _StudentCard extends StatelessWidget {
       required this.onEdit,
       required this.onIdCard,
       required this.onHistory,
-      required this.onSuspend});
+      required this.onSuspend,
+      this.isRejectedTab = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1497,21 +1532,27 @@ class _StudentCard extends StatelessWidget {
         ? student.namaLengkap[0].toUpperCase()
         : '?';
 
-    final Color badgeColor = isActive
-        ? AppColors.primary
-        : isPending
-            ? AppColors.orange
-            : AppColors.textGrey;
-    final Color badgeBg = isActive
-        ? AppColors.primaryLight
-        : isPending
-            ? AppColors.orange.withValues(alpha: 0.12)
-            : AppColors.surface2;
-    final String badgeText = isActive
-        ? 'AKTIF'
-        : isPending
-            ? 'MENUNGGU'
-            : 'NONAKTIF';
+    final Color badgeColor = isRejectedTab
+        ? AppColors.red
+        : isActive
+            ? AppColors.primary
+            : isPending
+                ? AppColors.orange
+                : AppColors.textGrey;
+    final Color badgeBg = isRejectedTab
+        ? AppColors.red.withValues(alpha: 0.10)
+        : isActive
+            ? AppColors.primaryLight
+            : isPending
+                ? AppColors.orange.withValues(alpha: 0.12)
+                : AppColors.surface2;
+    final String badgeText = isRejectedTab
+        ? 'DITOLAK'
+        : isActive
+            ? 'AKTIF'
+            : isPending
+                ? 'MENUNGGU'
+                : 'NONAKTIF';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

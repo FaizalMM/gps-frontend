@@ -24,6 +24,7 @@ class BusMapWidget extends StatefulWidget {
   final bool showRoutes;
   final bool showInfoCard;
   final List<dynamic> navigationPolyline;
+  final Color? navPolylineColor; // null = pakai default biru navigasi
   final void Function(BusModel)? onBusTap;
   final List<Polyline> extraPolylines;
   final List<Marker> extraMarkers;
@@ -44,6 +45,7 @@ class BusMapWidget extends StatefulWidget {
     this.showRoutes = false,
     this.showInfoCard = true,
     this.navigationPolyline = const [],
+    this.navPolylineColor,
     this.onBusTap,
     this.extraPolylines = const [],
     this.extraMarkers = const [],
@@ -76,6 +78,11 @@ class _BusMapWidgetState extends State<BusMapWidget> {
   void initState() {
     super.initState();
     _mapController = widget.mapController ?? MapController();
+    // Inisialisasi index polyline untuk semua bus yang sudah aktif saat widget pertama dibuat
+    for (final bus in widget.buses) {
+      if (!bus.gpsActive || bus.latitude == 0 || bus.longitude == 0) continue;
+      _updateBusPolylineIndex(bus);
+    }
   }
 
   bool _userInteracting = false;
@@ -389,13 +396,16 @@ class _BusMapWidgetState extends State<BusMapWidget> {
                       // Shadow
                       Polyline(
                         points: List<LatLng>.from(widget.navigationPolyline),
-                        color: const Color(0xFFFF6B00).withValues(alpha: 0.25),
+                        color:
+                            (widget.navPolylineColor ?? const Color(0xFF1A73E8))
+                                .withValues(alpha: 0.25),
                         strokeWidth: 10,
                       ),
-                      // Garis utama oranye putus-putus
+                      // Garis utama putus-putus
                       Polyline(
                         points: List<LatLng>.from(widget.navigationPolyline),
-                        color: const Color(0xFFFF6B00),
+                        color:
+                            widget.navPolylineColor ?? const Color(0xFF1A73E8),
                         strokeWidth: 4,
                         pattern: StrokePattern.dashed(segments: const [12, 6]),
                       ),

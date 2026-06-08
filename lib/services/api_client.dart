@@ -22,7 +22,7 @@ class ApiConfig {
   //
   // ─────────────────────────────────────────────────────────────────────────
   static const String baseUrl =
-      'https://unregal-keshia-contrapuntal.ngrok-free.dev/api'; // Ganti dengan Url server milikmu
+      'https://passenger-pleat-footgear.ngrok-free.dev/api'; // Ganti dengan Url server milikmu
 
   static const Duration timeout = Duration(seconds: 15);
 }

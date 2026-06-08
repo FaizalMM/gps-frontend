@@ -167,15 +167,17 @@ class _NavigationScreenState extends State<NavigationScreen>
 
     final target = LatLng(halte.latitude, halte.longitude);
     _navRequestInProgress = true;
-    final poly =
-        await _routingService.getNavigationRoute(from: _driverPos, to: target);
-    _navRequestInProgress = false;
-
-    if (mounted) {
-      setState(() {
-        if (poly.isNotEmpty) _polyline = poly;
-        _targetHalte = halte;
-      });
+    try {
+      final poly = await _routingService.getNavigationRoute(
+          from: _driverPos, to: target);
+      if (mounted) {
+        setState(() {
+          if (poly.isNotEmpty) _polyline = poly;
+          _targetHalte = halte;
+        });
+      }
+    } finally {
+      _navRequestInProgress = false;
     }
   }
 

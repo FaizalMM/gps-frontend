@@ -301,17 +301,19 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
     final target = LatLng(halte.latitude, halte.longitude);
 
     _navRequestInProgress = true;
-    final polyline = await _routingService.getNavigationRoute(
-      from: driverPos,
-      to: target,
-    );
-    _navRequestInProgress = false;
-
-    if (mounted) {
-      setState(() {
-        if (polyline.isNotEmpty) _navPolyline = polyline;
-        _targetHalte = halte;
-      });
+    try {
+      final polyline = await _routingService.getNavigationRoute(
+        from: driverPos,
+        to: target,
+      );
+      if (mounted) {
+        setState(() {
+          if (polyline.isNotEmpty) _navPolyline = polyline;
+          _targetHalte = halte;
+        });
+      }
+    } finally {
+      _navRequestInProgress = false;
     }
   }
 
@@ -808,6 +810,7 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                                       showRoutes:
                                           updatedBus.routeList.isNotEmpty,
                                       navigationPolyline: _navPolyline,
+                                      navPolylineColor: const Color(0xFF1A73E8),
                                     ),
                                   ),
                                   Positioned(

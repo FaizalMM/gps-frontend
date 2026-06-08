@@ -29,10 +29,19 @@ class RoutingService {
 
   final _distance = const Distance();
 
-  // Cache polyline per (profile + halte tujuan)
+  // Cache polyline per (profile + from_grid + to)
+  // from di-grid ke 3 desimal (~111m) agar cache tetap hit saat driver
+  // bergerak sedikit, tapi minta ulang jika sudah bergerak >~100m.
   final Map<String, List<LatLng>> _polylineCache = {};
   final Map<String, DateTime> _lastRequestTime = {};
-  static const int _requestThrottleSeconds = 5;
+
+  // Throttle per cache-key: minimal 3 detik antar request dengan key yang sama
+  static const int _requestThrottleSeconds = 3;
+
+  // Jarak minimum pergerakan dari sebelum minta ulang rute (meter)
+  static const double _rerouteThresholdMeters = 50.0;
+
+  LatLng? _lastFromPos;
 
   String get _baseUrl =>
       activeProfile == RoutingProfile.busHgv ? _osrmHgv : _osrmDriving;
@@ -42,16 +51,31 @@ class RoutingService {
     required LatLng to,
   }) async {
     const profileKey = activeProfile == RoutingProfile.busHgv ? 'hgv' : 'drv';
+
+    // Grid dari: presisi 3 desimal ≈ 111m per unit → cache hit jika belum jauh bergerak
+    final fromGrid =
+        '${from.latitude.toStringAsFixed(3)},${from.longitude.toStringAsFixed(3)}';
     final cacheKey =
-        '$profileKey:${to.latitude.toStringAsFixed(5)},${to.longitude.toStringAsFixed(5)}';
+        '$profileKey:$fromGrid->${to.latitude.toStringAsFixed(5)},${to.longitude.toStringAsFixed(5)}';
+
     final now = DateTime.now();
     final lastRequest = _lastRequestTime[cacheKey];
 
+    // Kembalikan cache jika masih fresh DAN driver belum bergerak melebihi threshold
     if (lastRequest != null &&
         now.difference(lastRequest).inSeconds < _requestThrottleSeconds) {
       final cached = _polylineCache[cacheKey];
-      if (cached != null && cached.isNotEmpty) return cached;
+      if (cached != null && cached.isNotEmpty) {
+        // Cek apakah driver sudah bergerak cukup jauh untuk paksa reroute
+        if (_lastFromPos == null ||
+            _distance.as(LengthUnit.Meter, _lastFromPos!, from) <
+                _rerouteThresholdMeters) {
+          return cached;
+        }
+      }
     }
+
+    _lastFromPos = from;
 
     try {
       final url =
@@ -129,14 +153,12 @@ class RoutingService {
   }
 
   void clearCacheForHalte(LatLng haltePos) {
-    final key =
-        'hgv:${haltePos.latitude.toStringAsFixed(5)},${haltePos.longitude.toStringAsFixed(5)}';
-    final keyDrv =
-        'drv:${haltePos.latitude.toStringAsFixed(5)},${haltePos.longitude.toStringAsFixed(5)}';
-    _polylineCache.remove(key);
-    _polylineCache.remove(keyDrv);
-    _lastRequestTime.remove(key);
-    _lastRequestTime.remove(keyDrv);
+    // Hapus semua cache key yang memiliki destination halte ini
+    final toSuffix =
+        '${haltePos.latitude.toStringAsFixed(5)},${haltePos.longitude.toStringAsFixed(5)}';
+    _polylineCache.removeWhere((key, _) => key.contains('->$toSuffix'));
+    _lastRequestTime.removeWhere((key, _) => key.contains('->$toSuffix'));
+    _lastFromPos = null;
   }
 
   int getNextHalteIndex({
