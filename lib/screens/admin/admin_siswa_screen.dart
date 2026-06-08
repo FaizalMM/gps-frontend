@@ -96,8 +96,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                 TextButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      // Gunakan studentDetail.id karena endpoint /students/{id}
-                      // merujuk ke tabel students, bukan tabel users
                       final studentId = u.studentDetail?.id ?? 0;
                       if (studentId <= 0) {
                         if (mounted) {
@@ -128,8 +126,7 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
             ));
   }
 
-  void _toggleStatus(UserModel u) async {
-    // Gunakan student.id (bukan user.id) karena endpoint /students/{id} merujuk ke tabel students
+  void _toggleStatus(UserModel u) {
     final studentId = u.studentDetail?.id;
     if (studentId == null || studentId == 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -141,37 +138,119 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
       return;
     }
     final isActive = u.status == AccountStatus.active;
-    bool ok;
-    if (isActive) {
-      ok = await StudentService().suspendStudent(studentId);
-    } else {
-      ok = await StudentService().unsuspendStudent(studentId);
-    }
-    if (!mounted) return;
-    if (ok) {
-      await widget.dataService.loadStudents();
-      if (!mounted) return;
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(isActive
-            ? '${u.namaLengkap} dinonaktifkan'
-            : '${u.namaLengkap} diaktifkan kembali'),
-        backgroundColor: isActive ? AppColors.orange : AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            'Gagal ${isActive ? 'menonaktifkan' : 'mengaktifkan'} ${u.namaLengkap}'),
-        backgroundColor: AppColors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
-    }
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(
+              isActive ? Icons.block_rounded : Icons.check_circle_outline,
+              color: isActive ? AppColors.red : AppColors.primary,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isActive ? 'Nonaktifkan Siswa' : 'Aktifkan Siswa',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isActive
+                  ? 'Nonaktifkan akun siswa ini?'
+                  : 'Aktifkan kembali akun siswa ini?',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              u.namaLengkap,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: isActive ? AppColors.red : AppColors.primary,
+                  fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isActive
+                  ? 'Siswa tidak akan dapat login hingga diaktifkan kembali.'
+                  : 'Siswa akan dapat login kembali dan menggunakan aplikasi.',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: AppColors.textGrey),
+            ),
+          ],
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Batal',
+                style: TextStyle(
+                    fontFamily: 'Poppins', color: AppColors.textGrey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isActive ? AppColors.red : AppColors.primary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = isActive
+                  ? await StudentService().suspendStudent(studentId)
+                  : await StudentService().unsuspendStudent(studentId);
+              if (!mounted) return;
+              if (ok) {
+                await widget.dataService.loadStudents();
+                if (!mounted) return;
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(isActive
+                      ? '${u.namaLengkap} dinonaktifkan'
+                      : '${u.namaLengkap} diaktifkan kembali'),
+                  backgroundColor: isActive ? AppColors.red : AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(
+                      'Gagal ${isActive ? 'menonaktifkan' : 'mengaktifkan'} ${u.namaLengkap}'),
+                  backgroundColor: AppColors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ));
+              }
+            },
+            child: Text(
+              isActive ? 'Ya, Nonaktifkan' : 'Ya, Aktifkan',
+              style: const TextStyle(
+                  fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  // ── Edit data siswa oleh admin
   void _showEditSiswaSheet(UserModel user) {
     final studentId = user.studentDetail?.id ?? 0;
     if (studentId == 0) {
@@ -237,7 +316,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 color: AppColors.lightGrey,
                                 borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 20),
-                    // Header
                     Row(children: [
                       Container(
                         width: 44,
@@ -340,7 +418,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    // Nama
                     _EditField(
                         label: 'Nama Lengkap',
                         controller: namaCtrl,
@@ -348,7 +425,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                             ? 'Nama tidak boleh kosong'
                             : null),
                     const SizedBox(height: 14),
-                    // Email
                     _EditField(
                         label: 'Email',
                         controller: emailCtrl,
@@ -363,32 +439,25 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                           return null;
                         }),
                     const SizedBox(height: 14),
-                    // NIS
                     _EditField(
                         label: 'NIS',
                         controller: nisCtrl,
                         keyboardType: TextInputType.number),
                     const SizedBox(height: 14),
-                    // Sekolah
                     _EditField(label: 'Sekolah', controller: sekolahCtrl),
                     const SizedBox(height: 14),
-                    // Kelas
                     _EditField(label: 'Kelas', controller: kelasCtrl),
                     const SizedBox(height: 14),
-                    // No HP
                     _EditField(
                         label: 'No. HP / WhatsApp',
                         controller: noHpCtrl,
                         keyboardType: TextInputType.phone),
                     const SizedBox(height: 14),
-                    // Alamat
                     _EditField(
                         label: 'Alamat Rumah',
                         controller: alamatCtrl,
                         maxLines: 2),
                     const SizedBox(height: 20),
-
-                    // ── Ganti Password — Toggle Enable/Disable ──
                     const Divider(height: 1, color: AppColors.lightGrey),
                     const SizedBox(height: 12),
                     Container(
@@ -401,7 +470,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 : AppColors.lightGrey),
                       ),
                       child: Column(children: [
-                        // ── Baris header + tombol toggle ──
                         Padding(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 12),
@@ -495,14 +563,11 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                             ),
                           ]),
                         ),
-
-                        // ── Field password — hanya tampil saat ubahPassword = true ──
                         if (ubahPassword) ...[
                           const Divider(height: 1, color: AppColors.lightGrey),
                           Padding(
                             padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
                             child: Column(children: [
-                              // Password baru
                               TextFormField(
                                 controller: passwordCtrl,
                                 obscureText: obscurePassword,
@@ -557,7 +622,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              // Konfirmasi password
                               TextFormField(
                                 controller: passwordConfirmCtrl,
                                 obscureText: obscureConfirm,
@@ -612,7 +676,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              // Info warning
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
@@ -643,8 +706,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       ]),
                     ),
                     const SizedBox(height: 28),
-
-                    // Tombol Simpan
                     SizedBox(
                       width: double.infinity,
                       height: 52,
@@ -669,7 +730,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                   'no_hp': noHpCtrl.text.trim(),
                                   'alamat': alamatCtrl.text.trim(),
                                 };
-                                // Sertakan password hanya jika diisi
                                 if (ubahPassword &&
                                     passwordCtrl.text.isNotEmpty) {
                                   data['password'] = passwordCtrl.text;
@@ -741,7 +801,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
     );
   }
 
-  // ── Assign / Re-assign bus untuk siswa yang sudah approved
   void _showAssignBusSheet(UserModel user) {
     final buses = widget.dataService.buses
         .where((b) => b.status == BusStatus.active)
@@ -794,7 +853,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
               ? user.studentDetail!.alamat
               : user.alamat;
 
-          // Auto-geocode saat sheet buka
           if (!isGeocoding && siswaCoords == null && alamat.isNotEmpty) {
             isGeocoding = true;
             _geocodeAlamat(alamat).then((coords) {
@@ -843,7 +901,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                                 color: AppColors.lightGrey,
                                 borderRadius: BorderRadius.circular(2)))),
                     const SizedBox(height: 20),
-
                     Row(children: [
                       Container(
                         width: 44,
@@ -888,8 +945,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                           ])),
                     ]),
                     const SizedBox(height: 12),
-
-                    // Kotak alamat + status geocoding
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -956,14 +1011,12 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                           ]),
                     ),
                     const SizedBox(height: 20),
-
                     const Text('Pilih Bus / Rute',
                         style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 13,
                             fontWeight: FontWeight.w600)),
                     const SizedBox(height: 10),
-
                     if (buses.isEmpty)
                       Container(
                         padding: const EdgeInsets.all(14),
@@ -1124,7 +1177,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                         );
                       }),
                     const SizedBox(height: 16),
-
                     if (selectedBus != null) ...[
                       Row(children: [
                         const Expanded(
@@ -1249,7 +1301,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                       }),
                       const SizedBox(height: 16),
                     ],
-
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
@@ -1679,7 +1730,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
                   return u.status != AccountStatus.active;
                 }
                 if (_filter == 'Belum ada Bus') {
-                  // Siswa aktif tapi belum punya bus assignment
                   return u.status == AccountStatus.active &&
                       (u.studentDetail?.busId ?? 0) == 0;
                 }
@@ -1728,7 +1778,6 @@ class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
   }
 }
 
-// Avatar siswa: tampilkan foto jika ada, fallback ke inisial
 class _SiswaAvatar extends StatelessWidget {
   final UserModel siswa;
   const _SiswaAvatar({required this.siswa});
@@ -1809,14 +1858,12 @@ class _SiswaCard extends StatelessWidget {
             ? AppColors.orange.withValues(alpha: 0.1)
             : AppColors.red.withValues(alpha: 0.1);
 
-    // Cek apakah siswa sudah punya bus
     final hasBus = (siswa.studentDetail?.busId ?? 0) > 0;
     final namaBus = siswa.studentDetail?.namaBus ?? '';
     final namaHalte = siswa.studentDetail?.namaHalte ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(14),
@@ -1835,105 +1882,113 @@ class _SiswaCard extends StatelessWidget {
                 offset: const Offset(0, 2))
           ]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          _SiswaAvatar(siswa: siswa),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(siswa.namaLengkap,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.black)),
-                const SizedBox(height: 2),
-                Text(siswa.email,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        color: AppColors.textGrey)),
-                const SizedBox(height: 5),
-                Row(children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                        color: statusBg,
-                        borderRadius: BorderRadius.circular(6)),
-                    child: Text(statusLabel,
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: statusColor)),
-                  ),
-                  const SizedBox(width: 6),
-                  if (isActive)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            _SiswaAvatar(siswa: siswa),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(siswa.namaLengkap,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.black)),
+                  const SizedBox(height: 2),
+                  Text(siswa.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 11,
+                          color: AppColors.textGrey)),
+                  const SizedBox(height: 6),
+                  Wrap(spacing: 5, runSpacing: 4, children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                          color: hasBus
-                              ? AppColors.primary.withValues(alpha: 0.08)
-                              : AppColors.orange.withValues(alpha: 0.1),
+                          color: statusBg,
                           borderRadius: BorderRadius.circular(6)),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(
-                            hasBus
-                                ? Icons.directions_bus_rounded
-                                : Icons.directions_bus_outlined,
-                            size: 10,
-                            color:
-                                hasBus ? AppColors.primary : AppColors.orange),
-                        const SizedBox(width: 3),
-                        Text(
-                            hasBus
-                                ? (namaBus.isNotEmpty ? namaBus : 'Ada Bus')
-                                : 'Belum Ada Bus',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: hasBus
-                                    ? AppColors.primary
-                                    : AppColors.orange)),
-                      ]),
+                      child: Text(statusLabel,
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor)),
                     ),
-                  if (isActive && hasBus && namaHalte.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1565C0).withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(6),
+                    if (isActive)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: hasBus
+                                ? AppColors.primary.withValues(alpha: 0.08)
+                                : AppColors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(
+                              hasBus
+                                  ? Icons.directions_bus_rounded
+                                  : Icons.directions_bus_outlined,
+                              size: 10,
+                              color: hasBus
+                                  ? AppColors.primary
+                                  : AppColors.orange),
+                          const SizedBox(width: 3),
+                          Text(
+                              hasBus
+                                  ? (namaBus.isNotEmpty ? namaBus : 'Ada Bus')
+                                  : 'Belum Ada Bus',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: hasBus
+                                      ? AppColors.primary
+                                      : AppColors.orange)),
+                        ]),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.place_rounded,
-                            size: 10, color: Color(0xFF1565C0)),
-                        const SizedBox(width: 3),
-                        Text(namaHalte,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF1565C0))),
-                      ]),
-                    ),
-                  ],
-                ]),
-              ])),
-          const SizedBox(width: 8),
-          Column(mainAxisSize: MainAxisSize.min, children: [
-            // Tombol edit data siswa
+                    if (isActive && hasBus && namaHalte.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color:
+                              const Color(0xFF1565C0).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.place_rounded,
+                              size: 10, color: Color(0xFF1565C0)),
+                          const SizedBox(width: 3),
+                          Text(namaHalte,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1565C0))),
+                        ]),
+                      ),
+                  ]),
+                ])),
+          ]),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            border: Border(
+                top: BorderSide(
+                    color: AppColors.lightGrey.withValues(alpha: 0.6))),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(children: [
             _ActionBtn(
               icon: Icons.edit_rounded,
               color: AppColors.primary,
@@ -1941,8 +1996,7 @@ class _SiswaCard extends StatelessWidget {
               onTap: onEdit,
               tooltip: 'Edit Data',
             ),
-            const SizedBox(height: 6),
-            // Tombol assign/ganti bus — tampil untuk siswa aktif
+            const SizedBox(width: 6),
             if (isActive) ...[
               _ActionBtn(
                 icon:
@@ -1954,7 +2008,7 @@ class _SiswaCard extends StatelessWidget {
                 onTap: onAssignBus,
                 tooltip: hasBus ? 'Ganti Bus' : 'Assign Bus',
               ),
-              const SizedBox(height: 6),
+              const SizedBox(width: 6),
               _ActionBtn(
                 icon: Icons.place_rounded,
                 color: const Color(0xFF1565C0),
@@ -1962,16 +2016,13 @@ class _SiswaCard extends StatelessWidget {
                 onTap: onAssignHalte,
                 tooltip: 'Tetapkan Halte',
               ),
-              const SizedBox(height: 6),
+              const SizedBox(width: 6),
               _ActionBtn(
-                icon:
-                    isActive ? Icons.block_rounded : Icons.check_circle_rounded,
-                color: isActive ? AppColors.red : AppColors.primary,
-                bg: isActive
-                    ? AppColors.red.withValues(alpha: 0.1)
-                    : AppColors.primaryLight,
+                icon: Icons.block_rounded,
+                color: AppColors.red,
+                bg: AppColors.red.withValues(alpha: 0.1),
                 onTap: onToggle,
-                tooltip: isActive ? 'Nonaktifkan' : 'Aktifkan',
+                tooltip: 'Nonaktifkan',
               ),
             ] else if (!isPending) ...[
               _ActionBtn(
@@ -1982,7 +2033,7 @@ class _SiswaCard extends StatelessWidget {
                 tooltip: 'Aktifkan',
               ),
             ],
-            const SizedBox(height: 6),
+            const Spacer(),
             _ActionBtn(
                 icon: Icons.delete_rounded,
                 color: AppColors.red,
@@ -1990,53 +2041,7 @@ class _SiswaCard extends StatelessWidget {
                 onTap: onDelete,
                 tooltip: 'Hapus'),
           ]),
-        ]),
-
-        // Info halte jika sudah ada bus
-        if (hasBus && namaHalte.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(8)),
-            child: Row(children: [
-              const Icon(Icons.location_on_rounded,
-                  size: 12, color: AppColors.primary),
-              const SizedBox(width: 5),
-              Text('Halte: $namaHalte',
-                  style: const TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 11,
-                      color: AppColors.primaryDark)),
-            ]),
-          ),
-        ],
-
-        // Warning jika aktif tapi belum ada bus
-        if (isActive && !hasBus) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-                color: AppColors.orange.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-                border:
-                    Border.all(color: AppColors.orange.withValues(alpha: 0.3))),
-            child: const Row(children: [
-              Icon(Icons.warning_amber_rounded,
-                  size: 12, color: AppColors.orange),
-              SizedBox(width: 5),
-              Expanded(
-                child: Text('Belum ditugaskan ke bus — tap tombol assign,',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 11,
-                        color: AppColors.orange)),
-              ),
-            ]),
-          ),
-        ],
+        ),
       ]),
     );
   }
@@ -2068,7 +2073,6 @@ class _ActionBtn extends StatelessWidget {
       );
 }
 
-// ── Widget input field untuk edit form siswa
 class _EditField extends StatelessWidget {
   final String label;
   final TextEditingController controller;

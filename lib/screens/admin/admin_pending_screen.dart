@@ -1525,10 +1525,10 @@ class _StudentCard extends StatelessWidget {
               offset: const Offset(0, 2))
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Container(
               width: 44,
               height: 44,
@@ -1564,15 +1564,14 @@ class _StudentCard extends StatelessWidget {
                           fontSize: 11,
                           color: AppColors.primary,
                           fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 3),
-                  if (student.noHp.isNotEmpty || student.alamat.isNotEmpty)
+                  if (student.alamat.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Row(children: [
                       const Icon(Icons.route_rounded,
                           size: 12, color: AppColors.textGrey),
                       const SizedBox(width: 3),
                       Expanded(
-                          child: Text(
-                              student.alamat.isNotEmpty ? student.alamat : '-',
+                          child: Text(student.alamat,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -1580,7 +1579,9 @@ class _StudentCard extends StatelessWidget {
                                   fontSize: 11,
                                   color: AppColors.textGrey))),
                     ]),
+                  ],
                 ])),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -1593,267 +1594,144 @@ class _StudentCard extends StatelessWidget {
                       color: badgeColor)),
             ),
           ]),
-          if (isPending) ...[
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(
-                  child: _InfoChip(
-                      label: 'BUS / RUTE',
-                      value: student.alamat.isNotEmpty
-                          ? student.alamat
-                          : 'Belum diisi')),
-              const SizedBox(width: 8),
-              Expanded(child: _InfoChip(label: 'EMAIL', value: student.email)),
-            ]),
-            const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: onApprove,
-                  child: Container(
-                    height: 38,
-                    decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(10)),
-                    child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_rounded,
-                              color: Colors.white, size: 16),
-                          SizedBox(width: 6),
-                          Text('Setujui',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white)),
-                        ]),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onIdCard,
-                child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.lightGrey)),
-                  child: const Row(children: [
-                    Icon(Icons.badge_rounded,
-                        size: 15, color: AppColors.textGrey),
-                    SizedBox(width: 5),
-                    Text('ID Card',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.black)),
-                  ]),
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    backgroundColor: Colors.transparent,
-                    builder: (ctx) => Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: const BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(20))),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Center(
-                            child: Container(
-                                width: 36,
-                                height: 4,
-                                decoration: BoxDecoration(
-                                    color: AppColors.lightGrey,
-                                    borderRadius: BorderRadius.circular(2)))),
-                        const SizedBox(height: 16),
-                        _MoreOption(
-                            icon: Icons.edit_rounded,
-                            label: 'Ubah Data',
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              onEdit();
-                            }),
-                        _MoreOption(
-                            icon: Icons.close_rounded,
-                            label: 'Tolak Pendaftaran',
-                            color: AppColors.orange,
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              onReject();
-                            }),
-                        _MoreOption(
-                            icon: Icons.delete_rounded,
-                            label: 'Hapus Siswa',
-                            color: AppColors.red,
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              onDelete();
-                            }),
-                      ]),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            border: Border(
+                top: BorderSide(
+                    color: AppColors.lightGrey.withValues(alpha: 0.6))),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: isPending
+              ? Row(children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: onApprove,
+                      child: Container(
+                        height: 34,
+                        decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8)),
+                        child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_rounded,
+                                  color: Colors.white, size: 15),
+                              SizedBox(width: 5),
+                              Text('Setujui',
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white)),
+                            ]),
+                      ),
                     ),
-                  );
-                },
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                      color: AppColors.surface2,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.lightGrey)),
-                  child: const Icon(Icons.more_vert_rounded,
-                      size: 16, color: AppColors.textGrey),
-                ),
-              ),
-            ]),
-          ] else ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              alignment: WrapAlignment.end,
-              children: [
-                _ActionBtn(
-                    icon: Icons.badge_rounded,
-                    label: 'ID Card',
-                    onTap: onIdCard),
-                _ActionBtn(
-                    icon: Icons.history_rounded,
-                    label: 'Riwayat',
-                    onTap: onHistory),
-                _ActionBtn(
-                    icon: student.status == AccountStatus.rejected
-                        ? Icons.lock_open_rounded
-                        : Icons.block_rounded,
-                    label: student.status == AccountStatus.rejected
-                        ? 'Aktifkan'
-                        : 'Nonaktifkan',
-                    onTap: onSuspend,
-                    color: student.status == AccountStatus.rejected
-                        ? AppColors.primary
-                        : AppColors.orange,
-                    bgColor: student.status == AccountStatus.rejected
-                        ? AppColors.primary.withValues(alpha: 0.08)
-                        : AppColors.orange.withValues(alpha: 0.08)),
-                _ActionBtn(
-                    icon: Icons.edit_rounded, label: 'Ubah', onTap: onEdit),
-                _ActionBtn(
-                    icon: Icons.delete_rounded,
-                    label: 'Hapus',
-                    onTap: onDelete,
-                    color: AppColors.red,
-                    bgColor: AppColors.red.withValues(alpha: 0.08)),
-              ],
-            ),
-          ],
-        ]),
-      ),
-    );
-  }
-}
-
-class _InfoChip extends StatelessWidget {
-  final String label, value;
-  const _InfoChip({required this.label, required this.value});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-          color: AppColors.surface2, borderRadius: BorderRadius.circular(8)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textGrey,
-                letterSpacing: 0.5)),
-        Text(value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.black)),
+                  ),
+                  const SizedBox(width: 8),
+                  _IconBtn(
+                      icon: Icons.badge_rounded,
+                      color: AppColors.textGrey,
+                      bg: AppColors.surface2,
+                      onTap: onIdCard,
+                      tooltip: 'ID Card'),
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                      icon: Icons.edit_rounded,
+                      color: AppColors.primary,
+                      bg: AppColors.primaryLight,
+                      onTap: onEdit,
+                      tooltip: 'Ubah Data'),
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                      icon: Icons.close_rounded,
+                      color: AppColors.orange,
+                      bg: AppColors.orange.withValues(alpha: 0.1),
+                      onTap: onReject,
+                      tooltip: 'Tolak'),
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                      icon: Icons.delete_rounded,
+                      color: AppColors.red,
+                      bg: AppColors.red.withValues(alpha: 0.08),
+                      onTap: onDelete,
+                      tooltip: 'Hapus'),
+                ])
+              : Row(children: [
+                  _IconBtn(
+                      icon: Icons.badge_rounded,
+                      color: AppColors.textGrey,
+                      bg: AppColors.surface2,
+                      onTap: onIdCard,
+                      tooltip: 'ID Card'),
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                      icon: Icons.history_rounded,
+                      color: AppColors.textGrey,
+                      bg: AppColors.surface2,
+                      onTap: onHistory,
+                      tooltip: 'Riwayat'),
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                      icon: student.status == AccountStatus.rejected
+                          ? Icons.lock_open_rounded
+                          : Icons.block_rounded,
+                      color: student.status == AccountStatus.rejected
+                          ? AppColors.primary
+                          : AppColors.orange,
+                      bg: student.status == AccountStatus.rejected
+                          ? AppColors.primary.withValues(alpha: 0.08)
+                          : AppColors.orange.withValues(alpha: 0.08),
+                      onTap: onSuspend,
+                      tooltip: student.status == AccountStatus.rejected
+                          ? 'Aktifkan'
+                          : 'Nonaktifkan'),
+                  const SizedBox(width: 6),
+                  _IconBtn(
+                      icon: Icons.edit_rounded,
+                      color: AppColors.primary,
+                      bg: AppColors.primaryLight,
+                      onTap: onEdit,
+                      tooltip: 'Ubah'),
+                  const Spacer(),
+                  _IconBtn(
+                      icon: Icons.delete_rounded,
+                      color: AppColors.red,
+                      bg: AppColors.red.withValues(alpha: 0.08),
+                      onTap: onDelete,
+                      tooltip: 'Hapus'),
+                ]),
+        ),
       ]),
     );
   }
 }
 
-class _ActionBtn extends StatelessWidget {
+class _IconBtn extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final Color color, bg;
   final VoidCallback onTap;
-  final Color color;
-  final Color bgColor;
-  const _ActionBtn(
+  final String tooltip;
+  const _IconBtn(
       {required this.icon,
-      required this.label,
+      required this.color,
+      required this.bg,
       required this.onTap,
-      this.color = AppColors.textGrey,
-      this.bgColor = AppColors.surface2});
+      required this.tooltip});
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.lightGrey)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: color)),
-        ]),
-      ),
-    );
-  }
-}
-
-class _MoreOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color color;
-  const _MoreOption(
-      {required this.icon,
-      required this.label,
-      required this.onTap,
-      this.color = AppColors.black});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      dense: true,
-      leading: Icon(icon, color: color, size: 20),
-      title: Text(label,
-          style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: color)),
-    );
-  }
+  Widget build(BuildContext context) => Tooltip(
+        message: tooltip,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                  color: bg, borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: color, size: 16)),
+        ),
+      );
 }
 
 class _RejectionHistorySheet extends StatefulWidget {

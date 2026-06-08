@@ -27,7 +27,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
   _BusFilter _filter = _BusFilter.all;
   String _searchQuery = '';
 
-  // ── Dialog tambah bus
   void _showAddBusDialog() {
     final namaCtrl = TextEditingController();
     final platCtrl = TextEditingController();
@@ -51,7 +50,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Foto Bus ──────────────────────────────────────
                 Center(
                   child: GestureDetector(
                     onTap: () async {
@@ -234,7 +232,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                             fontSize: 18,
                             fontWeight: FontWeight.w700)),
                     const SizedBox(height: 18),
-                    // ── Foto Bus ──────────────────────────────────────
                     Center(
                       child: GestureDetector(
                         onTap: () async {
@@ -312,7 +309,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                       selectedDriverId: selDriverId,
                       onChanged: (v) => setM(() => selDriverId = v),
                     ),
-
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
@@ -340,7 +336,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                           );
                           if (ok) {
                             try {
-                              // Upload foto jika ada yang baru dipilih
                               if (foto != null) {
                                 await BusService()
                                     .uploadBusPhoto(bus.id, foto!.path);
@@ -541,20 +536,17 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                   _Chip(
                       label: 'Aktif ($aktif)',
                       active: _filter == _BusFilter.active,
-                      dot: AppColors.primary,
                       onTap: () => setState(() => _filter = _BusFilter.active)),
                   const SizedBox(width: 8),
                   _Chip(
                       label: 'Perawatan ($maintenance)',
                       active: _filter == _BusFilter.maintenance,
-                      dot: AppColors.orange,
                       onTap: () =>
                           setState(() => _filter = _BusFilter.maintenance)),
                   const SizedBox(width: 8),
                   _Chip(
                       label: 'Nonaktif',
                       active: _filter == _BusFilter.inactive,
-                      dot: AppColors.textGrey,
                       onTap: () =>
                           setState(() => _filter = _BusFilter.inactive)),
                   const SizedBox(width: 8),
@@ -562,7 +554,6 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                       label:
                           'Tanpa Driver (${allBuses.where((b) => b.driverName.isEmpty).length})',
                       active: _filter == _BusFilter.noDriver,
-                      dot: AppColors.orange,
                       onTap: () =>
                           setState(() => _filter = _BusFilter.noDriver)),
                 ]),
@@ -662,39 +653,38 @@ class _BusCard extends StatelessWidget {
               offset: const Offset(0, 3))
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // ── Foto / Icon Bus ─────────────────────────────────
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 8, 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: bus.photoUrl != null && bus.photoUrl!.isNotEmpty
                   ? Image.network(
                       bus.photoUrl!,
-                      width: 54,
-                      height: 54,
+                      width: 52,
+                      height: 52,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        width: 54,
-                        height: 54,
+                        width: 52,
+                        height: 52,
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(Icons.directions_bus_rounded,
-                            color: statusColor, size: 30),
+                            color: statusColor, size: 28),
                       ),
                     )
                   : Container(
-                      width: 54,
-                      height: 54,
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(Icons.directions_bus_rounded,
-                          color: statusColor, size: 30),
+                          color: statusColor, size: 28),
                     ),
             ),
             const SizedBox(width: 12),
@@ -716,38 +706,14 @@ class _BusCard extends StatelessWidget {
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Container(
-                            width: 5,
-                            height: 5,
-                            decoration: BoxDecoration(
-                                color: statusColor, shape: BoxShape.circle)),
-                        const SizedBox(width: 4),
-                        Text(statusLabel,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: statusColor)),
-                      ]),
-                    ),
-                  ]),
-                  const SizedBox(height: 3),
-                  Row(children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(4)),
-                      child: const Text('Kode Bus',
+                      child: Text(statusLabel,
                           style: TextStyle(
                               fontFamily: 'Poppins',
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textGrey)),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor)),
                     ),
                   ]),
                   const SizedBox(height: 3),
@@ -813,27 +779,30 @@ class _BusCard extends StatelessWidget {
               ],
             ),
           ]),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.lightGrey),
-          const SizedBox(height: 10),
-          Row(children: [
-            // Atur Rute (tombol utama)
+        ),
+        Container(
+          decoration: BoxDecoration(
+            border: Border(
+                top: BorderSide(
+                    color: AppColors.lightGrey.withValues(alpha: 0.6))),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(children: [
             Expanded(
-              flex: 3,
               child: GestureDetector(
                 onTap: onAturRute,
                 child: Container(
-                  height: 38,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.alt_route_rounded,
-                            size: 15, color: Colors.white),
-                        SizedBox(width: 6),
+                            size: 14, color: Colors.white),
+                        SizedBox(width: 5),
                         Text('Rute & Halte',
                             style: TextStyle(
                                 fontFamily: 'Poppins',
@@ -845,42 +814,38 @@ class _BusCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: GestureDetector(
-                onTap: onManageSiswa,
-                child: Container(
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: AppColors.primary.withValues(alpha: 0.3)),
-                  ),
-                  child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.people_rounded,
-                            size: 15, color: AppColors.primary),
-                        SizedBox(width: 5),
-                        Text('Siswa',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary)),
-                      ]),
+            GestureDetector(
+              onTap: onManageSiswa,
+              child: Container(
+                height: 34,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
+                child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.people_rounded,
+                          size: 14, color: AppColors.primary),
+                      SizedBox(width: 5),
+                      Text('Siswa',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary)),
+                    ]),
               ),
             ),
           ]),
-        ]),
-      ),
+        ),
+      ]),
     );
   }
 }
-
-// BusRuteScreen — Atur rute bus + lihat peta jalur
 
 class BusRuteScreen extends StatefulWidget {
   final BusModel bus;
@@ -1056,7 +1021,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Belum ada rute
                       if (_route == null) ...[
                         Container(
                           width: double.infinity,
@@ -1108,10 +1072,7 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                             ),
                           ]),
                         ),
-                      ]
-
-                      // ── Sudah ada rute
-                      else ...[
+                      ] else ...[
                         _PetaRute(
                           route: _route!,
                           expanded: _petaExpanded,
@@ -1163,7 +1124,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                       ),
                                   ]),
                                 ),
-
                                 if (_route!.haltes.isEmpty)
                                   const Padding(
                                     padding: EdgeInsets.all(16),
@@ -1285,11 +1245,8 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                                       }).toList(),
                                     ),
                                   ),
-
                                 const Divider(
                                     height: 1, color: AppColors.lightGrey),
-
-                                // Tombol ubah dan hapus
                                 Padding(
                                   padding: const EdgeInsets.all(12),
                                   child: Row(children: [
@@ -1340,7 +1297,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
                               ]),
                         ),
                       ],
-
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(14),
@@ -1383,7 +1339,6 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
   }
 }
 
-// ── Widget peta preview jalur rute
 class _PetaRute extends StatefulWidget {
   final RouteModel route;
   final bool expanded;
@@ -1506,7 +1461,6 @@ class _PetaRuteState extends State<_PetaRute> {
                   color: AppColors.textGrey),
               onPressed: () {
                 widget.onToggle();
-                // Re-fit setelah animasi selesai
                 Future.delayed(const Duration(milliseconds: 350), () {
                   if (mounted && allPts.length >= 2) _fitBounds(allPts);
                 });
@@ -2054,13 +2008,8 @@ class _BusSiswaScreenState extends State<BusSiswaScreen> {
 class _Chip extends StatelessWidget {
   final String label;
   final bool active;
-  final Color? dot;
   final VoidCallback onTap;
-  const _Chip(
-      {required this.label,
-      required this.active,
-      required this.onTap,
-      this.dot});
+  const _Chip({required this.label, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -2082,27 +2031,17 @@ class _Chip extends StatelessWidget {
                   offset: const Offset(0, 2))
           ],
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          if (dot != null) ...[
-            Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-            const SizedBox(width: 5),
-          ],
-          Text(label,
-              style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: active ? AppColors.primary : AppColors.black)),
-        ]),
+        child: Text(label,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: active ? AppColors.primary : AppColors.black)),
       ),
     );
   }
 }
 
-// ── _BusFotoPicker ────────────────────────────────────────────────────────────
 class _BusFotoPicker extends StatelessWidget {
   final XFile? foto;
   final String? existingUrl;
@@ -2159,7 +2098,6 @@ class _BusFotoPicker extends StatelessWidget {
   }
 }
 
-// ── Sheet Wrapper (konsisten dengan driver screen) ─────────────
 class _BusSheetWrap extends StatelessWidget {
   final String title;
   final String? subtitle;

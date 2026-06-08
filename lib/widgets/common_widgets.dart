@@ -39,7 +39,6 @@ class MobitraAppBar extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          // Lonceng hanya muncul jika pendingCount != null (admin saja)
           if (pendingCount != null) ...[
             IconButton(
               onPressed: onNotification ?? () {},
@@ -58,17 +57,28 @@ class MobitraAppBar extends StatelessWidget {
                       size: 22,
                     ),
                   ),
-                  // Titik merah hanya muncul jika ada pending
                   if (pendingCount! > 0)
                     Positioned(
-                      right: 6,
-                      top: 6,
+                      right: -4,
+                      top: -4,
                       child: Container(
-                        width: 8,
-                        height: 8,
+                        constraints:
+                            const BoxConstraints(minWidth: 18, minHeight: 18),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         decoration: const BoxDecoration(
                           color: AppColors.red,
                           shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            pendingCount! > 99 ? '99+' : '$pendingCount',
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -98,7 +108,6 @@ class MobitraAppBar extends StatelessWidget {
   }
 }
 
-// Primary Button
 class PrimaryButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -179,7 +188,6 @@ class PrimaryButton extends StatelessWidget {
   }
 }
 
-// Input Field
 class AppTextField extends StatelessWidget {
   final String label;
   final TextEditingController? controller;
@@ -244,7 +252,6 @@ class AppTextField extends StatelessWidget {
   }
 }
 
-// Status Badge
 class StatusBadge extends StatelessWidget {
   final String text;
   final Color color;
@@ -296,7 +303,6 @@ class StatusBadge extends StatelessWidget {
   }
 }
 
-// Bottom Nav Bar
 class MobitraBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
