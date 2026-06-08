@@ -161,8 +161,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               onToggle: () =>
                   setState(() => _obscureConfirm = !_obscureConfirm),
               validator: (v) {
-                if (v == null || v.isEmpty)
+                if (v == null || v.isEmpty) {
                   return 'Konfirmasi password wajib diisi';
+                }
                 if (v != _newCtrl.text) return 'Password tidak cocok';
                 return null;
               },

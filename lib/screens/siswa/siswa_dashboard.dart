@@ -103,6 +103,7 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
   String? _myDriverName;
   bool _loadingBusInfo = true;
   BusModel? _myBusLive;
+  Timer? _busInfoTimer;
 
   @override
   void initState() {
@@ -116,10 +117,14 @@ class _SiswaHomeTabState extends State<_SiswaHomeTab>
       if (!mounted) return;
       setState(() => _myBusLive = bus);
     });
+    _busInfoTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _loadMyBusId();
+    });
   }
 
   @override
   void dispose() {
+    _busInfoTimer?.cancel();
     widget.dataService.stopHomePolling();
     _pulseAnim.dispose();
     super.dispose();

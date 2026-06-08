@@ -897,16 +897,25 @@ class _BusRuteScreenState extends State<BusRuteScreen> {
   RouteModel? _route;
   bool _loading = true;
   bool _petaExpanded = false;
+  Timer? _reloadTimer;
 
   @override
   void initState() {
     super.initState();
     _loadRoute();
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _loadRoute();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadRoute() async {
     setState(() => _loading = true);
-    // getRouteByBus → GET /buses/{id}/route
     final route = await _routeService.getRouteByBus(widget.bus.id);
     if (!mounted) return;
     setState(() {
@@ -1654,11 +1663,21 @@ class BusSiswaScreen extends StatefulWidget {
 class _BusSiswaScreenState extends State<BusSiswaScreen> {
   List<UserModel> _siswa = [];
   bool _loading = true;
+  Timer? _reloadTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

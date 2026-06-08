@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -22,6 +23,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
   late TabController _tabController;
   String _searchQuery = '';
   bool _isRefreshing = false;
+  Timer? _reloadTimer;
 
   @override
   void initState() {
@@ -29,6 +31,9 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
     _tabController = TabController(length: 3, vsync: this, initialIndex: 1);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
+    });
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _refreshData();
     });
   }
 
@@ -41,6 +46,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
 
   @override
   void dispose() {
+    _reloadTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -843,6 +849,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
               if (!mounted) return;
               if (ok) {
                 await _refreshData();
+                if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text('${user.namaLengkap} ditolak'),
                   backgroundColor: AppColors.red,
@@ -875,20 +882,64 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          isSuspended ? 'Aktifkan Siswa' : 'Nonaktifkan Siswa',
-          style: const TextStyle(
-              fontFamily: 'Poppins', fontWeight: FontWeight.w700),
+        title: Row(
+          children: [
+            Icon(
+              isSuspended ? Icons.check_circle_outline : Icons.block_rounded,
+              color: isSuspended ? AppColors.primary : AppColors.red,
+              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isSuspended ? 'Aktifkan Siswa' : 'Nonaktifkan Siswa',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16),
+            ),
+          ],
         ),
-        content: Text(
-          isSuspended
-              ? 'Aktifkan kembali akun ${user.namaLengkap}?'
-              : 'Nonaktifkan akun ${user.namaLengkap}? Siswa tidak dapat login.',
-          style: const TextStyle(fontFamily: 'Poppins', fontSize: 13),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isSuspended
+                  ? 'Aktifkan kembali akun siswa ini?'
+                  : 'Nonaktifkan akun siswa ini?',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              user.namaLengkap,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 13,
+                  color: isSuspended ? AppColors.primary : AppColors.red,
+                  fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isSuspended
+                  ? 'Siswa akan dapat login kembali dan menggunakan aplikasi.'
+                  : 'Siswa tidak akan dapat login hingga diaktifkan kembali.',
+              style: const TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  color: AppColors.textGrey),
+            ),
+          ],
         ),
         actions: [
-          TextButton(
+          OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
             child: const Text('Batal',
                 style: TextStyle(
                     fontFamily: 'Poppins', color: AppColors.textGrey)),
@@ -907,6 +958,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
               if (!mounted) return;
               if (ok) {
                 await _refreshData();
+                if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text(
                     isSuspended
@@ -928,7 +980,7 @@ class _AdminPendingScreenState extends State<AdminPendingScreen>
               }
             },
             child: Text(
-              isSuspended ? 'Aktifkan' : 'Nonaktifkan',
+              isSuspended ? 'Ya, Aktifkan' : 'Ya, Nonaktifkan',
               style: const TextStyle(
                   fontFamily: 'Poppins', fontWeight: FontWeight.w600),
             ),
@@ -1830,11 +1882,12 @@ class _RejectionHistorySheetState extends State<_RejectionHistorySheet> {
     setState(() => _loading = true);
     final result =
         await _histService.getStudentRejectionHistories(widget.studentId);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _histories = result;
         _loading = false;
       });
+    }
   }
 
   Future<void> _delete(int historyId) async {

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:io';
@@ -20,7 +21,23 @@ class AdminSiswaScreen extends StatefulWidget {
 
 class _AdminSiswaScreenState extends State<AdminSiswaScreen> {
   String _search = '';
-  String _filter = 'Semua'; // Semua / Aktif / Nonaktif
+  String _filter = 'Semua';
+  Timer? _reloadTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.dataService.loadStudents();
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) widget.dataService.loadStudents();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    super.dispose();
+  }
 
   Future<Map<String, double>?> _geocodeAlamat(String alamat) async {
     try {

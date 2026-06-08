@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -51,6 +53,7 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _api = ApiClient();
+  Timer? _reloadTimer;
 
   bool _loading = true;
   _ActivitySummary? _activity;
@@ -82,10 +85,14 @@ class _AdminAnalitikScreenState extends State<AdminAnalitikScreen>
     initializeDateFormatting('id_ID', null).then((_) {
       if (mounted) _loadData();
     });
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _loadData();
+    });
   }
 
   @override
   void dispose() {
+    _reloadTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }

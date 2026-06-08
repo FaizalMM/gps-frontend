@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
@@ -18,13 +19,22 @@ class AdminHalteScreen extends StatefulWidget {
 
 class _AdminHalteScreenState extends State<AdminHalteScreen> {
   String _searchQuery = '';
-  bool _loading =
-      true; // true dari awal agar skeleton langsung tampil sebelum data pertama
+  bool _loading = true;
+  Timer? _reloadTimer;
 
   @override
   void initState() {
     super.initState();
     _refresh();
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _refresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refresh() async {

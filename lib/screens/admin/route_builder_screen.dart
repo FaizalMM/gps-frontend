@@ -454,6 +454,7 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
       if (confirm != true) return;
     }
 
+    if (!mounted) return;
     Navigator.pop(
         context,
         RouteBuilderResult(
@@ -888,8 +889,8 @@ class _RouteBuilderScreenState extends State<RouteBuilderScreen>
               ),
           ],
           if (_routeError)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: _InfoBanner(
                 ikon: Icons.wifi_off_rounded,
                 warna: Colors.orange,

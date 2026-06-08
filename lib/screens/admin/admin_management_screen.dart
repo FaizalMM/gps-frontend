@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,11 +18,21 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   List<UserModel> _admins = [];
   bool _loading = true;
   String _search = '';
+  Timer? _reloadTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _reloadTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -629,7 +640,9 @@ class _Avatar extends StatelessWidget {
     ImageProvider? provider;
     if (file != null) {
       provider = FileImage(file!);
-    } else if (url != null && url!.isNotEmpty) provider = NetworkImage(url!);
+    } else if (url != null && url!.isNotEmpty) {
+      provider = NetworkImage(url!);
+    }
 
     final initials =
         name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'A';

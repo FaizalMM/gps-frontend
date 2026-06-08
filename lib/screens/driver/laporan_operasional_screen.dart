@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -35,7 +37,6 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   bool _hasError = false;
   String _errorMessage = '';
   DriverReportData? _reportData;
-  // Untuk mode mingguan — kumpulkan data per hari dalam seminggu
   List<_DayReport> _weekReports = [];
   bool _isLoadingWeek = false;
 
@@ -43,6 +44,7 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
   bool _isExportingExcel = false;
 
   final _catatanController = TextEditingController();
+  Timer? _reloadTimer;
 
   @override
   void initState() {
@@ -50,10 +52,14 @@ class _LaporanOperasionalScreenState extends State<LaporanOperasionalScreen> {
     initializeDateFormatting('id_ID', null).then((_) {
       if (mounted) _fetchReport();
     });
+    _reloadTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _fetchReport();
+    });
   }
 
   @override
   void dispose() {
+    _reloadTimer?.cancel();
     _catatanController.dispose();
     super.dispose();
   }

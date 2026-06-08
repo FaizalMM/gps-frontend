@@ -110,11 +110,12 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
     });
     _moveCameraTo(b);
     final route = await _routeService.getBusRoute(b.id);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _activeRoute = route;
         _loadingRoute = false;
       });
+    }
   }
 
   Future<void> _tapBus(BusModel b) async {
@@ -126,11 +127,12 @@ class _AdminTrackingScreenState extends State<AdminTrackingScreen> {
     });
     _moveCameraTo(b);
     final route = await _routeService.getBusRoute(b.id);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _activeRoute = route;
         _loadingRoute = false;
       });
+    }
   }
 
   static const _halteColors = [
