@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -26,6 +28,997 @@ class AdminBusScreen extends StatefulWidget {
 class _AdminBusScreenState extends State<AdminBusScreen> {
   _BusFilter _filter = _BusFilter.all;
   String _searchQuery = '';
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) widget.dataService.loadAll();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _showAssignDriverModal(BusModel bus) {
+    Map<String, dynamic>? currentDriver;
+    List<Map<String, dynamic>> availableDrivers = [];
+    bool loadingData = true;
+    bool showSearchPanel = false;
+    bool showFinishDate = false;
+    bool savingAssign = false;
+    String? selectedDriverId;
+    String selectedDriverName = '';
+    final startCtrl = TextEditingController(
+        text: DateTime.now().toIso8601String().substring(0, 10));
+    final finishCtrl = TextEditingController();
+    final searchCtrl = TextEditingController();
+    List<Map<String, dynamic>> filteredDrivers = [];
+
+    void filterSearch(String q, void Function(void Function()) setS) {
+      setS(() {
+        filteredDrivers = q.isEmpty
+            ? availableDrivers
+            : availableDrivers.where((d) {
+                final name = ((d['user']?['name'] ?? d['name'] ?? '') as String)
+                    .toLowerCase();
+                final email =
+                    ((d['user']?['email'] ?? d['email'] ?? '') as String)
+                        .toLowerCase();
+                final noHp = ((d['no_hp'] ?? '') as String).toLowerCase();
+                final nik = ((d['nik'] ?? d['user']?['nik'] ?? '') as String)
+                    .toLowerCase();
+                final lq = q.toLowerCase();
+                return name.contains(lq) ||
+                    email.contains(lq) ||
+                    noHp.contains(lq) ||
+                    nik.contains(lq);
+              }).toList();
+      });
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          if (loadingData &&
+              currentDriver == null &&
+              availableDrivers.isEmpty) {
+            loadingData = true;
+            Future.wait([
+              BusService().getBusActiveDriver(bus.id),
+              BusService().getAvailableDrivers(),
+            ]).then((results) {
+              if (!ctx.mounted) return;
+              setS(() {
+                currentDriver = results[0] as Map<String, dynamic>?;
+                availableDrivers = results[1] as List<Map<String, dynamic>>;
+                filteredDrivers = availableDrivers;
+                showSearchPanel = currentDriver == null;
+                loadingData = false;
+                if (currentDriver != null) {
+                  final start =
+                      currentDriver!['pivot']?['tanggal_mulai'] as String?;
+                  final end =
+                      currentDriver!['pivot']?['tanggal_selesai'] as String?;
+                  if (start != null) startCtrl.text = start;
+                  if (end != null) {
+                    showFinishDate = true;
+                    finishCtrl.text = end;
+                  }
+                }
+              });
+            });
+          }
+
+          final pivotId = currentDriver?['pivot']?['id'] as int?;
+          final driverName = currentDriver?['user']?['name'] as String? ??
+              currentDriver?['name'] as String? ??
+              '';
+          final driverNik = currentDriver?['nik'] as String? ??
+              currentDriver?['user']?['nik'] as String? ??
+              '-';
+          final driverPhone = currentDriver?['no_hp'] as String? ??
+              currentDriver?['user']?['no_hp'] as String? ??
+              '';
+          final driverEmail = currentDriver?['user']?['email'] as String? ??
+              currentDriver?['email'] as String? ??
+              '';
+          final driverPhoto = currentDriver?['user']?['photo_url'] as String? ??
+              currentDriver?['photo_url'] as String? ??
+              currentDriver?['user']?['photo'] as String? ??
+              currentDriver?['photo'] as String?;
+          final gpsStatus =
+              currentDriver?['pivot']?['gps_status'] as String? ?? '-';
+          final waNum = driverPhone.replaceAll(RegExp(r'[^0-9]'), '');
+          final waFormatted =
+              waNum.startsWith('0') ? '62${waNum.substring(1)}' : waNum;
+
+          return Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.92),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12, bottom: 4),
+                    child: Center(
+                        child: Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                                color: const Color(0xFFE5E7EB),
+                                borderRadius: BorderRadius.circular(2)))),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                    child: Row(children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.manage_accounts_rounded,
+                            color: AppColors.primary, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentDriver != null && !showSearchPanel
+                                    ? 'Driver Aktif'
+                                    : 'Assign Driver',
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                              Text('${bus.nama} · ${bus.platNomor}',
+                                  style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 12,
+                                      color: AppColors.textGrey)),
+                            ]),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                      child: loadingData
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 40),
+                              child: Center(
+                                  child: CircularProgressIndicator(
+                                      color: AppColors.primary)),
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (currentDriver != null &&
+                                    !showSearchPanel) ...[
+                                  Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF3F6FB),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color: const Color(0xFFE4E7EB)),
+                                    ),
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(children: [
+                                            Container(
+                                              width: 56,
+                                              height: 56,
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primaryLight,
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                                image: driverPhoto != null && driverPhoto.isNotEmpty
+                                                    ? DecorationImage(
+                                                        image: NetworkImage(driverPhoto),
+                                                        fit: BoxFit.cover,
+                                                      )
+                                                    : null,
+                                              ),
+                                              child: driverPhoto == null || driverPhoto.isEmpty
+                                                  ? Center(
+                                                      child: Text(
+                                                        driverName.isNotEmpty
+                                                            ? driverName[0].toUpperCase()
+                                                            : '?',
+                                                        style: const TextStyle(
+                                                            fontFamily: 'Poppins',
+                                                            fontWeight: FontWeight.w700,
+                                                            fontSize: 20,
+                                                            color: AppColors.primary),
+                                                      ),
+                                                    )
+                                                  : null,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                                child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                  Text(driverName,
+                                                      style: const TextStyle(
+                                                          fontFamily: 'Poppins',
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 14)),
+                                                  if (driverEmail.isNotEmpty)
+                                                    Text(driverEmail,
+                                                        style: const TextStyle(
+                                                            fontFamily:
+                                                                'Poppins',
+                                                            fontSize: 12,
+                                                            color: AppColors
+                                                                .textGrey),
+                                                        overflow: TextOverflow
+                                                            .ellipsis),
+                                                  if (driverPhone.isNotEmpty)
+                                                    Text(driverPhone,
+                                                        style: const TextStyle(
+                                                            fontFamily:
+                                                                'Poppins',
+                                                            fontSize: 12,
+                                                            color: AppColors
+                                                                .textGrey)),
+                                                ])),
+                                          ]),
+                                          const SizedBox(height: 12),
+                                          GridView.count(
+                                            crossAxisCount: 2,
+                                            shrinkWrap: true,
+                                            physics:
+                                                const NeverScrollableScrollPhysics(),
+                                            mainAxisSpacing: 8,
+                                            crossAxisSpacing: 8,
+                                            childAspectRatio: 3.2,
+                                            children: [
+                                              _InfoCell(
+                                                  label: 'NIK',
+                                                  value: driverNik),
+                                              _InfoCell(
+                                                  label: 'Status GPS',
+                                                  value: gpsStatus),
+                                              _InfoCell(
+                                                  label: 'Tgl Mulai',
+                                                  value: startCtrl.text.isEmpty
+                                                      ? '-'
+                                                      : startCtrl.text),
+                                              _InfoCell(
+                                                  label: 'Tgl Selesai',
+                                                  value: finishCtrl.text.isEmpty
+                                                      ? '-'
+                                                      : finishCtrl.text),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          if (driverPhone.isNotEmpty)
+                                            Row(children: [
+                                              Expanded(
+                                                child: _ActionButton(
+                                                  icon: Icons.chat_rounded,
+                                                  label: 'WhatsApp',
+                                                  color:
+                                                      const Color(0xFF25D366),
+                                                  textColor: Colors.white,
+                                                  onTap: () async {
+                                                    final uri = Uri.parse('https://wa.me/$waFormatted');
+                                                    if (await canLaunchUrl(uri)) {
+                                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                                    } else {
+                                                      if (!ctx.mounted) return;
+                                                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                                                        content: Text('Tidak bisa membuka WhatsApp: $driverPhone',
+                                                            style: const TextStyle(fontFamily: 'Poppins')),
+                                                        behavior: SnackBarBehavior.floating,
+                                                      ));
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: _ActionButton(
+                                                  icon: Icons
+                                                      .content_copy_rounded,
+                                                  label: 'Salin Nomor',
+                                                  color: Colors.white,
+                                                  textColor: AppColors.primary,
+                                                  borderColor:
+                                                      const Color(0xFFE4E7EB),
+                                                  onTap: () {
+                                                    Clipboard.setData(ClipboardData(text: driverPhone));
+                                                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                                                      content: Text('Nomor disalin: $driverPhone',
+                                                          style: const TextStyle(fontFamily: 'Poppins')),
+                                                      behavior: SnackBarBehavior.floating,
+                                                    ));
+                                                  },
+                                                ),
+                                              ),
+                                            ]),
+                                        ]),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  const Text('Tanggal Mulai',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textGrey)),
+                                  const SizedBox(height: 6),
+                                  _DatePickerField(
+                                    controller: startCtrl,
+                                    hint: 'Pilih tanggal mulai...',
+                                    onPick: (v) =>
+                                        setS(() => startCtrl.text = v),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(children: [
+                                    Switch(
+                                      value: showFinishDate,
+                                      onChanged: (v) =>
+                                          setS(() => showFinishDate = v),
+                                      activeThumbColor: AppColors.primary,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('Tentukan tanggal selesai',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            color: AppColors.textGrey)),
+                                  ]),
+                                  if (showFinishDate) ...[
+                                    const SizedBox(height: 8),
+                                    _DatePickerField(
+                                      controller: finishCtrl,
+                                      hint: 'Pilih tanggal selesai...',
+                                      onPick: (v) =>
+                                          setS(() => finishCtrl.text = v),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 14),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 42,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      onPressed: savingAssign
+                                          ? null
+                                          : () async {
+                                              if (startCtrl.text.isEmpty) {
+                                                ScaffoldMessenger.of(ctx)
+                                                    .showSnackBar(
+                                                        const SnackBar(
+                                                  content: Text(
+                                                      'Tanggal mulai wajib diisi',
+                                                      style: TextStyle(
+                                                          fontFamily:
+                                                              'Poppins')),
+                                                  backgroundColor:
+                                                      AppColors.red,
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                ));
+                                                return;
+                                              }
+                                              setS(() => savingAssign = true);
+                                              final ok = await BusService()
+                                                  .updateBusDriverAssignment(
+                                                pivotId!,
+                                                tanggalMulai: startCtrl.text,
+                                                tanggalSelesai:
+                                                    showFinishDate &&
+                                                            finishCtrl
+                                                                .text.isNotEmpty
+                                                        ? finishCtrl.text
+                                                        : null,
+                                              );
+                                              if (!ctx.mounted) return;
+                                              Navigator.pop(ctx);
+                                              if (!mounted) return;
+                                              await widget.dataService
+                                                  .loadAll();
+                                              setState(() {});
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(SnackBar(
+                                                content: Text(
+                                                    ok
+                                                        ? 'Data driver berhasil disimpan'
+                                                        : 'Gagal memperbarui data driver',
+                                                    style: const TextStyle(
+                                                        fontFamily: 'Poppins')),
+                                                backgroundColor: ok
+                                                    ? AppColors.primary
+                                                    : AppColors.red,
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ));
+                                            },
+                                      child: Text(
+                                        savingAssign
+                                            ? 'Menyimpan...'
+                                            : 'Simpan',
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 42,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                            color: AppColors.primary),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.swap_horiz_rounded,
+                                          color: AppColors.primary, size: 18),
+                                      label: const Text('Ganti Driver',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.primary)),
+                                      onPressed: () => setS(() {
+                                        showSearchPanel = true;
+                                        selectedDriverId = null;
+                                        selectedDriverName = '';
+                                        searchCtrl.clear();
+                                        filteredDrivers = availableDrivers;
+                                      }),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 42,
+                                    child: OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                            color: Colors.red
+                                                .withValues(alpha: 0.5)),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(
+                                          Icons.person_remove_rounded,
+                                          color: Colors.red,
+                                          size: 18),
+                                      label: const Text('Lepas Driver',
+                                          style: TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.red)),
+                                      onPressed: savingAssign
+                                          ? null
+                                          : () async {
+                                              setS(() => savingAssign = true);
+                                              final ok = await BusService()
+                                                  .unassignDriver(bus.id);
+                                              if (!ctx.mounted) return;
+                                              Navigator.pop(ctx);
+                                              if (!mounted) return;
+                                              await widget.dataService
+                                                  .loadAll();
+                                              setState(() {});
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(SnackBar(
+                                                content: Text(
+                                                    ok
+                                                        ? 'Driver berhasil dilepas'
+                                                        : 'Gagal melepas driver',
+                                                    style: const TextStyle(
+                                                        fontFamily: 'Poppins')),
+                                                backgroundColor: ok
+                                                    ? AppColors.primary
+                                                    : AppColors.red,
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ));
+                                            },
+                                    ),
+                                  ),
+                                ],
+
+                                if (currentDriver == null ||
+                                    showSearchPanel) ...[
+                                  if (showSearchPanel &&
+                                      currentDriver != null) ...[
+                                    const Text('Pilih driver pengganti:',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textGrey)),
+                                    const SizedBox(height: 8),
+                                  ] else ...[
+                                    const Text('Pilih driver untuk bus ini:',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textGrey)),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFB),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                          color: const Color(0xFFE4E7EB)),
+                                    ),
+                                    child: Row(children: [
+                                      const Icon(Icons.search_rounded,
+                                          color: AppColors.textGrey, size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: searchCtrl,
+                                          onChanged: (v) =>
+                                              filterSearch(v, setS),
+                                          style: const TextStyle(
+                                              fontFamily: 'Poppins',
+                                              fontSize: 13),
+                                          decoration: const InputDecoration(
+                                            hintText:
+                                                'Cari nama driver atau NIK...',
+                                            hintStyle: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                color: AppColors.textGrey,
+                                                fontSize: 12),
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                    vertical: 8),
+                                          ),
+                                        ),
+                                      ),
+                                    ]),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    constraints:
+                                        const BoxConstraints(maxHeight: 220),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                          color: const Color(0xFFE4E7EB)),
+                                    ),
+                                    child: filteredDrivers.isEmpty
+                                        ? const Padding(
+                                            padding: EdgeInsets.all(16),
+                                            child: Center(
+                                              child: Text(
+                                                'Tidak ada driver tersedia\nuntuk ditugaskan',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                    fontFamily: 'Poppins',
+                                                    fontSize: 13,
+                                                    color: AppColors.textGrey),
+                                              ),
+                                            ),
+                                          )
+                                        : ListView.separated(
+                                            shrinkWrap: true,
+                                            padding: EdgeInsets.zero,
+                                            itemCount: filteredDrivers.length,
+                                            separatorBuilder: (_, __) =>
+                                                const Divider(
+                                                    height: 1,
+                                                    color: Color(0xFFF0F0F0)),
+                                            itemBuilder: (_, i) {
+                                              final d = filteredDrivers[i];
+                                              final dId =
+                                                  d['id']?.toString() ?? '';
+                                              final dName = d['user']?['name']
+                                                      as String? ??
+                                                  d['name'] as String? ??
+                                                  '-';
+                                              final dEmail = d['user']?['email']
+                                                      as String? ??
+                                                  d['email'] as String? ??
+                                                  '';
+                                              final dPhone =
+                                                  d['no_hp'] as String? ?? '';
+                                              final isSelected =
+                                                  selectedDriverId == dId;
+                                              return Material(
+                                                color: isSelected
+                                                    ? AppColors.primaryLight
+                                                    : Colors.white,
+                                                child: InkWell(
+                                                  onTap: () => setS(() {
+                                                    selectedDriverId = dId;
+                                                    selectedDriverName = dName;
+                                                  }),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 14,
+                                                        vertical: 10),
+                                                    child: Row(children: [
+                                                      Expanded(
+                                                          child: Column(
+                                                              crossAxisAlignment:
+                                                                  CrossAxisAlignment
+                                                                      .start,
+                                                              children: [
+                                                            Text(dName,
+                                                                style: TextStyle(
+                                                                    fontFamily:
+                                                                        'Poppins',
+                                                                    fontSize:
+                                                                        13,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                    color: isSelected
+                                                                        ? AppColors
+                                                                            .primary
+                                                                        : AppColors
+                                                                            .black)),
+                                                            if (dEmail
+                                                                .isNotEmpty)
+                                                              Text(dEmail,
+                                                                  style: const TextStyle(
+                                                                      fontFamily:
+                                                                          'Poppins',
+                                                                      fontSize:
+                                                                          11,
+                                                                      color: AppColors
+                                                                          .textGrey)),
+                                                            if (dPhone
+                                                                .isNotEmpty)
+                                                              Text(dPhone,
+                                                                  style: const TextStyle(
+                                                                      fontFamily:
+                                                                          'Poppins',
+                                                                      fontSize:
+                                                                          11,
+                                                                      color: AppColors
+                                                                          .textGrey)),
+                                                          ])),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                                horizontal: 10,
+                                                                vertical: 4),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: isSelected
+                                                              ? AppColors
+                                                                  .primary
+                                                              : const Color(
+                                                                  0xFFEEF2FF),
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(99),
+                                                        ),
+                                                        child: Text(
+                                                          isSelected
+                                                              ? 'Dipilih'
+                                                              : 'Pilih',
+                                                          style: TextStyle(
+                                                              fontFamily:
+                                                                  'Poppins',
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color: isSelected
+                                                                  ? Colors.white
+                                                                  : AppColors
+                                                                      .primary),
+                                                        ),
+                                                      ),
+                                                    ]),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                  if (selectedDriverId != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        'Driver dipilih: $selectedDriverName',
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary),
+                                      ),
+                                    )
+                                  else
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        'Belum ada driver dipilih',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 12,
+                                            color: AppColors.textGrey),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 14),
+                                  const Text('Tanggal Mulai',
+                                      style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textGrey)),
+                                  const SizedBox(height: 6),
+                                  _DatePickerField(
+                                    controller: startCtrl,
+                                    hint: 'Pilih tanggal mulai...',
+                                    onPick: (picked) =>
+                                        setS(() => startCtrl.text = picked),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(children: [
+                                    Switch(
+                                      value: showFinishDate,
+                                      onChanged: (v) =>
+                                          setS(() => showFinishDate = v),
+                                      activeThumbColor: AppColors.primary,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text('Tentukan tanggal selesai',
+                                        style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 13,
+                                            color: AppColors.textGrey)),
+                                  ]),
+                                  if (showFinishDate) ...[
+                                    const SizedBox(height: 8),
+                                    _DatePickerField(
+                                      controller: finishCtrl,
+                                      hint: 'Pilih tanggal selesai...',
+                                      onPick: (picked) =>
+                                          setS(() => finishCtrl.text = picked),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 20),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        disabledBackgroundColor: AppColors
+                                            .primary
+                                            .withValues(alpha: 0.4),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12)),
+                                      ),
+                                      onPressed: (savingAssign ||
+                                              (selectedDriverId == null &&
+                                                  (currentDriver == null ||
+                                                      showSearchPanel)))
+                                          ? null
+                                          : () async {
+                                              if (startCtrl.text.isEmpty) {
+                                                ScaffoldMessenger.of(ctx)
+                                                    .showSnackBar(
+                                                        const SnackBar(
+                                                  content: Text(
+                                                      'Tanggal mulai wajib diisi',
+                                                      style: TextStyle(
+                                                          fontFamily:
+                                                              'Poppins')),
+                                                  backgroundColor:
+                                                      AppColors.red,
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                ));
+                                                return;
+                                              }
+                                              if (showFinishDate &&
+                                                  finishCtrl.text.isEmpty) {
+                                                ScaffoldMessenger.of(ctx)
+                                                    .showSnackBar(
+                                                        const SnackBar(
+                                                  content: Text(
+                                                      'Silakan pilih tanggal selesai',
+                                                      style: TextStyle(
+                                                          fontFamily:
+                                                              'Poppins')),
+                                                  backgroundColor:
+                                                      AppColors.red,
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                ));
+                                                return;
+                                              }
+                                              setS(() => savingAssign = true);
+
+                                              final svc = BusService();
+                                              bool ok;
+
+                                              if (!showSearchPanel &&
+                                                  pivotId != null) {
+                                                ok = await svc
+                                                    .updateBusDriverAssignment(
+                                                  pivotId,
+                                                  tanggalMulai: startCtrl.text,
+                                                  tanggalSelesai:
+                                                      showFinishDate &&
+                                                              finishCtrl.text
+                                                                  .isNotEmpty
+                                                          ? finishCtrl.text
+                                                          : null,
+                                                );
+                                              } else if (showSearchPanel &&
+                                                  pivotId != null) {
+                                                ok = await svc.assignDriver(
+                                                  bus.id,
+                                                  int.parse(selectedDriverId!),
+                                                  tanggalMulai: startCtrl.text,
+                                                  tanggalSelesai:
+                                                      showFinishDate &&
+                                                              finishCtrl.text
+                                                                  .isNotEmpty
+                                                          ? finishCtrl.text
+                                                          : null,
+                                                );
+                                                if (ok) {
+                                                  await svc
+                                                      .deactivateDriverOnOtherBuses(
+                                                    bus.id,
+                                                    int.parse(
+                                                        selectedDriverId!),
+                                                  );
+                                                }
+                                              } else {
+                                                ok = await svc.assignDriver(
+                                                  bus.id,
+                                                  int.parse(selectedDriverId!),
+                                                  tanggalMulai: startCtrl.text,
+                                                  tanggalSelesai:
+                                                      showFinishDate &&
+                                                              finishCtrl.text
+                                                                  .isNotEmpty
+                                                          ? finishCtrl.text
+                                                          : null,
+                                                );
+                                                if (ok) {
+                                                  await svc
+                                                      .deactivateDriverOnOtherBuses(
+                                                    bus.id,
+                                                    int.parse(
+                                                        selectedDriverId!),
+                                                  );
+                                                }
+                                              }
+
+                                              if (!ctx.mounted) return;
+                                              Navigator.pop(ctx);
+                                              if (!mounted) return;
+                                              await widget.dataService
+                                                  .loadAll();
+                                              setState(() {});
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(SnackBar(
+                                                content: Text(
+                                                    ok
+                                                        ? (showSearchPanel &&
+                                                                pivotId != null
+                                                            ? 'Driver berhasil diganti'
+                                                            : 'Driver berhasil di-assign')
+                                                        : 'Gagal assign driver',
+                                                    style: const TextStyle(
+                                                        fontFamily: 'Poppins')),
+                                                backgroundColor: ok
+                                                    ? AppColors.primary
+                                                    : AppColors.red,
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ));
+                                            },
+                                      child: Text(
+                                        savingAssign
+                                            ? 'Menyimpan...'
+                                            : (!showSearchPanel &&
+                                                    currentDriver != null
+                                                ? 'Simpan'
+                                                : showSearchPanel &&
+                                                        currentDriver != null
+                                                    ? 'Simpan Penggantian'
+                                                    : 'Assign Driver'),
+                                        style: const TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15),
+                                      ),
+                                    ),
+                                  ),
+                                  if (showSearchPanel &&
+                                      currentDriver != null) ...[
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: TextButton(
+                                        onPressed: () => setS(() {
+                                          showSearchPanel = false;
+                                          selectedDriverId = null;
+                                          selectedDriverName = '';
+                                        }),
+                                        child: const Text('Batal',
+                                            style: TextStyle(
+                                                fontFamily: 'Poppins',
+                                                color: AppColors.textGrey)),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   void _showAddBusDialog() {
     final namaCtrl = TextEditingController();
@@ -34,7 +1027,13 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     BusStatus selectedStatus = BusStatus.active;
     XFile? foto;
     final formKey = GlobalKey<FormState>();
-    final drivers = widget.dataService.drivers;
+    final assignedDriverIds = widget.dataService.buses
+        .where((b) => b.driverId.isNotEmpty)
+        .map((b) => b.driverId)
+        .toSet();
+    final drivers = widget.dataService.drivers
+        .where((d) => !assignedDriverIds.contains(d.idStr))
+        .toList();
 
     showModalBottomSheet(
       context: context,
@@ -196,7 +1195,15 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
     BusStatus selStatus = bus.status;
     XFile? foto;
     final formKey = GlobalKey<FormState>();
-    final drivers = widget.dataService.drivers;
+    final assignedElsewhere = widget.dataService.buses
+        .where((b) => b.id != bus.id && b.driverId.isNotEmpty)
+        .map((b) => b.driverId)
+        .toSet();
+    final drivers = widget.dataService.drivers
+        .where((d) =>
+            !assignedElsewhere.contains(d.idStr) ||
+            d.idStr == bus.driverId)
+        .toList();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -600,6 +1607,7 @@ class _AdminBusScreenState extends State<AdminBusScreen> {
                                   builder: (_) => BusSiswaScreen(
                                       bus: bus,
                                       dataService: widget.dataService))),
+                          onAssignDriver: () => _showAssignDriverModal(bus),
                         );
                       },
                     ),
@@ -617,6 +1625,7 @@ class _BusCard extends StatelessWidget {
   final VoidCallback onDelete;
   final VoidCallback onAturRute;
   final VoidCallback onManageSiswa;
+  final VoidCallback onAssignDriver;
 
   const _BusCard({
     required this.bus,
@@ -624,6 +1633,7 @@ class _BusCard extends StatelessWidget {
     required this.onDelete,
     required this.onAturRute,
     required this.onManageSiswa,
+    required this.onAssignDriver,
   });
 
   @override
@@ -641,6 +1651,8 @@ class _BusCard extends StatelessWidget {
       statusLabel = 'Aktif';
     }
 
+    final bool hasDriver = bus.driverName.isNotEmpty;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -648,105 +1660,124 @@ class _BusCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
               offset: const Offset(0, 3))
         ],
       ),
       child: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 8, 12),
+          padding: const EdgeInsets.fromLTRB(14, 14, 4, 12),
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: bus.photoUrl != null && bus.photoUrl!.isNotEmpty
                   ? Image.network(
                       bus.photoUrl!,
-                      width: 52,
-                      height: 52,
+                      width: 58,
+                      height: 58,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.directions_bus_rounded,
-                            color: statusColor, size: 28),
-                      ),
+                      errorBuilder: (_, __, ___) => _BusPhotoPlaceholder(
+                          color: statusColor),
                     )
-                  : Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.directions_bus_rounded,
-                          color: statusColor, size: 28),
-                    ),
+                  : _BusPhotoPlaceholder(color: statusColor),
             ),
             const SizedBox(width: 12),
             Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                  Row(children: [
-                    Expanded(
-                        child: Text(bus.nama,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700))),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
+                      Expanded(
+                        child: Text(
+                          bus.nama,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.black),
+                        ),
                       ),
-                      child: Text(statusLabel,
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          statusLabel,
                           style: TextStyle(
                               fontFamily: 'Poppins',
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: statusColor)),
-                    ),
-                  ]),
-                  const SizedBox(height: 3),
-                  Text(bus.platNomor,
+                              color: statusColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(children: [
+                    const Icon(Icons.confirmation_number_outlined,
+                        size: 11, color: AppColors.textGrey),
+                    const SizedBox(width: 4),
+                    Text(
+                      bus.platNomor,
                       style: const TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 12,
-                          color: AppColors.textGrey)),
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    const Icon(Icons.person_rounded,
-                        size: 12, color: AppColors.textGrey),
-                    const SizedBox(width: 4),
-                    Expanded(
-                        child: Text(
-                      bus.driverName.isEmpty
-                          ? 'Belum ada driver'
-                          : bus.driverName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        color: bus.driverName.isEmpty
-                            ? AppColors.textGrey
-                            : AppColors.black,
-                        fontStyle: bus.driverName.isEmpty
-                            ? FontStyle.italic
-                            : FontStyle.normal,
-                      ),
-                    )),
+                          color: AppColors.textGrey),
+                    ),
                   ]),
-                ])),
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: hasDriver
+                          ? const Color(0xFFE8F5E9)
+                          : const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          hasDriver
+                              ? Icons.person_rounded
+                              : Icons.person_off_outlined,
+                          size: 11,
+                          color: hasDriver
+                              ? AppColors.primary
+                              : AppColors.orange,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            hasDriver ? bus.driverName : 'Belum ada driver',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: hasDriver
+                                  ? AppColors.primary
+                                  : AppColors.orange,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded,
                   color: AppColors.textGrey, size: 20),
@@ -782,67 +1813,135 @@ class _BusCard extends StatelessWidget {
         ),
         Container(
           decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFB),
+            borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(16)),
             border: Border(
-                top: BorderSide(
-                    color: AppColors.lightGrey.withValues(alpha: 0.6))),
+              top: BorderSide(
+                  color: AppColors.lightGrey.withValues(alpha: 0.8)),
+            ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Row(children: [
             Expanded(
-              child: GestureDetector(
+              flex: 5,
+              child: _CardAction(
                 onTap: onAturRute,
-                child: Container(
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.alt_route_rounded,
-                            size: 14, color: Colors.white),
-                        SizedBox(width: 5),
-                        Text('Rute & Halte',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
-                      ]),
-                ),
+                icon: Icons.alt_route_rounded,
+                label: 'Rute & Halte',
+                bgColor: AppColors.primary,
+                fgColor: Colors.white,
+                filled: true,
               ),
             ),
             const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onManageSiswa,
-              child: Container(
-                height: 34,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3)),
-                ),
-                child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.people_rounded,
-                          size: 14, color: AppColors.primary),
-                      SizedBox(width: 5),
-                      Text('Siswa',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary)),
-                    ]),
+            Expanded(
+              flex: 4,
+              child: _CardAction(
+                onTap: onAssignDriver,
+                icon: hasDriver
+                    ? Icons.manage_accounts_rounded
+                    : Icons.person_add_rounded,
+                label: hasDriver ? 'Driver' : 'Assign Driver',
+                bgColor: hasDriver
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFFFF3E0),
+                fgColor: hasDriver ? AppColors.primary : AppColors.orange,
+                borderColor: hasDriver
+                    ? AppColors.primary.withValues(alpha: 0.3)
+                    : AppColors.orange.withValues(alpha: 0.4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              flex: 3,
+              child: _CardAction(
+                onTap: onManageSiswa,
+                icon: Icons.people_rounded,
+                label: 'Siswa',
+                bgColor: AppColors.primaryLight,
+                fgColor: AppColors.primary,
+                borderColor: AppColors.primary.withValues(alpha: 0.3),
               ),
             ),
           ]),
         ),
       ]),
+    );
+  }
+}
+
+class _BusPhotoPlaceholder extends StatelessWidget {
+  final Color color;
+  const _BusPhotoPlaceholder({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(Icons.directions_bus_rounded, color: color, size: 30),
+    );
+  }
+}
+
+class _CardAction extends StatelessWidget {
+  final VoidCallback onTap;
+  final IconData icon;
+  final String label;
+  final Color bgColor;
+  final Color fgColor;
+  final Color? borderColor;
+  final bool filled;
+
+  const _CardAction({
+    required this.onTap,
+    required this.icon,
+    required this.label,
+    required this.bgColor,
+    required this.fgColor,
+    this.borderColor,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 36,
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(10),
+          border: borderColor != null
+              ? Border.all(color: borderColor!)
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 13, color: fgColor),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: fgColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -2554,6 +3653,137 @@ class _DriverSearchFieldState extends State<_DriverSearchField> {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _InfoCell extends StatelessWidget {
+  final String label;
+  final String value;
+  const _InfoCell({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textGrey)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.black),
+            overflow: TextOverflow.ellipsis),
+      ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color textColor;
+  final Color? borderColor;
+  final VoidCallback onTap;
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.textColor,
+    required this.onTap,
+    this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 38,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(10),
+          border: borderColor != null ? Border.all(color: borderColor!) : null,
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: textColor, size: 15),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: textColor)),
+        ]),
+      ),
+    );
+  }
+}
+
+class _DatePickerField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final void Function(String) onPick;
+  const _DatePickerField({
+    required this.controller,
+    required this.hint,
+    required this.onPick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: DateTime.tryParse(controller.text) ?? DateTime.now(),
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2099),
+          builder: (ctx, child) => Theme(
+            data: Theme.of(ctx).copyWith(
+              colorScheme: const ColorScheme.light(
+                  primary: AppColors.primary,
+                  onPrimary: Colors.white,
+                  surface: Colors.white),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) {
+          onPick(picked.toIso8601String().substring(0, 10));
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFB),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE4E7EB)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.calendar_today_rounded,
+              size: 16, color: AppColors.textGrey),
+          const SizedBox(width: 8),
+          Text(
+            controller.text.isEmpty ? hint : controller.text,
+            style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 13,
+                color: controller.text.isEmpty
+                    ? AppColors.textGrey
+                    : AppColors.black),
+          ),
+        ]),
+      ),
     );
   }
 }

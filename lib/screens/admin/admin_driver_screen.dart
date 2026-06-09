@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,8 +10,6 @@ import '../../services/domain_services.dart';
 import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
-// ── Buka WhatsApp
-
 Future<void> _bukaWhatsApp(String noHp) async {
   String n = noHp.replaceAll(RegExp(r'[\s\-+]'), '');
   if (n.startsWith('0')) n = '62${n.substring(1)}';
@@ -19,7 +18,6 @@ Future<void> _bukaWhatsApp(String noHp) async {
   if (await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   } else {
-    // Fallback: salin ke clipboard jika WhatsApp tidak terinstall
     await Clipboard.setData(ClipboardData(text: noHp));
   }
 }
@@ -34,11 +32,21 @@ class AdminDriverScreen extends StatefulWidget {
 class _AdminDriverScreenState extends State<AdminDriverScreen> {
   final _searchCtrl = TextEditingController();
   final _suspendService = DriverSuspendService();
-  String _filterMode = 'semua'; // semua | online | offline | no_bus
+  String _filterMode = 'semua';
   String _sortBy = 'name';
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) widget.dataService.loadAll();
+    });
+  }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -107,7 +115,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Filter & sort
   List<UserModel> _filtered(List<UserModel> all) {
     var list = all.where((u) => u.role == UserRole.driver).toList();
 
@@ -142,7 +149,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     return list;
   }
 
-  // ── Snackbar
   void _snack(String msg, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -153,7 +159,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     ));
   }
 
-  // ── Hubungi driver via WA
   void _hubungi(UserModel driver) {
     if (driver.noHp.isEmpty) {
       _snack('No. HP ${driver.namaLengkap} belum diisi', AppColors.red);
@@ -183,8 +188,7 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       color: Colors.white)),
               onPressed: () async {
                 Navigator.pop(ctx);
-                await _bukaWhatsApp(
-                    driver.noHp); //  Sekarang membuka WA langsung
+                await _bukaWhatsApp(driver.noHp);
                 if (mounted) {
                   _snack('Membuka WhatsApp...', const Color(0xFF25D366));
                 }
@@ -234,7 +238,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Dialog Tambah
   void _showAdd() {
     final namaC = TextEditingController();
     final emailC = TextEditingController();
@@ -363,7 +366,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Dialog Edit
   void _showEdit(UserModel driver) {
     final namaC = TextEditingController(text: driver.namaLengkap);
     final hpC = TextEditingController(text: driver.noHp);
@@ -505,7 +507,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── Sort sheet
   void _showSort() {
     showModalBottomSheet(
       context: context,
@@ -527,7 +528,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 
-  // ── BUILD
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -578,7 +578,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Search bar
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                               child: Container(
@@ -620,7 +619,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            // Filter chips
                             SizedBox(
                               height: 36,
                               child: ListView(
@@ -676,7 +674,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                                 height: 0.5,
                                 thickness: 0.5,
                                 color: AppColors.lightGrey),
-                            // Sort bar
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                               child: Row(children: [
@@ -714,7 +711,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       );
                     }
 
-                    // Item 1 saat kosong: pesan kontekstual
                     if (list.isEmpty && i == 1) {
                       final isOnlineFilter = _filterMode == 'online';
                       return SizedBox(
@@ -758,7 +754,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
                       );
                     }
 
-                    // Item 1..n: kartu driver
                     final driverIndex = i - 1;
                     if (driverIndex < 0 || driverIndex >= list.length) {
                       return const SizedBox.shrink();
@@ -794,8 +789,6 @@ class _AdminDriverScreenState extends State<AdminDriverScreen> {
     );
   }
 }
-
-// DRIVER CARD
 
 class _DriverCard extends StatelessWidget {
   final UserModel driver;
@@ -834,7 +827,6 @@ class _DriverCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── BARIS ATAS
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -845,7 +837,6 @@ class _DriverCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Nama
                         Text(driver.namaLengkap,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -855,7 +846,6 @@ class _DriverCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.black)),
                         const SizedBox(height: 2),
-                        // Bus
                         Row(children: [
                           Icon(Icons.directions_bus_rounded,
                               size: 11,
@@ -883,7 +873,6 @@ class _DriverCard extends StatelessWidget {
                           ),
                         ]),
                         const SizedBox(height: 2),
-                        // Foto indicator
                         Row(children: [
                           Icon(
                             hasPhoto
@@ -908,7 +897,6 @@ class _DriverCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // Badge Online/Offline berdasarkan GPS
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -948,14 +936,11 @@ class _DriverCard extends StatelessWidget {
                   ],
                 ],
               ),
-
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: Divider(
                     height: 0.5, thickness: 0.5, color: AppColors.lightGrey),
               ),
-
-              // ── BARIS BAWAH: No HP + aksi ─────────────────
               Row(children: [
                 const Icon(Icons.phone_rounded,
                     size: 12, color: AppColors.textLight),
@@ -1140,8 +1125,6 @@ class _DriverCard extends StatelessWidget {
     );
   }
 }
-
-// WIDGET HELPERS
 
 class _Avatar extends StatelessWidget {
   final UserModel driver;

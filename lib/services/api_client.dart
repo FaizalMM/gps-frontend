@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Konfigurasi Base URL — ganti sesuai server Laravel kamu
 class ApiConfig {
   // ─── GANTI SESUAI ENVIRONMENT ────────────────────────────────────────────
   //
@@ -27,7 +26,6 @@ class ApiConfig {
   static const Duration timeout = Duration(seconds: 15);
 }
 
-/// Response wrapper
 class ApiResponse<T> {
   final bool success;
   final T? data;
@@ -42,7 +40,6 @@ class ApiResponse<T> {
   });
 }
 
-/// Core API client
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
@@ -207,7 +204,6 @@ class ApiClient {
     }
   }
 
-  // Upload file (multipart) dengan fields tambahan
   Future<ApiResponse<Map<String, dynamic>>> uploadMultipart(
     String endpoint,
     String filePath,
@@ -238,7 +234,6 @@ class ApiClient {
     }
   }
 
-  // Upload file (multipart)
   Future<ApiResponse<Map<String, dynamic>>> uploadFile(
     String endpoint,
     String filePath,
@@ -265,8 +260,6 @@ class ApiClient {
           success: false, message: 'Gagal upload: $e', statusCode: 0);
     }
   }
-
-  // ── Response parser ───────────────────────────────────────
 
   ApiResponse<Map<String, dynamic>> _parse(http.Response response) {
     try {

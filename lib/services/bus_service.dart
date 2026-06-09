@@ -9,7 +9,6 @@ class BusService {
     final res = await _api.get('/buses');
     if (!res.success || res.data == null) return [];
     final raw = res.data!['data'];
-    // Response sekarang array langsung (bukan paginated)
     final list = raw is List ? raw : (raw?['data'] as List? ?? []);
     return list
         .map((e) => BusModel.fromJson(e as Map<String, dynamic>))
@@ -61,8 +60,6 @@ class BusService {
     return res.success;
   }
 
-  /// Upload foto bus — endpoint: POST /buses/{id}/photo
-  /// Gunakan multipart dengan field 'photo'
   Future<String?> uploadBusPhoto(int busId, String filePath) async {
     final res = await _api.uploadMultipart(
       '/buses/$busId/photo',
@@ -77,7 +74,6 @@ class BusService {
     return null;
   }
 
-  // Guard agar tidak double-call assignDriver
   final Set<String> _assigningKeys = {};
 
   Future<bool> assignDriver(int busId, int driverId,
@@ -123,7 +119,6 @@ class BusService {
     return false;
   }
 
-  /// Unassign driver dari bus (hapus assignment)
   Future<bool> unassignDriver(int busId) async {
     try {
       final res = await _api.delete('/buses/$busId/drivers');
@@ -134,12 +129,92 @@ class BusService {
     }
   }
 
-  /// Khusus driver — pakai /driver/buses/{id}/students agar tidak 403
+  Future<bool> updateBusDriverAssignment(
+    int pivotId, {
+    String? tanggalMulai,
+    String? tanggalSelesai,
+  }) async {
+    final body = <String, dynamic>{};
+    if (tanggalMulai != null) body['tanggal_mulai'] = tanggalMulai;
+    body['tanggal_selesai'] = tanggalSelesai;
+    final res = await _api.put('/bus-driver/$pivotId', body);
+    return res.success;
+  }
+
+  Future<Map<String, dynamic>?> getBusActiveDriver(int busId) async {
+    try {
+      final res = await _api.get('/buses/$busId/driver');
+      if (!res.success || res.data == null) return null;
+      final data = res.data!['data'] ?? res.data!;
+      if (data is Map<String, dynamic>) return data;
+      return null;
+    } catch (e) {
+      debugPrint('Error getBusActiveDriver: $e');
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAvailableDrivers() async {
+    try {
+      final res = await _api.get('/drivers', params: {'per_page': '100'});
+      if (!res.success || res.data == null) return [];
+      final raw = res.data!['data'];
+      final list =
+          raw is Map ? (raw['data'] as List? ?? []) : (raw as List? ?? []);
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      return list.whereType<Map<String, dynamic>>().where((d) {
+        final buses = d['buses'] as List? ?? [];
+        final hasActiveBus = buses.any((b) {
+          final end = (b as Map<String, dynamic>)['pivot']?['tanggal_selesai']
+              as String?;
+          return end == null || end.compareTo(today) >= 0;
+        });
+        return !hasActiveBus;
+      }).toList();
+    } catch (e) {
+      debugPrint('Error getAvailableDrivers: $e');
+      return [];
+    }
+  }
+
+  Future<void> deactivateDriverOnOtherBuses(
+      int targetBusId, int driverId) async {
+    try {
+      final res = await _api.get('/buses', params: {'per_page': '1000'});
+      if (!res.success || res.data == null) return;
+      final raw = res.data!['data'];
+      final list = raw is List
+          ? raw
+          : (raw is Map ? (raw['data'] as List? ?? []) : <dynamic>[]);
+      final today = DateTime.now().toIso8601String().substring(0, 10);
+      final futures = <Future>[];
+      for (final b in list) {
+        final busJson = b as Map<String, dynamic>;
+        final busId = busJson['id'] as int? ?? 0;
+        if (busId == targetBusId) continue;
+        final drivers = busJson['drivers'] as List? ?? [];
+        for (final d in drivers) {
+          final dMap = d as Map<String, dynamic>;
+          final did = dMap['id'] as int? ?? dMap['user_id'] as int? ?? 0;
+          final pivotId = dMap['pivot']?['id'] as int?;
+          final end = dMap['pivot']?['tanggal_selesai'] as String?;
+          final active = end == null || end.compareTo(today) >= 0;
+          if (pivotId != null && active && did == driverId) {
+            futures
+                .add(updateBusDriverAssignment(pivotId, tanggalSelesai: today));
+          }
+        }
+      }
+      await Future.wait(futures);
+    } catch (e) {
+      debugPrint('Error deactivateDriverOnOtherBuses: $e');
+    }
+  }
+
   Future<List<UserModel>> getDriverBusStudents(int busId) async {
     final res = await _api.get('/driver/buses/$busId/students');
     if (!res.success || res.data == null) return [];
 
-    // Debug: print struktur response
     debugPrint('[BusService] raw data: ${res.data}');
 
     final wrapper = res.data!['data'];
@@ -166,7 +241,6 @@ class BusService {
         }
 
         final merged = {
-          // Data dari user object, fallback ke field student jika user null
           'id': userId,
           'name': user?['name'] ?? student['name'] ?? 'Siswa',
           'email': user?['email'] ?? student['email'] ?? '',
@@ -176,11 +250,9 @@ class BusService {
           'created_at': user?['created_at'] ??
               student['created_at'] ??
               DateTime.now().toIso8601String(),
-          // Data student sebagai nested object
           'student': {
             'id': student['id'] ?? 0,
-            'user_id':
-                userId, // FIX: wajib ada agar StudentDetail.fromJson tidak crash
+            'user_id': userId,
             'nis': student['nis'] ?? '',
             'sekolah': student['sekolah'] ?? '',
             'kelas': student['kelas'] ?? '',
@@ -202,7 +274,6 @@ class BusService {
     return result;
   }
 
-  /// Khusus admin — pakai /buses/{id}/students
   Future<List<UserModel>> getBusStudents(int busId) async {
     final res = await _api.get('/buses/$busId/students');
     if (!res.success || res.data == null) return [];
@@ -210,7 +281,6 @@ class BusService {
     final list = raw is List ? raw : (raw?['data'] as List? ?? []);
     return list.map((e) {
       final json = e as Map<String, dynamic>;
-      // Response dari getBusStudents: student object dengan relasi user
       if (json['user'] != null) {
         final userJson =
             Map<String, dynamic>.from(json['user'] as Map<String, dynamic>);
@@ -247,23 +317,17 @@ class BusService {
         .toList();
   }
 
-  /// Cek apakah token tersedia sebelum melakukan request
   Future<bool> hasValidToken() async {
     final token = await _api.getToken();
     return token != null && token.isNotEmpty;
   }
 
-  /// Parsing response dashboard: backend kirim {'data': {'count': N, 'data': [...]}}
-  /// Ekstrak list bus dari struktur nested tersebut.
   List<BusModel> _parseDashboardList(Map<String, dynamic> responseData) {
-    // Struktur response: responseData = {'data': {'count': N, 'data': [...]}, ...}
     final outer = responseData['data'];
     List? list;
     if (outer is Map) {
-      // {'data': {'count': N, 'data': [...]}} — struktur normal backend
       list = outer['data'] as List?;
     } else if (outer is List) {
-      // Fallback jika backend kirim array langsung
       list = outer;
     }
     list ??= [];
@@ -292,8 +356,6 @@ class BusService {
     }).toList();
   }
 
-  /// Versi getGpsDashboard yang juga mengembalikan status code HTTP
-  /// sehingga polling bisa mendeteksi 401 dan berhenti sendiri.
   Future<({List<BusModel> buses, int statusCode})>
       getGpsDashboardWithStatus() async {
     final res = await _api.get('/gps-tracks/dashboard');
@@ -354,13 +416,12 @@ class BusService {
                   'user': {'name': d['driver_name']}
                 }
               : null,
-          'current_position': pos, // kirim pos apa adanya, boleh null
+          'current_position': pos,
           'routes': d['routes'] ?? [],
           'created_at': DateTime.now().toIso8601String(),
         });
 
         if (gpsActive && pos != null) {
-          // GPS aktif DAN sudah ada koordinat — update posisi
           bus.updateGps(
             latitude: (pos['latitude'] as num?)?.toDouble() ?? 0,
             longitude: (pos['longitude'] as num?)?.toDouble() ?? 0,
