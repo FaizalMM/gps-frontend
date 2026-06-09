@@ -11,9 +11,6 @@ import '../../services/gps_service.dart';
 class QrCodeScreen extends StatefulWidget {
   final UserModel siswa;
 
-  /// Callback saat tombol back ditekan. Jika null, pakai Navigator.pop biasa.
-  /// Harus diisi saat QrCodeScreen dipakai dalam IndexedStack (bukan Navigator push)
-  /// agar tidak terjadi layar hitam.
   final VoidCallback? onBack;
   const QrCodeScreen({super.key, required this.siswa, this.onBack});
   @override
@@ -30,27 +27,28 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   String? _namaHalte;
   double? _jarakKeHalte;
 
-  // Status polling absensi — setelah QR berhasil dibuat, poll tiap 10 detik
-  // untuk cek apakah driver sudah menscan QR siswa
   Timer? _pollTimer;
-  bool _isScanned =
-      false; // QR sudah discan driver (status checked_in/checked_out)
-  bool _isOnTrip = false; // Siswa sedang dalam perjalanan
-  bool _isPendingServer =
-      false; // QR sudah teregister di server (status pending, menunggu scan)
-  String? _scannedAt; // Waktu scan (jam naik)
-  String? _scannedHalte; // Halte naik
-  String? _scannedBus; // Bus yang dinaiki
+  bool _isScanned = false;
+  bool _isOnTrip = false;
+  bool _isPendingServer = false;
+  String? _scannedAt;
+  String? _scannedHalte;
+  String? _scannedBus;
 
   @override
   void initState() {
     super.initState();
+    _namaHalte = widget.siswa.studentDetail?.namaHalte.isNotEmpty == true
+        ? widget.siswa.studentDetail!.namaHalte
+        : null;
     if (widget.siswa.status == AccountStatus.active) {
-      // Selalu generate QR saat buka halaman.
-      // Backend akan reuse qr_id yang sama jika hari ini sudah ada record pending.
-      _generateQr();
-      _checkAttendanceStatus();
+      _initQr();
     }
+  }
+
+  Future<void> _initQr() async {
+    await _generateQr();
+    await _checkAttendanceStatus();
   }
 
   @override
@@ -59,8 +57,8 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
     super.dispose();
   }
 
-  /// Cek status absensi hari ini — apakah sudah discan driver
   Future<void> _checkAttendanceStatus() async {
+    if (_errorMsg != null) return;
     try {
       final result = await StudentService()
           .getMyAttendanceToday(int.parse(widget.siswa.idStr));
@@ -96,12 +94,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             _scannedHalte = latest['halte_naik'] as String?;
             _scannedBus = latest['bus_code'] as String?;
           });
-          // Sudah discan driver — stop polling
           _pollTimer?.cancel();
           return;
         }
       }
-      // Tidak ada attendance atau status tidak dikenal — lanjut polling
       _startPolling();
     } catch (_) {
       _startPolling();
@@ -120,9 +116,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
     });
   }
 
-  // Status apakah sedang di fase ambil GPS (sebelum hit server)
   bool _isGettingGps = false;
-  // Jarak terakhir ke halte & bus (untuk info ke siswa)
   String? _jarakInfo;
 
   Future<void> _generateQr() async {
@@ -134,7 +128,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       _jarakInfo = null;
     });
 
-    // dapatkan koordinat GPS
     final pos = await _gpsService.getCurrentPosition();
     if (!mounted) return;
 
@@ -148,7 +141,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
       return;
     }
 
-    // kirim koordinat ke server
     setState(() => _isGettingGps = false);
 
     final result = await StudentService().generateQrCode(
@@ -186,7 +178,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
           _errorMsg = errMsg;
         }
       } else {
-        // Sukses — parse data QR
         _jarakInfo = null;
         if (result['qr_data'] != null) {
           final qrMap = result['qr_data'];
@@ -199,7 +190,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         final halteInfo = result['halte_info'] as Map<String, dynamic>?;
         _namaHalte = halteInfo?['nama_halte'] as String?;
         _jarakKeHalte = (result['distance_to_halte'] as num?)?.toDouble();
-        // Mulai polling setelah QR berhasil dibuat
         _startPolling();
       }
     });
@@ -225,8 +215,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: AppColors.black, size: 20),
           onPressed: () {
-            // Gunakan callback jika tersedia (mode IndexedStack)
-            // agar tidak terjadi layar hitam saat di-pop dari dalam stack
             if (widget.onBack != null) {
               widget.onBack!();
             } else {
@@ -401,7 +389,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               ]),
             ),
             const SizedBox(height: 12),
-          ] else if (_isPendingServer && !_isLoading) ...[
+          ] else if (_isPendingServer && !_isLoading && _errorMsg == null) ...[
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -455,7 +443,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ),
             const SizedBox(height: 12),
           ] else if (_qrData != null && !_isLoading) ...[
-            // ── QR baru dibuat, belum ada konfirmasi dari server ──
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
@@ -494,7 +481,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               ],
             ),
             child: Column(children: [
-              // Header gradient
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
@@ -551,13 +537,10 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                   ),
                 ]),
               ),
-
-              // QR area
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Column(children: [
                   if (isActive) ...[
-                    // QR aktif atau loading
                     if (_isLoading)
                       SizedBox(
                           height: 200,
@@ -634,7 +617,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                                         : AppColors.red,
                                     height: 1.5),
                               ),
-                              // Info jarak jika tersedia
                               if (_jarakInfo != null) ...[
                                 const SizedBox(height: 6),
                                 Container(
@@ -654,7 +636,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                                   ),
                                 ),
                               ],
-                              // Tips tindakan
                               if (_errorMsg!.contains('halte') ||
                                   _errorMsg!.contains('Tunggu')) ...[
                                 const SizedBox(height: 8),
@@ -716,8 +697,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                               color: AppColors.textGrey,
                               letterSpacing: 1.2)),
                       const SizedBox(height: 6),
-                      // QR sudah persisten sepanjang hari — tidak perlu tombol refresh.
-                      // Saat dibuka ulang, qr_id yang sama akan ditampilkan kembali.
                       const Text(
                         'QR ini berlaku hingga 23:59 hari ini',
                         style: TextStyle(
@@ -726,7 +705,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                             color: AppColors.textGrey),
                       ),
                     ] else ...[
-                      // Belum ada QR (belum generate)
                       Container(
                         width: 180,
                         height: 180,
@@ -752,7 +730,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       ),
                     ],
                   ] else ...[
-                    // QR belum aktif — placeholder
                     Container(
                       width: 180,
                       height: 180,
@@ -801,7 +778,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                   ],
                 ]),
               ),
-
               Container(
                   height: 1,
                   margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -809,7 +785,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                 child: Column(children: [
-                  // Row halte
                   Row(children: [
                     Icon(Icons.location_on_rounded,
                         color:
@@ -828,14 +803,12 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                                   color: AppColors.textGrey,
                                   letterSpacing: 0.8)),
                           Text(
-                            hasQr && _namaHalte != null
+                            _namaHalte != null
                                 ? _namaHalte! +
                                     (_jarakKeHalte != null
                                         ? ' (${_jarakKeHalte! < 1000 ? "${_jarakKeHalte!.round()} m" : "${(_jarakKeHalte! / 1000).toStringAsFixed(1)} km"})'
                                         : '')
-                                : siswa.alamat.isNotEmpty
-                                    ? siswa.alamat
-                                    : 'Belum diatur',
+                                : 'Belum diatur',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -870,7 +843,6 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
                       ),
                     ],
                   ]),
-                  // Row expired
                   if (hasQr && _expiresAt != null) ...[
                     const SizedBox(height: 8),
                     Row(children: [
