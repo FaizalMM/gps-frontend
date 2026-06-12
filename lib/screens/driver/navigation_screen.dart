@@ -4,21 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
+import 'package:provider/provider.dart';
 import '../../models/models_api.dart';
 import '../../services/routing_service.dart';
+import '../../services/auth_provider.dart';
 import '../../utils/app_theme.dart';
 
-/// Layar navigasi fullscreen ala Google Maps untuk driver.
-/// Peta heading-up (rotasi sesuai arah bus), banner halte di atas,
-/// panel info di bawah.
 class NavigationScreen extends StatefulWidget {
   final BusModel bus;
   final LatLng initialDriverPos;
   final List<LatLng> initialPolyline;
   final int initialHalteIndex;
   final HalteModel? initialTargetHalte;
-
-  /// Stream posisi driver dari GpsService — dikirim dari driver_dashboard
   final Stream<({LatLng pos, double heading, double speed})> positionStream;
 
   const NavigationScreen({
@@ -54,12 +51,12 @@ class _NavigationScreenState extends State<NavigationScreen>
   bool _userInteracting = false;
   DateTime? _lastInteractionTime;
 
-  // Animasi kompas
   late final AnimationController _compassAnim;
   late Animation<double> _compassRotation;
   double _prevHeading = 0;
 
   bool _navRequestInProgress = false;
+  Timer? _busRefreshTimer;
 
   @override
   void initState() {
@@ -83,6 +80,29 @@ class _NavigationScreenState extends State<NavigationScreen>
     _compassRotation = Tween<double>(begin: 0, end: 0).animate(_compassAnim);
 
     _posSub = widget.positionStream.listen(_onPosition);
+
+    _busRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _refreshBusData();
+    });
+  }
+
+  Future<void> _refreshBusData() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.refreshDriverBus();
+      final updatedBus = authProvider.authService.cachedDriverBus;
+      if (!mounted || updatedBus == null) return;
+
+      if (updatedBus.routeList.isNotEmpty) {
+        final haltes = updatedBus.routeList.first.haltes;
+        if (_targetHalteIndex < haltes.length) {
+          final newTargetHalte = haltes[_targetHalteIndex].halte;
+          if (newTargetHalte?.id != _targetHalte?.id) {
+            setState(() => _targetHalte = newTargetHalte);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -92,8 +112,8 @@ class _NavigationScreenState extends State<NavigationScreen>
       statusBarIconBrightness: Brightness.dark,
     ));
     _posSub?.cancel();
+    _busRefreshTimer?.cancel();
     _compassAnim.dispose();
-    // MapController tidak perlu dispose di flutter_map 7
     super.dispose();
   }
 
@@ -108,7 +128,6 @@ class _NavigationScreenState extends State<NavigationScreen>
       if (headingChanged) _heading = data.heading;
     });
 
-    // Animasi kompas
     if (headingChanged) {
       _compassRotation = Tween<double>(
         begin: _prevHeading,
@@ -118,7 +137,6 @@ class _NavigationScreenState extends State<NavigationScreen>
       _prevHeading = data.heading;
     }
 
-    // Geser + rotate kamera
     if (!_isUserInteracting) {
       _mapController.move(_driverPos, _mapController.camera.zoom);
       if (_headingUp) {
@@ -239,7 +257,6 @@ class _NavigationScreenState extends State<NavigationScreen>
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // ── Peta fullscreen ───────────────────────────────────────────
             FlutterMap(
               mapController: _mapController,
               options: MapOptions(
@@ -258,7 +275,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                 },
               ),
               children: [
-                // Tile peta
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   fallbackUrl:
@@ -270,8 +286,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                         'Mobitra/1.0 (school bus tracker; contact@mobitra.app)',
                   },
                 ),
-
-                // Rute bus keseluruhan (abu-abu tipis)
                 if (widget.bus.routeList.isNotEmpty &&
                     widget.bus.routeList.first.polyline.isNotEmpty)
                   PolylineLayer(polylines: [
@@ -283,8 +297,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                       strokeWidth: 5,
                     ),
                   ]),
-
-                // Polyline navigasi — dua layer (shadow + biru tebal)
                 if (_polyline.isNotEmpty) ...[
                   PolylineLayer(polylines: [
                     Polyline(
@@ -301,8 +313,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                     ),
                   ]),
                 ],
-
-                // Marker halte
                 MarkerLayer(
                   markers: [
                     ...haltes.asMap().entries.map((e) {
@@ -346,8 +356,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                     }).whereType<Marker>(),
                   ],
                 ),
-
-                // Marker driver — panah arah bus
                 MarkerLayer(markers: [
                   Marker(
                     point: _driverPos,
@@ -367,8 +375,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                 ]),
               ],
             ),
-
-            // ── Banner halte atas ──────────────────────────────────────────
             Positioned(
               top: safeTop + 8,
               left: 12,
@@ -466,8 +472,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                 ],
               ),
             ),
-
-            // ── Tombol kompas + recenter ───────────────────────────────────
             Positioned(
               right: 12,
               top: safeTop + 150,
@@ -496,8 +500,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                 ),
               ]),
             ),
-
-            // ── Panel bawah ────────────────────────────────────────────────
             Positioned(
               left: 0,
               right: 0,
@@ -526,8 +528,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                               borderRadius: BorderRadius.circular(2))),
                     ),
                     const SizedBox(height: 14),
-
-                    // Info chips
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -552,8 +552,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                       ],
                     ),
                     const SizedBox(height: 14),
-
-                    // Progress bar
                     if (totalHaltes > 0) ...[
                       Row(children: [
                         Text('$passed halte terlewati',
@@ -581,8 +579,6 @@ class _NavigationScreenState extends State<NavigationScreen>
                       ),
                       const SizedBox(height: 14),
                     ],
-
-                    // Tombol keluar
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
@@ -615,7 +611,6 @@ class _NavigationScreenState extends State<NavigationScreen>
   }
 }
 
-// ── Reusable map button ───────────────────────────────────────────────────────
 class _MapButton extends StatelessWidget {
   final VoidCallback onTap;
   final Widget child;
@@ -641,7 +636,6 @@ class _MapButton extends StatelessWidget {
   }
 }
 
-// ── Info Chip ─────────────────────────────────────────────────────────────────
 class _InfoChip extends StatelessWidget {
   final IconData icon;
   final String value;
@@ -680,14 +674,12 @@ class _InfoChip extends StatelessWidget {
   }
 }
 
-// ── Bus Arrow Painter ─────────────────────────────────────────────────────────
 class _BusArrowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
-    // Shadow
     canvas.drawPath(
       Path()
         ..moveTo(cx, cy - 18)
@@ -700,7 +692,6 @@ class _BusArrowPainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
 
-    // Outline putih
     canvas.drawPath(
       Path()
         ..moveTo(cx, cy - 20)
@@ -713,7 +704,6 @@ class _BusArrowPainter extends CustomPainter {
         ..style = PaintingStyle.fill,
     );
 
-    // Fill biru
     canvas.drawPath(
       Path()
         ..moveTo(cx, cy - 18)
@@ -726,7 +716,6 @@ class _BusArrowPainter extends CustomPainter {
         ..style = PaintingStyle.fill,
     );
 
-    // Titik tengah
     canvas.drawCircle(Offset(cx, cy + 2), 4, Paint()..color = Colors.white);
   }
 

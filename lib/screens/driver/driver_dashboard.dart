@@ -34,6 +34,7 @@ class _DriverDashboardState extends State<DriverDashboard> {
   BusModel? _driverBus;
 
   bool _isRefreshingBus = false;
+  Timer? _busRefreshTimer;
 
   @override
   void initState() {
@@ -42,14 +43,23 @@ class _DriverDashboardState extends State<DriverDashboard> {
         .authService
         .cachedDriverBus;
 
-    if (_driverBus == null) {
-      _refreshBusFromApi();
-    }
+    _refreshBusFromApi();
+    _busRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _refreshBusFromApi();
+    });
+  }
+
+  @override
+  void dispose() {
+    _busRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _refreshBusFromApi() async {
     if (!mounted) return;
-    setState(() => _isRefreshingBus = true);
+    if (_driverBus == null) {
+      setState(() => _isRefreshingBus = true);
+    }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.refreshDriverBus();
@@ -596,7 +606,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                             fontFamily: 'Poppins',
                             fontSize: 14,
                             color: AppColors.textGrey)),
-                    // ── Judul "Siap Beroperasi" tanpa emoji ──
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -960,7 +969,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                             fontWeight: FontWeight.w700,
                             color: AppColors.black)),
                     const SizedBox(height: 12),
-
                     Row(children: [
                       Expanded(
                         child: _ActionCard(
@@ -996,13 +1004,11 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                       ),
                     ]),
                     const SizedBox(height: 12),
-
                     _SelesaiBertugasButton(
                       bus: widget.bus,
                       attendanceCount: _attendanceToday.length,
                     ),
                     const SizedBox(height: 24),
-
                     Row(children: [
                       const Expanded(
                           child: Text('Penumpang Hari Ini',
@@ -1036,7 +1042,6 @@ class _DriverHomeTabState extends State<_DriverHomeTab>
                       ),
                     ]),
                     const SizedBox(height: 10),
-
                     if (_attendanceToday.isEmpty)
                       Container(
                         width: double.infinity,
@@ -1816,8 +1821,6 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
-
-// ── Profile Tab
 
 class _DriverProfileTab extends StatefulWidget {
   final UserModel driver;

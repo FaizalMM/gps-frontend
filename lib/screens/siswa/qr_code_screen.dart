@@ -28,6 +28,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   double? _jarakKeHalte;
 
   Timer? _pollTimer;
+  Timer? _autoRefreshTimer;
   bool _isScanned = false;
   bool _isOnTrip = false;
   bool _isPendingServer = false;
@@ -43,7 +44,16 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
         : null;
     if (widget.siswa.status == AccountStatus.active) {
       _initQr();
+      _startAutoRefresh();
     }
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted || _isScanned) return;
+      _checkAttendanceStatus();
+    });
   }
 
   Future<void> _initQr() async {
@@ -54,6 +64,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _autoRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -88,8 +99,7 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
           setState(() {
             _isScanned = true;
             _isPendingServer = false;
-            _isOnTrip =
-                waktuTurun == null; // masih di perjalanan jika belum checkout
+            _isOnTrip = waktuTurun == null;
             _scannedAt = jamNaik;
             _scannedHalte = latest['halte_naik'] as String?;
             _scannedBus = latest['bus_code'] as String?;
@@ -238,679 +248,692 @@ class _QrCodeScreenState extends State<QrCodeScreen> {
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-        child: Column(children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? AppColors.primaryLight
-                  : isPending
-                      ? AppColors.orange.withValues(alpha: 0.1)
-                      : AppColors.red.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: isActive
-                      ? AppColors.primary.withValues(alpha: 0.3)
-                      : isPending
-                          ? AppColors.orange.withValues(alpha: 0.3)
-                          : AppColors.red.withValues(alpha: 0.2)),
-            ),
-            child: Row(children: [
-              Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.primary
-                        : isPending
-                            ? AppColors.orange
-                            : AppColors.red,
-                    shape: BoxShape.circle,
-                  )),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(
-                      isActive
-                          ? 'Status Scan Aktif'
-                          : isPending
-                              ? 'Menunggu Persetujuan Admin'
-                              : 'Akun Tidak Aktif',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isActive
-                              ? AppColors.primary
-                              : isPending
-                                  ? AppColors.orange
-                                  : AppColors.red),
-                    ),
-                    Text(
-                      isActive
-                          ? 'Siap untuk di-scan driver'
-                          : isPending
-                              ? 'QR aktif setelah admin menyetujui akun kamu'
-                              : 'Hubungi admin untuk mengaktifkan akun',
-                      style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          color: isActive
-                              ? AppColors.primaryDark
-                              : isPending
-                                  ? AppColors.orange.withValues(alpha: 0.8)
-                                  : AppColors.red.withValues(alpha: 0.7)),
-                    ),
-                  ])),
-              Icon(
-                isActive
-                    ? Icons.check_circle_rounded
-                    : isPending
-                        ? Icons.access_time_rounded
-                        : Icons.cancel_rounded,
-                color: isActive
-                    ? AppColors.primary
-                    : isPending
-                        ? AppColors.orange
-                        : AppColors.red,
-                size: 18,
-              ),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          if (_isScanned) ...[
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: () async {
+          await _initQr();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+          child: Column(children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: _isOnTrip
-                    ? const Color(0xFFE8F5E9)
-                    : AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: _isOnTrip
-                        ? Colors.green.withValues(alpha: 0.4)
-                        : AppColors.primary.withValues(alpha: 0.3)),
-              ),
-              child: Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                      color: _isOnTrip
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : AppColors.primaryLight,
-                      shape: BoxShape.circle),
-                  child: Icon(
-                    _isOnTrip
-                        ? Icons.directions_bus_rounded
-                        : Icons.check_circle_rounded,
-                    color: _isOnTrip ? Colors.green : AppColors.primary,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isOnTrip
-                              ? 'Kamu sedang dalam perjalanan!'
-                              : '✅ Perjalanan selesai hari ini',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: _isOnTrip
-                                  ? Colors.green.shade800
-                                  : AppColors.primary),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          [
-                            if (_scannedAt != null) 'Naik jam $_scannedAt',
-                            if (_scannedHalte != null) 'di $_scannedHalte',
-                            if (_scannedBus != null) '• Bus $_scannedBus',
-                          ].join(' '),
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              color: _isOnTrip
-                                  ? Colors.green.shade700
-                                  : AppColors.primaryDark),
-                        ),
-                      ]),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-          ] else if (_isPendingServer && !_isLoading && _errorMsg == null) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
-                borderRadius: BorderRadius.circular(14),
-                border:
-                    Border.all(color: AppColors.orange.withValues(alpha: 0.4)),
-              ),
-              child: Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                      color: AppColors.orange.withValues(alpha: 0.12),
-                      shape: BoxShape.circle),
-                  child: const Icon(Icons.qr_code_2_rounded,
-                      color: AppColors.orange, size: 20),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'QR siap — tunjukkan ke driver!',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.orange),
-                        ),
-                        SizedBox(height: 2),
-                        Row(children: [
-                          SizedBox(
-                              width: 10,
-                              height: 10,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 1.5, color: AppColors.orange)),
-                          SizedBox(width: 6),
-                          Text(
-                            'Menunggu driver scan...',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 11,
-                                color: AppColors.orange),
-                          ),
-                        ]),
-                      ]),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-          ] else if (_qrData != null && !_isLoading) ...[
-            Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(12)),
-              child: const Row(children: [
-                SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 1.5, color: AppColors.textGrey)),
-                SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Menunggu driver scan QR kamu...',
-                    style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 12,
-                        color: AppColors.textGrey),
-                  ),
-                ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-          ],
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8))
-              ],
-            ),
-            child: Column(children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isActive
-                        ? [AppColors.primary, AppColors.primaryDark]
-                        : [const Color(0xFF9E9E9E), const Color(0xFF757575)],
-                  ),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: Column(children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          width: 2.5),
-                    ),
-                    child: Center(
-                        child: Text(initials,
-                            style: const TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 34,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white))),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(siswa.namaLengkap,
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white)),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Text(studentId,
-                        style: const TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white)),
-                  ),
-                ]),
+                color: isActive
+                    ? AppColors.primaryLight
+                    : isPending
+                        ? AppColors.orange.withValues(alpha: 0.1)
+                        : AppColors.red.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: isActive
+                        ? AppColors.primary.withValues(alpha: 0.3)
+                        : isPending
+                            ? AppColors.orange.withValues(alpha: 0.3)
+                            : AppColors.red.withValues(alpha: 0.2)),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-                child: Column(children: [
-                  if (isActive) ...[
-                    if (_isLoading)
-                      SizedBox(
-                          height: 200,
-                          width: 200,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const CircularProgressIndicator(
-                                    color: AppColors.primary),
-                                const SizedBox(height: 14),
-                                Text(
-                                  _isGettingGps
-                                      ? 'Mendapatkan lokasi GPS...'
-                                      : 'Membuat QR Code...',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 12,
-                                      color: AppColors.textGrey),
-                                ),
-                              ],
-                            ),
-                          ))
-                    else if (_errorMsg != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                            color: _errorMsg!.contains('halte') ||
-                                    _errorMsg!.contains('dekat') ||
-                                    _errorMsg!.contains('Tunggu')
-                                ? AppColors.orange.withValues(alpha: 0.06)
-                                : AppColors.red.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: _errorMsg!.contains('halte') ||
-                                        _errorMsg!.contains('dekat') ||
-                                        _errorMsg!.contains('Tunggu')
-                                    ? AppColors.orange.withValues(alpha: 0.3)
-                                    : AppColors.red.withValues(alpha: 0.2))),
-                        child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _errorMsg!.contains('GPS') ||
-                                        _errorMsg!.contains('lokasi')
-                                    ? Icons.location_off_rounded
-                                    : _errorMsg!.contains('halte') ||
-                                            _errorMsg!.contains('dekat') ||
-                                            _errorMsg!.contains('Tunggu')
-                                        ? Icons.place_rounded
-                                        : _errorMsg!.contains('perjalanan')
-                                            ? Icons.directions_bus_rounded
-                                            : Icons.error_outline_rounded,
-                                size: 36,
-                                color: _errorMsg!.contains('halte') ||
-                                        _errorMsg!.contains('dekat') ||
-                                        _errorMsg!.contains('Tunggu')
+              child: Row(children: [
+                Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? AppColors.primary
+                          : isPending
+                              ? AppColors.orange
+                              : AppColors.red,
+                      shape: BoxShape.circle,
+                    )),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(
+                        isActive
+                            ? 'Status Scan Aktif'
+                            : isPending
+                                ? 'Menunggu Persetujuan Admin'
+                                : 'Akun Tidak Aktif',
+                        style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isActive
+                                ? AppColors.primary
+                                : isPending
                                     ? AppColors.orange
-                                    : AppColors.red,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _errorMsg!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 11,
-                                    color: _errorMsg!.contains('halte') ||
-                                            _errorMsg!.contains('dekat') ||
-                                            _errorMsg!.contains('Tunggu')
-                                        ? AppColors.orange
-                                        : AppColors.red,
-                                    height: 1.5),
-                              ),
-                              if (_jarakInfo != null) ...[
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                      color: AppColors.orange
-                                          .withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(20)),
-                                  child: Text(
-                                    '$_jarakInfo',
-                                    style: const TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 10,
-                                        color: AppColors.orange,
-                                        fontWeight: FontWeight.w600),
-                                  ),
-                                ),
-                              ],
-                              if (_errorMsg!.contains('halte') ||
-                                  _errorMsg!.contains('Tunggu')) ...[
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Mendekat ke halte atau tunggu bus tiba',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 10,
-                                      color: AppColors.textGrey),
-                                ),
-                              ],
-                            ]),
+                                    : AppColors.red),
                       ),
-                      const SizedBox(height: 10),
-                      TextButton.icon(
-                        onPressed: _generateQr,
-                        icon: const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Coba Lagi',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontWeight: FontWeight.w600)),
-                        style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary),
-                      ),
-                    ] else if (hasQr) ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: AppColors.lightGrey, width: 1.5),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2))
-                          ],
-                        ),
-                        child: QrImageView(
-                          data: qrData,
-                          version: QrVersions.auto,
-                          size: 180,
-                          eyeStyle: const QrEyeStyle(
-                              eyeShape: QrEyeShape.square,
-                              color: AppColors.black),
-                          dataModuleStyle: const QrDataModuleStyle(
-                              dataModuleShape: QrDataModuleShape.square,
-                              color: AppColors.black),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('PINDAI UNTUK VERIFIKASI',
-                          style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textGrey,
-                              letterSpacing: 1.2)),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'QR ini berlaku hingga 23:59 hari ini',
+                      Text(
+                        isActive
+                            ? 'Siap untuk di-scan driver'
+                            : isPending
+                                ? 'QR aktif setelah admin menyetujui akun kamu'
+                                : 'Hubungi admin untuk mengaktifkan akun',
                         style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 11,
-                            color: AppColors.textGrey),
+                            color: isActive
+                                ? AppColors.primaryDark
+                                : isPending
+                                    ? AppColors.orange.withValues(alpha: 0.8)
+                                    : AppColors.red.withValues(alpha: 0.7)),
                       ),
+                    ])),
+                Icon(
+                  isActive
+                      ? Icons.check_circle_rounded
+                      : isPending
+                          ? Icons.access_time_rounded
+                          : Icons.cancel_rounded,
+                  color: isActive
+                      ? AppColors.primary
+                      : isPending
+                          ? AppColors.orange
+                          : AppColors.red,
+                  size: 18,
+                ),
+              ]),
+            ),
+            const SizedBox(height: 12),
+            if (_isScanned) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: _isOnTrip
+                      ? const Color(0xFFE8F5E9)
+                      : AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: _isOnTrip
+                          ? Colors.green.withValues(alpha: 0.4)
+                          : AppColors.primary.withValues(alpha: 0.3)),
+                ),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: _isOnTrip
+                            ? Colors.green.withValues(alpha: 0.15)
+                            : AppColors.primaryLight,
+                        shape: BoxShape.circle),
+                    child: Icon(
+                      _isOnTrip
+                          ? Icons.directions_bus_rounded
+                          : Icons.check_circle_rounded,
+                      color: _isOnTrip ? Colors.green : AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _isOnTrip
+                                ? 'Kamu sedang dalam perjalanan!'
+                                : '✅ Perjalanan selesai hari ini',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: _isOnTrip
+                                    ? Colors.green.shade800
+                                    : AppColors.primary),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              if (_scannedAt != null) 'Naik jam $_scannedAt',
+                              if (_scannedHalte != null) 'di $_scannedHalte',
+                              if (_scannedBus != null) '• Bus $_scannedBus',
+                            ].join(' '),
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: _isOnTrip
+                                    ? Colors.green.shade700
+                                    : AppColors.primaryDark),
+                          ),
+                        ]),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+            ] else if (_isPendingServer &&
+                !_isLoading &&
+                _errorMsg == null) ...[
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: AppColors.orange.withValues(alpha: 0.4)),
+                ),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: AppColors.orange.withValues(alpha: 0.12),
+                        shape: BoxShape.circle),
+                    child: const Icon(Icons.qr_code_2_rounded,
+                        color: AppColors.orange, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'QR siap — tunjukkan ke driver!',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.orange),
+                          ),
+                          SizedBox(height: 2),
+                          Row(children: [
+                            SizedBox(
+                                width: 10,
+                                height: 10,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 1.5, color: AppColors.orange)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Menunggu driver scan...',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 11,
+                                  color: AppColors.orange),
+                            ),
+                          ]),
+                        ]),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+            ] else if (_qrData != null && !_isLoading) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(12)),
+                child: const Row(children: [
+                  SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1.5, color: AppColors.textGrey)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Menunggu driver scan QR kamu...',
+                      style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12,
+                          color: AppColors.textGrey),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.10),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8))
+                ],
+              ),
+              child: Column(children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isActive
+                          ? [AppColors.primary, AppColors.primaryDark]
+                          : [const Color(0xFF9E9E9E), const Color(0xFF757575)],
+                    ),
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: Column(children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            width: 2.5),
+                      ),
+                      child: Center(
+                          child: Text(initials,
+                              style: const TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white))),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(siswa.namaLengkap,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: Text(studentId,
+                          style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white)),
+                    ),
+                  ]),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                  child: Column(children: [
+                    if (isActive) ...[
+                      if (_isLoading)
+                        SizedBox(
+                            height: 200,
+                            width: 200,
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const CircularProgressIndicator(
+                                      color: AppColors.primary),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    _isGettingGps
+                                        ? 'Mendapatkan lokasi GPS...'
+                                        : 'Membuat QR Code...',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12,
+                                        color: AppColors.textGrey),
+                                  ),
+                                ],
+                              ),
+                            ))
+                      else if (_errorMsg != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                              color: _errorMsg!.contains('halte') ||
+                                      _errorMsg!.contains('dekat') ||
+                                      _errorMsg!.contains('Tunggu')
+                                  ? AppColors.orange.withValues(alpha: 0.06)
+                                  : AppColors.red.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: _errorMsg!.contains('halte') ||
+                                          _errorMsg!.contains('dekat') ||
+                                          _errorMsg!.contains('Tunggu')
+                                      ? AppColors.orange.withValues(alpha: 0.3)
+                                      : AppColors.red.withValues(alpha: 0.2))),
+                          child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _errorMsg!.contains('GPS') ||
+                                          _errorMsg!.contains('lokasi')
+                                      ? Icons.location_off_rounded
+                                      : _errorMsg!.contains('halte') ||
+                                              _errorMsg!.contains('dekat') ||
+                                              _errorMsg!.contains('Tunggu')
+                                          ? Icons.place_rounded
+                                          : _errorMsg!.contains('perjalanan')
+                                              ? Icons.directions_bus_rounded
+                                              : Icons.error_outline_rounded,
+                                  size: 36,
+                                  color: _errorMsg!.contains('halte') ||
+                                          _errorMsg!.contains('dekat') ||
+                                          _errorMsg!.contains('Tunggu')
+                                      ? AppColors.orange
+                                      : AppColors.red,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _errorMsg!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 11,
+                                      color: _errorMsg!.contains('halte') ||
+                                              _errorMsg!.contains('dekat') ||
+                                              _errorMsg!.contains('Tunggu')
+                                          ? AppColors.orange
+                                          : AppColors.red,
+                                      height: 1.5),
+                                ),
+                                if (_jarakInfo != null) ...[
+                                  const SizedBox(height: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: AppColors.orange
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(20)),
+                                    child: Text(
+                                      '$_jarakInfo',
+                                      style: const TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 10,
+                                          color: AppColors.orange,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                                if (_errorMsg!.contains('halte') ||
+                                    _errorMsg!.contains('Tunggu')) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Mendekat ke halte atau tunggu bus tiba',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 10,
+                                        color: AppColors.textGrey),
+                                  ),
+                                ],
+                              ]),
+                        ),
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          onPressed: _generateQr,
+                          icon: const Icon(Icons.refresh_rounded, size: 16),
+                          label: const Text('Coba Lagi',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w600)),
+                          style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary),
+                        ),
+                      ] else if (hasQr) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: AppColors.lightGrey, width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2))
+                            ],
+                          ),
+                          child: QrImageView(
+                            data: qrData,
+                            version: QrVersions.auto,
+                            size: 180,
+                            eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: AppColors.black),
+                            dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: AppColors.black),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('PINDAI UNTUK VERIFIKASI',
+                            style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textGrey,
+                                letterSpacing: 1.2)),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'QR ini berlaku hingga 23:59 hari ini',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              color: AppColors.textGrey),
+                        ),
+                      ] else ...[
+                        Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                              color: AppColors.surface2,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: AppColors.lightGrey, width: 1.5)),
+                          child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.qr_code_2_rounded,
+                                    size: 60, color: AppColors.lightGrey),
+                                SizedBox(height: 10),
+                                Text('Butuh Lokasi GPS',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12,
+                                        color: AppColors.textGrey,
+                                        height: 1.4)),
+                              ]),
+                        ),
+                      ],
                     ] else ...[
                       Container(
                         width: 180,
                         height: 180,
                         decoration: BoxDecoration(
-                            color: AppColors.surface2,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: AppColors.lightGrey, width: 1.5)),
-                        child: const Column(
+                          color: AppColors.surface2,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: AppColors.lightGrey, width: 1.5),
+                        ),
+                        child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.qr_code_2_rounded,
-                                  size: 60, color: AppColors.lightGrey),
-                              SizedBox(height: 10),
-                              Text('Butuh Lokasi GPS',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 12,
-                                      color: AppColors.textGrey,
-                                      height: 1.4)),
+                              Icon(
+                                isPending
+                                    ? Icons.hourglass_top_rounded
+                                    : Icons.qr_code_2_rounded,
+                                size: 60,
+                                color: AppColors.lightGrey,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                isPending
+                                    ? 'Menunggu\nPersetujuan'
+                                    : 'QR Tidak\nAktif',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 12,
+                                    color: AppColors.textGrey,
+                                    height: 1.4),
+                              ),
                             ]),
                       ),
-                    ],
-                  ] else ...[
-                    Container(
-                      width: 180,
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(16),
-                        border:
-                            Border.all(color: AppColors.lightGrey, width: 1.5),
-                      ),
-                      child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              isPending
-                                  ? Icons.hourglass_top_rounded
-                                  : Icons.qr_code_2_rounded,
-                              size: 60,
-                              color: AppColors.lightGrey,
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              isPending
-                                  ? 'Menunggu\nPersetujuan'
-                                  : 'QR Tidak\nAktif',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 12,
-                                  color: AppColors.textGrey,
-                                  height: 1.4),
-                            ),
-                          ]),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      isPending
-                          ? 'QR akan otomatis aktif saat admin\nmenyetujui pendaftaranmu'
-                          : 'Hubungi admin untuk mengaktifkan akun',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          color: AppColors.textGrey,
-                          height: 1.5),
-                    ),
-                  ],
-                ]),
-              ),
-              Container(
-                  height: 1,
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  color: AppColors.lightGrey),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                child: Column(children: [
-                  Row(children: [
-                    Icon(Icons.location_on_rounded,
-                        color:
-                            isActive ? AppColors.primary : AppColors.textGrey,
-                        size: 15),
-                    const SizedBox(width: 6),
-                    Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          const Text('HALTE NAIK',
-                              style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textGrey,
-                                  letterSpacing: 0.8)),
-                          Text(
-                            _namaHalte != null
-                                ? _namaHalte! +
-                                    (_jarakKeHalte != null
-                                        ? ' (${_jarakKeHalte! < 1000 ? "${_jarakKeHalte!.round()} m" : "${(_jarakKeHalte! / 1000).toStringAsFixed(1)} km"})'
-                                        : '')
-                                : 'Belum diatur',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isActive
-                                    ? AppColors.black
-                                    : AppColors.textGrey),
-                          ),
-                        ])),
-                    if (hasQr && _busCode != null) ...[
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.directions_bus_rounded,
-                              size: 12, color: AppColors.primary),
-                          const SizedBox(width: 4),
-                          Text(_busCode!,
-                              style: const TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary)),
-                        ]),
+                      const SizedBox(height: 12),
+                      Text(
+                        isPending
+                            ? 'QR akan otomatis aktif saat admin\nmenyetujui pendaftaranmu'
+                            : 'Hubungi admin untuk mengaktifkan akun',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            color: AppColors.textGrey,
+                            height: 1.5),
                       ),
                     ],
                   ]),
-                  if (hasQr && _expiresAt != null) ...[
-                    const SizedBox(height: 8),
+                ),
+                Container(
+                    height: 1,
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    color: AppColors.lightGrey),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: Column(children: [
                     Row(children: [
-                      const Icon(Icons.access_time_rounded,
-                          size: 13, color: AppColors.textGrey),
+                      Icon(Icons.location_on_rounded,
+                          color:
+                              isActive ? AppColors.primary : AppColors.textGrey,
+                          size: 15),
                       const SizedBox(width: 6),
-                      const Text(
-                        'QR berlaku hari ini s/d 23:59',
-                        style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 11,
-                            color: AppColors.textGrey),
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            const Text('HALTE NAIK',
+                                style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textGrey,
+                                    letterSpacing: 0.8)),
+                            Text(
+                              _namaHalte != null
+                                  ? _namaHalte! +
+                                      (_jarakKeHalte != null
+                                          ? ' (${_jarakKeHalte! < 1000 ? "${_jarakKeHalte!.round()} m" : "${(_jarakKeHalte! / 1000).toStringAsFixed(1)} km"})'
+                                          : '')
+                                  : 'Belum diatur',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: isActive
+                                      ? AppColors.black
+                                      : AppColors.textGrey),
+                            ),
+                          ])),
+                      if (hasQr && _busCode != null) ...[
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            const Icon(Icons.directions_bus_rounded,
+                                size: 12, color: AppColors.primary),
+                            const SizedBox(width: 4),
+                            Text(_busCode!,
+                                style: const TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primary)),
+                          ]),
                         ),
-                        child: const Text('Expired tiap hari',
-                            style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.pendingOrange)),
-                      ),
+                      ],
                     ]),
-                  ],
-                ]),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04), blurRadius: 8)
-              ],
+                    if (hasQr && _expiresAt != null) ...[
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        const Icon(Icons.access_time_rounded,
+                            size: 13, color: AppColors.textGrey),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'QR berlaku hari ini s/d 23:59',
+                          style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 11,
+                              color: AppColors.textGrey),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('Expired tiap hari',
+                              style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.pendingOrange)),
+                        ),
+                      ]),
+                    ],
+                  ]),
+                ),
+              ]),
             ),
-            child: Row(children: [
-              Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.info_outline_rounded,
-                      color: AppColors.primary, size: 18)),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Text(
-                isActive
-                    ? 'Tunjukkan QR ini kepada driver saat naik bus. QR otomatis memvalidasi rute kamu.'
-                    : 'QR Code kamu akan otomatis aktif begitu admin menyetujui pendaftaranmu. Tidak perlu langkah tambahan.',
-                style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 12,
-                    color: AppColors.textGrey,
-                    height: 1.4),
-              )),
-            ]),
-          ),
-        ]),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.04),
+                      blurRadius: 8)
+                ],
+              ),
+              child: Row(children: [
+                Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.info_outline_rounded,
+                        color: AppColors.primary, size: 18)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Text(
+                  isActive
+                      ? 'Tunjukkan QR ini kepada driver saat naik bus. QR otomatis memvalidasi rute kamu.'
+                      : 'QR Code kamu akan otomatis aktif begitu admin menyetujui pendaftaranmu. Tidak perlu langkah tambahan.',
+                  style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 12,
+                      color: AppColors.textGrey,
+                      height: 1.4),
+                )),
+              ]),
+            ),
+          ]),
+        ),
       ),
     );
   }
